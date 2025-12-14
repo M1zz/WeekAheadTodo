@@ -219,4 +219,82 @@ class CalendarService: ObservableObject {
     var isAuthorized: Bool {
         authorizationStatus == .fullAccess || authorizationStatus == .authorized
     }
+
+    // MARK: - Time Block Calculation
+
+    /// 특정 날짜의 캘린더 이벤트 총 시간 계산 (분 단위)
+    /// - Parameters:
+    ///   - date: 계산할 날짜
+    ///   - calendarIdentifiers: 포함할 캘린더 ID 목록
+    /// - Returns: 해당 날짜의 이벤트 총 시간 (분)
+    func calculateEventDuration(for date: Date, calendarIdentifiers: Set<String>) -> Int {
+        guard isAuthorized else {
+            print("⚠️ [CalendarService] 권한 없음 - 이벤트 시간 계산 불가")
+            return 0
+        }
+
+        guard !calendarIdentifiers.isEmpty else {
+            print("ℹ️ [CalendarService] 선택된 캘린더 없음")
+            return 0
+        }
+
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            return 0
+        }
+
+        // 선택된 캘린더만 필터링
+        let selectedCalendars = eventStore.calendars(for: .event).filter {
+            calendarIdentifiers.contains($0.calendarIdentifier)
+        }
+
+        guard !selectedCalendars.isEmpty else {
+            print("⚠️ [CalendarService] 선택된 캘린더를 찾을 수 없음")
+            return 0
+        }
+
+        // 해당 날짜의 이벤트 가져오기
+        let predicate = eventStore.predicateForEvents(
+            withStart: startOfDay,
+            end: endOfDay,
+            calendars: selectedCalendars
+        )
+
+        let events = eventStore.events(matching: predicate)
+
+        // 전일 이벤트 제외하고 총 시간 계산
+        var totalMinutes = 0
+        for event in events {
+            // 전일 이벤트는 시간 계산에서 제외
+            guard !event.isAllDay else { continue }
+
+            let eventStart = max(event.startDate, startOfDay)
+            let eventEnd = min(event.endDate, endOfDay)
+
+            let duration = eventEnd.timeIntervalSince(eventStart)
+            totalMinutes += Int(duration / 60)
+        }
+
+        print("📊 [CalendarService] \(date.formatted(date: .abbreviated, time: .omitted)): \(totalMinutes)분 일정")
+        return totalMinutes
+    }
+
+    /// 여러 날짜의 캘린더 이벤트 시간 계산
+    /// - Parameters:
+    ///   - dates: 계산할 날짜 배열
+    ///   - calendarIdentifiers: 포함할 캘린더 ID 목록
+    /// - Returns: [날짜: 총 시간(분)] 딕셔너리
+    func calculateEventDurations(for dates: [Date], calendarIdentifiers: Set<String>) -> [Date: Int] {
+        var result: [Date: Int] = [:]
+        let calendar = Calendar.current
+
+        for date in dates {
+            let startOfDay = calendar.startOfDay(for: date)
+            let minutes = calculateEventDuration(for: startOfDay, calendarIdentifiers: calendarIdentifiers)
+            result[startOfDay] = minutes
+        }
+
+        return result
+    }
 }

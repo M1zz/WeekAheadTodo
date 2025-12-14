@@ -250,21 +250,27 @@ struct CalendarIntegrationView: View {
 
     private var calendarSelectionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("분석할 캘린더 선택", systemImage: "checklist")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Label("패턴 감지용 캘린더 선택", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
-                Spacer()
+                    Spacer()
 
-                Button(showingCalendarSelection ? "접기" : "펼치기") {
-                    withAnimation {
-                        showingCalendarSelection.toggle()
+                    Button(showingCalendarSelection ? "접기" : "펼치기") {
+                        withAnimation {
+                            showingCalendarSelection.toggle()
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundColor(.blue)
                 }
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundColor(.blue)
+
+                Text("반복 일정 패턴을 찾을 캘린더를 선택하세요 (예: 업무, 회의)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             if showingCalendarSelection {

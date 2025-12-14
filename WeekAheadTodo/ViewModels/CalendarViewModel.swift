@@ -23,8 +23,9 @@ class CalendarViewModel: ObservableObject {
 
     // MARK: - Services
 
-    private let calendarService: CalendarService
+    let calendarService: CalendarService  // public for time block calculation
     private let patternService: PatternDetectionService
+    private var patternManagementService: PatternManagementService?
 
     // MARK: - Initialization
 
@@ -32,6 +33,13 @@ class CalendarViewModel: ObservableObject {
         self.calendarService = CalendarService()
         self.patternService = PatternDetectionService()
         updateAuthorizationStatus()
+    }
+
+    // MARK: - Service Injection
+
+    /// Set pattern management service (called from ContentView)
+    func setPatternManagementService(_ service: PatternManagementService) {
+        self.patternManagementService = service
     }
 
     // MARK: - Authorization
@@ -296,6 +304,20 @@ class CalendarViewModel: ObservableObject {
 
     /// 선택된 패턴 승인 (TaskViewModel에서 Task 생성)
     func approvePatterns(_ patternIds: Set<UUID>) {
+        let patternsToApprove = detectedPatterns.filter { patternIds.contains($0.id) }
+
+        // Save to SwiftData
+        if let service = patternManagementService {
+            for pattern in patternsToApprove {
+                do {
+                    try service.saveApprovedPattern(pattern)
+                    print("✅ Pattern saved to SwiftData: \(pattern.suggestedTask.title)")
+                } catch {
+                    print("❌ Error saving pattern: \(error)")
+                }
+            }
+        }
+
         // 실제 Task 생성은 TaskViewModel에서 수행
         // 여기서는 승인된 패턴 제거
         detectedPatterns.removeAll { patternIds.contains($0.id) }

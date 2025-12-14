@@ -21,6 +21,10 @@
 		A19ACD8EEF2A67E02C87D79C /* CalendarIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */; };
 		A100D58EF96DA4DC19E5B6A2 /* PatternReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */; };
 		A1029A05FBB79BD181DD2B22 /* PatternDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11F5765D788F9412636B249 /* PatternDetailView.swift */; };
+		A1AAA111111111111111111B /* ApprovedPattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AAA111111111111111111A /* ApprovedPattern.swift */; };
+		A1BBB222222222222222222C /* PatternManagementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1BBB222222222222222222B /* PatternManagementService.swift */; };
+		A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */; };
+		A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DDD444444444444444444D /* EditApprovedPatternView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +43,10 @@
 		A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarIntegrationView.swift; sourceTree = "<group>"; };
 		A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternReviewView.swift; sourceTree = "<group>"; };
 		A11F5765D788F9412636B249 /* PatternDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternDetailView.swift; sourceTree = "<group>"; };
+		A1AAA111111111111111111A /* ApprovedPattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPattern.swift; sourceTree = "<group>"; };
+		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
+		A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPatternManagementView.swift; sourceTree = "<group>"; };
+		A1DDD444444444444444444D /* EditApprovedPatternView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditApprovedPatternView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +97,7 @@
 				A1000002234567890000004 /* TimeBlock.swift */,
 				A1578DEE4987F86FBBAC2939 /* CalendarEvent.swift */,
 				A18D1386D284CA97002326B1 /* RecurrencePattern.swift */,
+				A1AAA111111111111111111A /* ApprovedPattern.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -107,6 +116,7 @@
 			children = (
 				A126E6D23BBEC2B0F3E10552 /* CalendarService.swift */,
 				A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */,
+				A1BBB222222222222222222B /* PatternManagementService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -117,6 +127,8 @@
 				A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */,
 				A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */,
 				A11F5765D788F9412636B249 /* PatternDetailView.swift */,
+				A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */,
+				A1DDD444444444444444444D /* EditApprovedPatternView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -204,6 +216,10 @@
 				A19ACD8EEF2A67E02C87D79C /* CalendarIntegrationView.swift in Sources */,
 				A100D58EF96DA4DC19E5B6A2 /* PatternReviewView.swift in Sources */,
 				A1029A05FBB79BD181DD2B22 /* PatternDetailView.swift in Sources */,
+				A1AAA111111111111111111B /* ApprovedPattern.swift in Sources */,
+				A1BBB222222222222222222C /* PatternManagementService.swift in Sources */,
+				A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */,
+				A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
