@@ -16,6 +16,7 @@ enum TaskFilterMode: String, CaseIterable {
 struct ContentView: View {
     @StateObject private var viewModel = TaskViewModel()
     @StateObject private var calendarViewModel = CalendarViewModel()
+    @StateObject private var notificationService = NotificationService.shared
     @State private var selectedSection: SidebarSection = .today
     @Environment(\.modelContext) private var modelContext
 
@@ -64,6 +65,7 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 600)
         .environmentObject(viewModel)
         .environmentObject(calendarViewModel)
+        .environmentObject(notificationService)
         .onAppear {
             setupServices()
             _Concurrency.Task {
@@ -78,6 +80,14 @@ struct ContentView: View {
 
         // TaskViewModel과 CalendarViewModel 연결 (타임 블록 계산용)
         viewModel.setCalendarViewModel(calendarViewModel)
+
+        // NotificationService 연결 및 초기화
+        viewModel.setNotificationService(notificationService)
+
+        // 알림 권한 확인
+        _Concurrency.Task {
+            await notificationService.checkAuthorizationStatus()
+        }
     }
 
     private func generateTasksIfNeeded() async {
@@ -150,7 +160,9 @@ struct ContentView: View {
 
 struct TodayView: View {
     @EnvironmentObject var viewModel: TaskViewModel
+    @EnvironmentObject var notificationService: NotificationService
     @State private var showingAddTask = false
+    @State private var showingNotificationPreview = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -260,9 +272,75 @@ struct TodayView: View {
                     }
                 }
             }
+
+            // 알림 미리보기 버튼 (가장 오른쪽)
+            Button(action: {
+                showingNotificationPreview.toggle()
+            }) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: notificationService.isNotificationEnabled ? "bell.fill" : "bell.slash.fill")
+                        .font(.title2)
+                        .foregroundColor(notificationService.isNotificationEnabled ? .blue : .gray)
+
+                    // 알림 필요한 태스크가 있으면 배지 표시
+                    if notificationService.isNotificationEnabled && tasksNeedingAttentionCount > 0 {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Text("\(min(tasksNeedingAttentionCount, 9))")
+                                    .font(.system(size: 7, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
+                            .offset(x: 8, y: -8)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .help("알림 미리보기")
+            .popover(isPresented: $showingNotificationPreview, arrowEdge: .bottom) {
+                NotificationPreviewView()
+            }
         }
         .padding(24)
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    // 알림 필요한 태스크 개수
+    private var tasksNeedingAttentionCount: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+
+        var count = 0
+
+        for task in viewModel.tasks where !task.isCompleted {
+            // 1. 시작일이 지났는데 아직 시작 안한 일
+            if task.effectiveStartDate < today && task.isNotStarted {
+                count += 1
+                continue
+            }
+
+            // 2. 오늘 해야 할 일이 아직 완료되지 않은 경우
+            if calendar.isDate(task.effectiveStartDate, inSameDayAs: today) && !task.isCompleted {
+                count += 1
+                continue
+            }
+
+            // 3. 마감 1일 전 알림 (내일이 마감일)
+            if calendar.isDate(task.dueDate, inSameDayAs: tomorrow) && !task.isCompleted {
+                count += 1
+                continue
+            }
+
+            // 4. 준비 태스크를 시작할 시간
+            if task.isPreparation && calendar.isDate(task.effectiveStartDate, inSameDayAs: today) && !task.isCompleted {
+                count += 1
+                continue
+            }
+        }
+
+        return count
     }
 
     // 오늘 준비하고 있는 가장 먼 미래 (일 수)
@@ -1786,6 +1864,7 @@ struct WeekOverviewView: View {
 struct SettingsView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @EnvironmentObject var calendarViewModel: CalendarViewModel
+    @EnvironmentObject var notificationService: NotificationService
 
     @State private var showingSaveToCloudAlert = false
     @State private var showingRestoreFromCloudAlert = false
@@ -1808,6 +1887,9 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    // 리마인더 알림
+                    notificationSection
+
                     // 클라우드 동기화
                     cloudSyncSection
 
@@ -1824,6 +1906,113 @@ struct SettingsView: View {
             }
 
             Spacer()
+        }
+    }
+
+    private var notificationSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("리마인더 알림")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                // 알림 권한 상태
+                HStack {
+                    Image(systemName: notificationService.notificationPermissionStatus == .authorized ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(notificationService.notificationPermissionStatus == .authorized ? .green : .orange)
+
+                    Text(notificationPermissionStatusText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                // 알림 기능 토글
+                Toggle("리마인더 알림 활성화", isOn: Binding(
+                    get: { notificationService.isNotificationEnabled },
+                    set: { newValue in
+                        if newValue && notificationService.notificationPermissionStatus != .authorized {
+                            // 권한이 없으면 권한 요청
+                            _Concurrency.Task {
+                                try? await viewModel.requestNotificationAuthorization()
+                            }
+                        }
+                        viewModel.setNotificationEnabled(newValue)
+                    }
+                ))
+                .disabled(notificationService.notificationPermissionStatus == .denied)
+
+                // 알림 설명
+                Text("하루 3번(오전 9시, 오후 3시, 저녁 9시) 할 일 진행 상황을 체크합니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                // 알림 내용 설명
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("다음과 같은 상황에서 알림을 받습니다:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("•")
+                        Text("시작일이 지났는데 아직 시작하지 않은 일")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("•")
+                        Text("오늘 해야 할 일이 아직 완료되지 않은 경우")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("•")
+                        Text("내일이 마감일인 경우")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("•")
+                        Text("준비 태스크를 시작할 시간")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+                .padding(.top, 4)
+
+                // 테스트 버튼
+                if notificationService.isNotificationEnabled {
+                    Button(action: {
+                        _Concurrency.Task {
+                            await notificationService.sendTestNotification()
+                        }
+                    }) {
+                        Label("테스트 알림 보내기", systemImage: "bell.badge")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(12)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+        }
+    }
+
+    private var notificationPermissionStatusText: String {
+        switch notificationService.notificationPermissionStatus {
+        case .authorized:
+            return "알림 권한이 승인되었습니다"
+        case .denied:
+            return "알림 권한이 거부되었습니다. 시스템 설정에서 권한을 허용해주세요."
+        case .notDetermined:
+            return "알림 권한이 아직 요청되지 않았습니다"
+        case .provisional:
+            return "임시 알림 권한이 부여되었습니다"
+        case .ephemeral:
+            return "임시 앱 알림 권한이 부여되었습니다"
+        @unknown default:
+            return "알 수 없는 권한 상태"
         }
     }
 

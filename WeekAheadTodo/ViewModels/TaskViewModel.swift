@@ -61,6 +61,9 @@ class TaskViewModel: ObservableObject {
     // Calendar reference for time block calculation
     weak var calendarViewModel: CalendarViewModel?
 
+    // Notification service reference
+    var notificationService: NotificationService?
+
     // MARK: - Persistence
 
     private let tasksKey = "SavedTasks"
@@ -111,6 +114,11 @@ class TaskViewModel: ObservableObject {
             let data = try encoder.encode(tasks)
             UserDefaults.standard.set(data, forKey: tasksKey)
             print("✅ Tasks saved: \(tasks.count)개")
+
+            // 태스크가 변경되면 알림 스케줄 갱신
+            _Concurrency.Task {
+                await updateNotificationSchedule()
+            }
         } catch {
             print("❌ Failed to save tasks: \(error)")
         }
@@ -821,6 +829,45 @@ class TaskViewModel: ObservableObject {
         if useCalendarForTimeBlocks {
             updateTimeBlocksWithCalendar()
         }
+    }
+
+    // MARK: - Notification Management
+
+    /// NotificationService 연결
+    func setNotificationService(_ service: NotificationService) {
+        self.notificationService = service
+        print("✅ [TaskViewModel] NotificationService 연결됨")
+
+        // 연결 후 즉시 알림 스케줄 업데이트
+        _Concurrency.Task {
+            await updateNotificationSchedule()
+        }
+    }
+
+    /// 알림 스케줄 갱신
+    func updateNotificationSchedule() async {
+        guard let service = notificationService else {
+            print("ℹ️ [TaskViewModel] NotificationService가 연결되지 않음")
+            return
+        }
+
+        await service.scheduleNotifications(for: tasks)
+    }
+
+    /// 알림 기능 활성화/비활성화
+    func setNotificationEnabled(_ enabled: Bool) {
+        notificationService?.setNotificationEnabled(enabled)
+    }
+
+    /// 알림 권한 요청
+    func requestNotificationAuthorization() async throws {
+        guard let service = notificationService else {
+            throw NSError(domain: "TaskViewModel", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "NotificationService가 초기화되지 않았습니다."
+            ])
+        }
+
+        try await service.requestAuthorization()
     }
 }
 
