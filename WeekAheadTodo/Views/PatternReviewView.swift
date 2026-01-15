@@ -446,6 +446,21 @@ struct PatternRowView: View {
                         .frame(width: 35, alignment: .trailing)
                 }
 
+                // 최근 5개 날짜 표시
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                    Text("최근 5회:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(pattern.recentEventDatesFormatted)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                }
+                .padding(.vertical, 2)
+
                 // 감지 근거
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(pattern.detectedCharacteristics, id: \.self) { characteristic in

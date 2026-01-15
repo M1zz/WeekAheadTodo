@@ -199,6 +199,52 @@ struct Task: Identifiable, Codable {
         }
     }
 
+    /// 마감일을 간단한 날짜 형식으로 (M/d)
+    var dueDateFormatted: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: dueDate)
+    }
+
+    /// 마감일을 요일 포함 형식으로 (M/d (요일))
+    var dueDateWithWeekday: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "M/d"
+        let dateString = dateFormatter.string(from: dueDate)
+
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.locale = Locale(identifier: "ko_KR")
+        weekdayFormatter.dateFormat = "E"
+        let weekdayString = weekdayFormatter.string(from: dueDate)
+
+        return "\(dateString) (\(weekdayString))"
+    }
+
+    /// D-day 형식 텍스트 (D-3, D-day, D+2 등)
+    var dDayText: String {
+        let days = daysUntilDue
+        if days > 0 {
+            return "D-\(days)"
+        } else if days == 0 {
+            return "D-day"
+        } else {
+            return "D+\(abs(days))"
+        }
+    }
+
+    /// D-day 형식 + 실제 날짜 조합 (D-3 (12/20 (수)))
+    var dDayWithDate: String {
+        return "\(dDayText) (\(dueDateWithWeekday))"
+    }
+
+    /// 타겟 날짜를 간단한 날짜 형식으로 (M/d)
+    var targetDateFormatted: String? {
+        guard let target = targetDate else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: target)
+    }
+
     // MARK: - 준비 태스크 관련
 
     /// 준비 태스크인지 확인

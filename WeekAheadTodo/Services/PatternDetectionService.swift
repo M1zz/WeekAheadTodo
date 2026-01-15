@@ -544,12 +544,12 @@ class PatternDetectionService {
 
         let baseTitle = firstEvent.title
 
-        // 키워드 분석
+        // 키워드 분석 - 회의/미팅 관련만 "준비" 붙이기
         let preparationKeywords = ["회의", "미팅", "meeting", "발표", "presentation"]
 
         for keyword in preparationKeywords {
             if baseTitle.lowercased().contains(keyword) {
-                return "\(baseTitle) 준비"
+                return "\"\(baseTitle)\" 준비"
             }
         }
 

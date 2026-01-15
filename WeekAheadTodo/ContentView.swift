@@ -25,6 +25,7 @@ struct ContentView: View {
         case thisWeek = "이번 주"
         case nextWeek = "다음 주"
         case weekOverview = "주간 개요"
+        case importTasks = "가져오기"
         case patterns = "패턴 관리"
         case settings = "설정"
 
@@ -34,6 +35,7 @@ struct ContentView: View {
             case .thisWeek: return "calendar.badge.clock"
             case .nextWeek: return "calendar.badge.plus"
             case .weekOverview: return "chart.bar.fill"
+            case .importTasks: return "square.and.arrow.down"
             case .patterns: return "arrow.triangle.2.circlepath"
             case .settings: return "gear"
             }
@@ -52,6 +54,7 @@ struct ContentView: View {
                 
                 Section("관리") {
                     sidebarItem(.weekOverview)
+                    sidebarItem(.importTasks)
                     sidebarItem(.patterns)
                     sidebarItem(.settings)
                 }
@@ -148,6 +151,8 @@ struct ContentView: View {
             NextWeekView()
         case .weekOverview:
             WeekOverviewView()
+        case .importTasks:
+            ImportView()
         case .patterns:
             ApprovedPatternManagementView()
         case .settings:
@@ -163,7 +168,10 @@ struct TodayView: View {
     @EnvironmentObject var notificationService: NotificationService
     @State private var showingAddTask = false
     @State private var showingNotificationPreview = false
-    
+    @State private var isEditMode = false
+    @State private var selectedTasks: Set<UUID> = []
+    @State private var showingDeleteConfirmation = false
+
     var body: some View {
         VStack(spacing: 0) {
             // 헤더
@@ -255,6 +263,39 @@ struct TodayView: View {
             }
             Spacer()
 
+            // 편집 모드 버튼 및 삭제 버튼
+            if !viewModel.todayTasks.isEmpty {
+                HStack(spacing: 12) {
+                    // 편집 모드 토글
+                    Button(action: {
+                        isEditMode.toggle()
+                        if !isEditMode {
+                            selectedTasks.removeAll()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: isEditMode ? "checkmark.circle.fill" : "checkmark.circle")
+                            Text(isEditMode ? "완료" : "선택")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+
+                    // 삭제 버튼 (편집 모드일 때만 표시)
+                    if isEditMode && !selectedTasks.isEmpty {
+                        Button(action: {
+                            showingDeleteConfirmation = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("\(selectedTasks.count)개 삭제")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                    }
+                }
+            }
+
             // 달성도 표시
             if !viewModel.todayTasks.isEmpty {
                 VStack(alignment: .trailing, spacing: 4) {
@@ -304,6 +345,17 @@ struct TodayView: View {
         }
         .padding(24)
         .background(Color(NSColor.windowBackgroundColor))
+        .alert("선택한 \(selectedTasks.count)개의 할 일을 삭제하시겠습니까?", isPresented: $showingDeleteConfirmation) {
+            Button("취소", role: .cancel) { }
+            Button("삭제", role: .destructive) {
+                let tasksToDelete = viewModel.tasks.filter { selectedTasks.contains($0.id) }
+                viewModel.deleteTasks(tasksToDelete)
+                selectedTasks.removeAll()
+                isEditMode = false
+            }
+        } message: {
+            Text("이 작업은 되돌릴 수 없습니다.")
+        }
     }
 
     // 알림 필요한 태스크 개수
@@ -614,9 +666,28 @@ struct TodayView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             ForEach(tasks) { task in
-                TaskRowView(task: task)
+                if isEditMode {
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            if selectedTasks.contains(task.id) {
+                                selectedTasks.remove(task.id)
+                            } else {
+                                selectedTasks.insert(task.id)
+                            }
+                        }) {
+                            Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(selectedTasks.contains(task.id) ? .blue : .gray)
+                                .font(.title3)
+                        }
+                        .buttonStyle(.plain)
+
+                        TaskRowView(task: task)
+                    }
+                } else {
+                    TaskRowView(task: task)
+                }
             }
         }
     }
@@ -796,13 +867,9 @@ struct TodayView: View {
                     // 가장 가까운 3개
                     ForEach(upcomingMainTasks.sorted { $0.daysUntilDue < $1.daysUntilDue }.prefix(3)) { task in
                         HStack(spacing: 6) {
-                            if task.daysUntilDue == 1 {
-                                Text("⏰ 내일")
-                                    .foregroundColor(.orange)
-                            } else {
-                                Text("📌 \(task.daysUntilDue)일 뒤")
-                                    .foregroundColor(.blue)
-                            }
+                            let emoji = task.daysUntilDue == 1 ? "⏰" : "📌"
+                            Text("\(emoji) \(task.dDayWithDate)")
+                                .foregroundColor(task.daysUntilDue == 1 ? .orange : .blue)
                             Text(task.title)
                                 .lineLimit(1)
                         }
@@ -964,36 +1031,17 @@ struct TaskRowView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "star.circle.fill")
                             .font(.caption)
-                            .foregroundColor(.blue)
-                        if task.daysUntilDue == 0 {
-                            Text("오늘 마감 ⚡")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.red)
-                        } else if task.daysUntilDue == 1 {
-                            Text("내일 마감 ⏰")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.orange)
-                        } else if task.daysUntilDue > 0 && task.daysUntilDue <= 7 {
-                            Text("\(task.daysUntilDue)일 뒤 마감 📌")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.blue)
-                        } else if task.daysUntilDue > 7 {
-                            Text("\(task.daysUntilDue)일 뒤 마감")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("마감 지남 ❗")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.red)
-                        }
+                            .foregroundColor(task.daysUntilDue <= 0 ? .red : task.daysUntilDue == 1 ? .orange : .blue)
+
+                        let emoji = task.daysUntilDue == 0 ? "⚡" : task.daysUntilDue == 1 ? "⏰" : task.daysUntilDue > 0 && task.daysUntilDue <= 7 ? "📌" : task.daysUntilDue < 0 ? "❗" : ""
+                        Text("\(task.dDayWithDate) \(emoji)")
+                            .font(.caption)
+                            .fontWeight(task.daysUntilDue <= 1 ? .bold : task.daysUntilDue <= 7 ? .semibold : .medium)
+                            .foregroundColor(task.daysUntilDue <= 0 ? .red : task.daysUntilDue == 1 ? .orange : task.daysUntilDue <= 7 ? .blue : .secondary)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(task.daysUntilDue <= 1 ? Color.red.opacity(0.1) : Color.blue.opacity(0.1))
+                    .background(task.daysUntilDue <= 0 ? Color.red.opacity(0.1) : task.daysUntilDue <= 1 ? Color.orange.opacity(0.1) : Color.blue.opacity(0.1))
                     .cornerRadius(6)
                 }
 
@@ -1016,15 +1064,8 @@ struct TaskRowView: View {
                     Label(task.estimatedTimeFormatted, systemImage: "clock")
 
                     // 마감일 표시
-                    if task.daysUntilDue > 0 {
-                        Label("D-\(task.daysUntilDue)", systemImage: "calendar")
-                    } else if task.daysUntilDue == 0 {
-                        Label("오늘 마감", systemImage: "calendar")
-                            .foregroundColor(.red)
-                    } else {
-                        Label("마감 지남", systemImage: "calendar")
-                            .foregroundColor(.red)
-                    }
+                    Label(task.dDayWithDate, systemImage: "calendar")
+                        .foregroundColor(task.daysUntilDue <= 0 ? .red : .primary)
 
                     // 선행 일수 (역산 정보)
                     if task.leadTimeDays > 0 {
@@ -1182,6 +1223,9 @@ struct ThisWeekView: View {
     @State private var showingAddTask = false
     @State private var viewMode: WeekViewMode = .calendar
     @State private var taskFilterMode: TaskFilterMode = .byStartDate
+    @State private var isEditMode = false
+    @State private var selectedTasks: Set<UUID> = []
+    @State private var showingDeleteConfirmation = false
 
     // 이번 주: 오늘부터 7일
     private var weekDates: [Date] {
@@ -1247,6 +1291,39 @@ struct ThisWeekView: View {
                 }
                 Spacer()
 
+                // 편집 모드 버튼 및 삭제 버튼
+                if totalTasksThisWeek > 0 {
+                    HStack(spacing: 12) {
+                        // 편집 모드 토글
+                        Button(action: {
+                            isEditMode.toggle()
+                            if !isEditMode {
+                                selectedTasks.removeAll()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: isEditMode ? "checkmark.circle.fill" : "checkmark.circle")
+                                Text(isEditMode ? "완료" : "선택")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+
+                        // 삭제 버튼 (편집 모드일 때만 표시)
+                        if isEditMode && !selectedTasks.isEmpty {
+                            Button(action: {
+                                showingDeleteConfirmation = true
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                    Text("\(selectedTasks.count)개 삭제")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                        }
+                    }
+                }
+
                 // 달성도 표시
                 if totalTasksThisWeek > 0 {
                     VStack(alignment: .trailing, spacing: 4) {
@@ -1267,6 +1344,17 @@ struct ThisWeekView: View {
             }
             .padding(24)
             .background(Color(NSColor.windowBackgroundColor))
+            .alert("선택한 \(selectedTasks.count)개의 할 일을 삭제하시겠습니까?", isPresented: $showingDeleteConfirmation) {
+                Button("취소", role: .cancel) { }
+                Button("삭제", role: .destructive) {
+                    let tasksToDelete = viewModel.tasks.filter { selectedTasks.contains($0.id) }
+                    viewModel.deleteTasks(tasksToDelete)
+                    selectedTasks.removeAll()
+                    isEditMode = false
+                }
+            } message: {
+                Text("이 작업은 되돌릴 수 없습니다.")
+            }
 
             // 뷰 모드 및 필터 선택
             HStack(spacing: 12) {
@@ -1309,14 +1397,16 @@ struct ThisWeekView: View {
                 Group {
                     switch viewMode {
                     case .calendar:
-                        ScrollView(.horizontal, showsIndicators: true) {
+                        ScrollView([.horizontal, .vertical], showsIndicators: true) {
                             HStack(alignment: .top, spacing: 16) {
                                 ForEach(weekDates, id: \.self) { date in
                                     WeekDayCard(
                                         date: date,
                                         tasks: tasks(for: date),
                                         isToday: Calendar.current.isDateInToday(date),
-                                        isTomorrow: Calendar.current.isDateInTomorrow(date)
+                                        isTomorrow: Calendar.current.isDateInTomorrow(date),
+                                        isEditMode: $isEditMode,
+                                        selectedTasks: $selectedTasks
                                     )
                                     .frame(width: 280)
                                 }
@@ -1327,7 +1417,9 @@ struct ThisWeekView: View {
                         WeekListView(
                             weekDates: weekDates,
                             tasks: allThisWeekTasks,
-                            filterMode: taskFilterMode
+                            filterMode: taskFilterMode,
+                            isEditMode: $isEditMode,
+                            selectedTasks: $selectedTasks
                         )
                     }
                 }
@@ -1353,6 +1445,9 @@ struct WeekDayCard: View {
     let tasks: [Task]
     let isToday: Bool
     let isTomorrow: Bool
+    @Binding var isEditMode: Bool
+    @Binding var selectedTasks: Set<UUID>
+    @EnvironmentObject var viewModel: TaskViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1409,7 +1504,26 @@ struct WeekDayCard: View {
                     .padding(.vertical, 8)
             } else {
                 ForEach(tasks) { task in
-                    TaskRowView(task: task)
+                    if isEditMode {
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                if selectedTasks.contains(task.id) {
+                                    selectedTasks.remove(task.id)
+                                } else {
+                                    selectedTasks.insert(task.id)
+                                }
+                            }) {
+                                Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(selectedTasks.contains(task.id) ? .blue : .gray)
+                                    .font(.title3)
+                            }
+                            .buttonStyle(.plain)
+
+                            TaskRowView(task: task)
+                        }
+                    } else {
+                        TaskRowView(task: task)
+                    }
                 }
             }
         }
@@ -1453,6 +1567,9 @@ struct NextWeekView: View {
     @State private var showingAddTask = false
     @State private var viewMode: WeekViewMode = .calendar
     @State private var taskFilterMode: TaskFilterMode = .byStartDate
+    @State private var isEditMode = false
+    @State private var selectedTasks: Set<UUID> = []
+    @State private var showingDeleteConfirmation = false
 
     // 다음 주: 오늘로부터 8일째부터 14일째까지 (7일간)
     private var weekDates: [Date] {
@@ -1515,6 +1632,39 @@ struct NextWeekView: View {
                 }
                 Spacer()
 
+                // 편집 모드 버튼 및 삭제 버튼
+                if totalTasksNextWeek > 0 {
+                    HStack(spacing: 12) {
+                        // 편집 모드 토글
+                        Button(action: {
+                            isEditMode.toggle()
+                            if !isEditMode {
+                                selectedTasks.removeAll()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: isEditMode ? "checkmark.circle.fill" : "checkmark.circle")
+                                Text(isEditMode ? "완료" : "선택")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+
+                        // 삭제 버튼 (편집 모드일 때만 표시)
+                        if isEditMode && !selectedTasks.isEmpty {
+                            Button(action: {
+                                showingDeleteConfirmation = true
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                    Text("\(selectedTasks.count)개 삭제")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                        }
+                    }
+                }
+
                 // 달성도 및 예상 시간
                 if totalTasksNextWeek > 0 {
                     HStack(spacing: 16) {
@@ -1549,6 +1699,17 @@ struct NextWeekView: View {
             }
             .padding(24)
             .background(Color(NSColor.windowBackgroundColor))
+            .alert("선택한 \(selectedTasks.count)개의 할 일을 삭제하시겠습니까?", isPresented: $showingDeleteConfirmation) {
+                Button("취소", role: .cancel) { }
+                Button("삭제", role: .destructive) {
+                    let tasksToDelete = viewModel.tasks.filter { selectedTasks.contains($0.id) }
+                    viewModel.deleteTasks(tasksToDelete)
+                    selectedTasks.removeAll()
+                    isEditMode = false
+                }
+            } message: {
+                Text("이 작업은 되돌릴 수 없습니다.")
+            }
 
             // 뷰 모드 및 필터 선택
             HStack(spacing: 12) {
@@ -1594,14 +1755,16 @@ struct NextWeekView: View {
                 Group {
                     switch viewMode {
                     case .calendar:
-                        ScrollView(.horizontal, showsIndicators: true) {
+                        ScrollView([.horizontal, .vertical], showsIndicators: true) {
                             HStack(alignment: .top, spacing: 16) {
                                 ForEach(weekDates, id: \.self) { date in
                                     WeekDayCard(
                                         date: date,
                                         tasks: tasks(for: date),
                                         isToday: false,
-                                        isTomorrow: false
+                                        isTomorrow: false,
+                                        isEditMode: $isEditMode,
+                                        selectedTasks: $selectedTasks
                                     )
                                     .frame(width: 280)
                                 }
@@ -1612,7 +1775,9 @@ struct NextWeekView: View {
                         WeekListView(
                             weekDates: weekDates,
                             tasks: allNextWeekTasks,
-                            filterMode: taskFilterMode
+                            filterMode: taskFilterMode,
+                            isEditMode: $isEditMode,
+                            selectedTasks: $selectedTasks
                         )
                     }
                 }
@@ -1638,11 +1803,14 @@ struct WeekListView: View {
     let weekDates: [Date]
     let tasks: [Task]
     let filterMode: TaskFilterMode
+    @Binding var isEditMode: Bool
+    @Binding var selectedTasks: Set<UUID>
 
     private var groupedTasks: [(date: Date, tasks: [Task])] {
         weekDates.map { date in
             let calendar = Calendar.current
-            let tasksForDate = tasks.filter { task in
+            // viewModel.tasks를 직접 필터링 (캘린더 모드와 동일한 데이터 소스 사용)
+            let tasksForDate = viewModel.tasks.filter { task in
                 switch filterMode {
                 case .byStartDate:
                     return calendar.isDate(task.effectiveStartDate, inSameDayAs: date)
@@ -1684,7 +1852,26 @@ struct WeekListView: View {
                             // 태스크 목록
                             VStack(spacing: 8) {
                                 ForEach(group.tasks) { task in
-                                    TaskRowView(task: task)
+                                    if isEditMode {
+                                        HStack(spacing: 8) {
+                                            Button(action: {
+                                                if selectedTasks.contains(task.id) {
+                                                    selectedTasks.remove(task.id)
+                                                } else {
+                                                    selectedTasks.insert(task.id)
+                                                }
+                                            }) {
+                                                Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
+                                                    .foregroundColor(selectedTasks.contains(task.id) ? .blue : .gray)
+                                                    .font(.title3)
+                                            }
+                                            .buttonStyle(.plain)
+
+                                            TaskRowView(task: task)
+                                        }
+                                    } else {
+                                        TaskRowView(task: task)
+                                    }
                                 }
                             }
                             .padding(.horizontal, 16)

@@ -119,6 +119,24 @@ struct PatternDetailView: View {
             Text("과거 이벤트 (\(pattern.events.count)회)")
                 .font(.headline)
 
+            // 최근 5개 날짜 요약
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundColor(.blue)
+                    .font(.caption)
+                Text("최근 5회:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(pattern.recentEventDatesFormatted)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.blue.opacity(0.05))
+            .cornerRadius(8)
+
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(pattern.events.prefix(10)) { event in
                     HStack {

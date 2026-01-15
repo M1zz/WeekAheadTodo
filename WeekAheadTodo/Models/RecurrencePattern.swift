@@ -211,6 +211,26 @@ struct RecurrencePattern: Identifiable, Codable {
         }
     }
 
+    /// 최근 5개의 이벤트 날짜 (최신순)
+    var recentEventDates: [Date] {
+        let sortedEvents = events.sorted { $0.startDate > $1.startDate }
+        return Array(sortedEvents.prefix(5)).map { $0.startDate }
+    }
+
+    /// 최근 5개의 이벤트 날짜를 포맷팅한 문자열
+    var recentEventDatesFormatted: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "M/d"
+
+        let dateStrings = recentEventDates.map { dateFormatter.string(from: $0) }
+
+        if dateStrings.isEmpty {
+            return "날짜 없음"
+        }
+
+        return dateStrings.joined(separator: ", ")
+    }
+
     // MARK: - Initialization
 
     init(

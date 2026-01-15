@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1MD000000000000000PARSE /* MarkdownParser.swift */; };
+		A1IV111111111111111BUILD /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IV000000000000000VIEWW /* ImportView.swift */; };
 		293A912635E623BE692B94DA /* NotificationPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */; };
 		581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D84A5C8231A5D6F641C7 /* NotificationService.swift */; };
 		A1000001234567890000001 /* WeekAheadTodoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002234567890000001 /* WeekAheadTodoApp.swift */; };
@@ -30,6 +32,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
+		A1IV000000000000000VIEWW /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		A1000002234567890000001 /* WeekAheadTodoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadTodoApp.swift; sourceTree = "<group>"; };
 		A1000002234567890000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000002234567890000003 /* Task.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Task.swift; sourceTree = "<group>"; };
@@ -118,6 +122,7 @@
 		A16748511F016D66C6FA50EF /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A1IV000000000000000VIEWW /* ImportView.swift */,
 				A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */,
 				A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */,
 				A11F5765D788F9412636B249 /* PatternDetailView.swift */,
@@ -131,6 +136,7 @@
 		A1FB72B5092F65279D203C72 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A1MD000000000000000PARSE /* MarkdownParser.swift */,
 				A126E6D23BBEC2B0F3E10552 /* CalendarService.swift */,
 				A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */,
 				A1BBB222222222222222222B /* PatternManagementService.swift */,
@@ -209,6 +215,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */,
+				A1IV111111111111111BUILD /* ImportView.swift in Sources */,
 				A1000001234567890000001 /* WeekAheadTodoApp.swift in Sources */,
 				A1000001234567890000002 /* ContentView.swift in Sources */,
 				A1000001234567890000003 /* Task.swift in Sources */,
@@ -365,6 +373,8 @@
 				DEVELOPMENT_TEAM = QGAQ3AY3R3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "일정 비서";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다. 앱은 일정을 읽기만 하며 수정하지 않습니다.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -393,6 +403,8 @@
 				DEVELOPMENT_TEAM = QGAQ3AY3R3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "일정 비서";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다. 앱은 일정을 읽기만 하며 수정하지 않습니다.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";

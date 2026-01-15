@@ -266,30 +266,37 @@ class TaskViewModel: ObservableObject {
     }
     
     func deleteTask(_ task: Task) {
+        deleteTasks([task])
+    }
+
+    /// 여러 태스크를 한 번에 삭제
+    func deleteTasks(_ tasksToDelete: [Task]) {
         // 메인 태스크 삭제 시: 연결된 준비 태스크들도 함께 삭제
         // 준비 태스크 삭제 시: 해당 태스크만 삭제 (메인 태스크는 유지)
-        var tasksToDelete: [UUID] = [task.id]
+        var allTaskIdsToDelete: Set<UUID> = Set(tasksToDelete.map { $0.id })
 
-        if task.isMain {
-            // 메인 태스크 삭제: 이 메인을 위한 준비 태스크들 찾기
-            let preparationTaskIds = tasks
-                .filter { $0.mainTaskId == task.id }
+        for task in tasksToDelete {
+            if task.isMain {
+                // 메인 태스크 삭제: 이 메인을 위한 준비 태스크들 찾기
+                let preparationTaskIds = tasks
+                    .filter { $0.mainTaskId == task.id }
+                    .map { $0.id }
+                allTaskIdsToDelete.formUnion(preparationTaskIds)
+            }
+
+            // 레거시 서브태스크도 함께 삭제 (parentTaskId 기반)
+            let childTaskIds = tasks
+                .filter { $0.parentTaskId == task.id }
                 .map { $0.id }
-            tasksToDelete.append(contentsOf: preparationTaskIds)
+            allTaskIdsToDelete.formUnion(childTaskIds)
         }
 
-        // 레거시 서브태스크도 함께 삭제 (parentTaskId 기반)
-        let childTaskIds = tasks
-            .filter { $0.parentTaskId == task.id }
-            .map { $0.id }
-        tasksToDelete.append(contentsOf: childTaskIds)
-
         // 태스크 삭제
-        tasks.removeAll { tasksToDelete.contains($0.id) }
+        tasks.removeAll { allTaskIdsToDelete.contains($0.id) }
 
         // 시간 블록에서도 제거
         for i in 0..<timeBlockManager.blocks.count {
-            timeBlockManager.blocks[i].allocatedTasks.removeAll { tasksToDelete.contains($0) }
+            timeBlockManager.blocks[i].allocatedTasks.removeAll { allTaskIdsToDelete.contains($0) }
         }
     }
     
