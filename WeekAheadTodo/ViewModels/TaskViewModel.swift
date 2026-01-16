@@ -197,7 +197,7 @@ class TaskViewModel: ObservableObject {
     var todayTasks: [Task] {
         tasks
             .filter { $0.currentHorizon == .today }
-            .sorted { $0.urgencyScore < $1.urgencyScore }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
 
     /// 오늘 할 일 중 미완료만
@@ -205,10 +205,17 @@ class TaskViewModel: ObservableObject {
         todayTasks.filter { !$0.isCompleted }
     }
 
-    /// 이번 주 할 일 - 완료된 것 포함
+    /// 이번 주 할 일 - 완료된 것 포함 (주 시작 요일 기준)
     var thisWeekTasks: [Task] {
-        tasks
-            .filter { $0.currentHorizon == .thisWeek }
+        let calendar = Calendar.current
+        let today = Date()
+        let weekRange = getWeekDateRange(for: today)
+
+        return tasks
+            .filter { task in
+                let startDate = task.effectiveStartDate
+                return startDate >= weekRange.start && startDate <= weekRange.end
+            }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }
 
@@ -217,10 +224,20 @@ class TaskViewModel: ObservableObject {
         thisWeekTasks.filter { !$0.isCompleted }
     }
 
-    /// 다음 주 할 일 - 완료된 것 포함
+    /// 다음 주 할 일 - 완료된 것 포함 (주 시작 요일 기준)
     var nextWeekTasks: [Task] {
-        tasks
-            .filter { $0.currentHorizon == .nextWeek }
+        let calendar = Calendar.current
+        let today = Date()
+        guard let nextWeekDate = calendar.date(byAdding: .weekOfYear, value: 1, to: today) else {
+            return []
+        }
+        let weekRange = getWeekDateRange(for: nextWeekDate)
+
+        return tasks
+            .filter { task in
+                let startDate = task.effectiveStartDate
+                return startDate >= weekRange.start && startDate <= weekRange.end
+            }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }
 
@@ -229,14 +246,36 @@ class TaskViewModel: ObservableObject {
         nextWeekTasks.filter { !$0.isCompleted }
     }
 
+    /// 주 범위 계산 (weekStartDay 설정 반영)
+    private func getWeekDateRange(for date: Date) -> (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+
+        // weekStartDay: 1=일요일, 2=월요일
+        let daysFromStart = (weekday - weekStartDay + 7) % 7
+
+        guard let weekStart = calendar.date(byAdding: .day, value: -daysFromStart, to: calendar.startOfDay(for: date)),
+              let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else {
+            return (calendar.startOfDay(for: date), calendar.startOfDay(for: date))
+        }
+
+        return (calendar.startOfDay(for: weekStart), calendar.startOfDay(for: weekEnd))
+    }
+
     /// 언젠가 할 일 (다음 주 이후의 태스크)
     var somedayTasks: [Task] {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let nextWeekEnd = calendar.date(byAdding: .day, value: 14, to: today)!
+        let today = Date()
+        guard let nextWeekDate = calendar.date(byAdding: .weekOfYear, value: 1, to: today) else {
+            return []
+        }
+        let nextWeekRange = getWeekDateRange(for: nextWeekDate)
 
         return tasks
-            .filter { $0.dueDate > nextWeekEnd }
+            .filter { task in
+                let startDate = task.effectiveStartDate
+                return startDate > nextWeekRange.end
+            }
             .sorted { $0.dueDate < $1.dueDate } // 마감일 가까운 순
     }
 
@@ -290,9 +329,9 @@ class TaskViewModel: ObservableObject {
     }
     
     func addTaskWithSubtasks(mainTask: Task, template: TaskTemplate) {
-        // 메인 태스크 추가 (role을 main으로 설정)
+        // 일반 태스크 추가 (role을 main으로 설정)
         var main = mainTask
-        main.taskRole = .main
+        main.taskRole = .none
         tasks.append(main)
 
         // 템플릿 기반 준비 태스크 생성
@@ -305,7 +344,7 @@ class TaskViewModel: ObservableObject {
                 taskType: .preparable,
                 taskRole: .preparation,              // 준비 태스크로 설정
                 parentTaskId: main.id,
-                mainTaskId: main.id,                 // 메인 태스크 연결
+                mainTaskId: main.id,                 // 일반 태스크 연결
                 targetDate: main.dueDate             // 타겟 날짜 설정
             )
             tasks.append(sub)
@@ -333,13 +372,13 @@ class TaskViewModel: ObservableObject {
 
     /// 여러 태스크를 한 번에 삭제
     func deleteTasks(_ tasksToDelete: [Task]) {
-        // 메인 태스크 삭제 시: 연결된 준비 태스크들도 함께 삭제
-        // 준비 태스크 삭제 시: 해당 태스크만 삭제 (메인 태스크는 유지)
+        // 일반 태스크 삭제 시: 연결된 준비 태스크들도 함께 삭제
+        // 준비 태스크 삭제 시: 해당 태스크만 삭제 (일반 태스크는 유지)
         var allTaskIdsToDelete: Set<UUID> = Set(tasksToDelete.map { $0.id })
 
         for task in tasksToDelete {
-            if task.isMain {
-                // 메인 태스크 삭제: 이 메인을 위한 준비 태스크들 찾기
+            if !task.isPreparation {
+                // 일반 태스크 삭제: 이 메인을 위한 준비 태스크들 찾기
                 let preparationTaskIds = tasks
                     .filter { $0.mainTaskId == task.id }
                     .map { $0.id }
@@ -367,7 +406,27 @@ class TaskViewModel: ObservableObject {
             tasks[index] = task
         }
     }
-    
+
+    /// 오늘 태스크 순서를 수동으로 재조정
+    func reorderTodayTasks(from source: IndexSet, to destination: Int) {
+        var reorderedTasks = todayTasks
+        reorderedTasks.move(fromOffsets: source, toOffset: destination)
+
+        // 새 순서에 따라 manualPriority 할당 (0, 1, 2, ...)
+        for (index, task) in reorderedTasks.enumerated() {
+            if let taskIndex = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[taskIndex].manualPriority = index
+            }
+        }
+    }
+
+    /// 모든 태스크의 수동 우선순위 초기화 (자동 정렬로 복귀)
+    func resetManualPriorities() {
+        for index in 0..<tasks.count {
+            tasks[index].manualPriority = nil
+        }
+    }
+
     // MARK: - Time Block Management
     
     /// 태스크를 적절한 시간 블록에 배정
@@ -465,7 +524,7 @@ class TaskViewModel: ObservableObject {
         // 다음 발생 날짜 계산
         let nextOccurrence = suggested.recurrenceRule?.nextOccurrenceDate ?? Calendar.current.date(byAdding: .day, value: 7, to: Date())!
 
-        // Task 생성 (캘린더 패턴 태스크는 메인 태스크)
+        // Task 생성 (캘린더 패턴 태스크는 일반 태스크)
         let task = Task(
             title: suggested.title,
             description: "캘린더 패턴에서 자동 생성됨",
@@ -473,7 +532,7 @@ class TaskViewModel: ObservableObject {
             estimatedMinutes: suggested.estimatedMinutes,
             leadTimeDays: suggested.leadTimeDays,
             taskType: suggested.taskType,
-            taskRole: .main,  // 캘린더 패턴 태스크는 메인 태스크
+            taskRole: .none,  // 캘린더 패턴 태스크는 일반 태스크
             status: .notStarted
         )
 
@@ -539,7 +598,7 @@ class TaskViewModel: ObservableObject {
                     }
 
                     if !alreadyExists {
-                        // Create task (패턴에서 생성되는 태스크는 메인 태스크)
+                        // Create task (패턴에서 생성되는 태스크는 일반 태스크)
                         let task = Task(
                             title: pattern.taskTitle,
                             description: "자동 생성됨 (반복 패턴)",
@@ -547,7 +606,7 @@ class TaskViewModel: ObservableObject {
                             estimatedMinutes: pattern.estimatedMinutes,
                             leadTimeDays: pattern.leadTimeDays,
                             taskType: pattern.taskType,
-                            taskRole: .main,  // 패턴 태스크는 메인 태스크
+                            taskRole: .none,  // 패턴 태스크는 일반 태스크
                             status: .notStarted
                         )
 
@@ -588,19 +647,19 @@ class TaskViewModel: ObservableObject {
 
     // MARK: - Preparation Task Management
 
-    /// 특정 메인 태스크의 준비 태스크들 조회
+    /// 특정 일반 태스크의 준비 태스크들 조회
     func preparationTasks(for mainTask: Task) -> [Task] {
         tasks.filter { $0.mainTaskId == mainTask.id && $0.isPreparation }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }
 
-    /// 준비 태스크가 연결된 메인 태스크 조회
+    /// 준비 태스크가 연결된 일반 태스크 조회
     func mainTask(for preparationTask: Task) -> Task? {
         guard let mainId = preparationTask.mainTaskId else { return nil }
         return tasks.first { $0.id == mainId }
     }
 
-    /// 메인 태스크의 준비도 계산 (완료된 준비 태스크 비율)
+    /// 일반 태스크의 준비도 계산 (완료된 준비 태스크 비율)
     func preparationProgress(for mainTask: Task) -> (completed: Int, total: Int, percentage: Int) {
         let preps = preparationTasks(for: mainTask)
         guard !preps.isEmpty else { return (0, 0, 0) }
@@ -646,16 +705,28 @@ class TaskViewModel: ObservableObject {
         try await deleteAllCloudRecords()
 
         // Convert tasks to CKRecords and save
-        let records = tasks.map { taskToCKRecord($0) }
-        for batch in records.chunked(into: 200) {
+        let taskRecords = tasks.map { taskToCKRecord($0) }
+        for batch in taskRecords.chunked(into: 200) {
             try await saveBatch(batch)
         }
+
+        // Convert projects to CKRecords and save
+        let projectRecords = projects.map { projectToCKRecord($0) }
+        for batch in projectRecords.chunked(into: 200) {
+            try await saveBatch(batch)
+        }
+
+        // Save recordNames to UserDefaults (쿼리 없이 복원하기 위함)
+        let taskRecordNames = tasks.map { $0.id.uuidString }
+        let projectRecordNames = projects.map { $0.id.uuidString }
+        UserDefaults.standard.set(taskRecordNames, forKey: "cloudTaskRecordNames")
+        UserDefaults.standard.set(projectRecordNames, forKey: "cloudProjectRecordNames")
 
         // Update last sync date
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
-        print("☁️ Successfully saved \(tasks.count) tasks to cloud")
+        print("☁️ Successfully saved \(tasks.count) tasks and \(projects.count) projects to cloud")
     }
 
     /// 클라우드에서 복원
@@ -672,17 +743,66 @@ class TaskViewModel: ObservableObject {
 
         defer { isSyncing = false }
 
-        let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
-        var cloudTasks: [Task] = []
+        // Get saved recordNames from UserDefaults
+        let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
+        let projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
 
-        let (results, _) = try await fetchRecords(query: query)
-        cloudTasks = results
+        print("📋 Found \(taskRecordNames.count) task records and \(projectRecordNames.count) project records to restore")
+
+        // Restore tasks using recordIDs (쿼리 없이 직접 fetch)
+        var cloudTasks: [Task] = []
+        if !taskRecordNames.isEmpty {
+            let taskRecordIDs = taskRecordNames.map { CKRecord.ID(recordName: $0) }
+
+            // Fetch in batches of 200
+            for batch in taskRecordIDs.chunked(into: 200) {
+                do {
+                    let results = try await database.records(for: batch)
+                    let batchTasks = results.values.compactMap { result in
+                        try? result.get()
+                    }.compactMap { ckRecordToTask($0) }
+                    cloudTasks.append(contentsOf: batchTasks)
+                } catch let error as CKError {
+                    // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
+                    if error.code == .unknownItem {
+                        print("⚠️ Some task records not found (may have been deleted)")
+                    } else {
+                        throw error
+                    }
+                }
+            }
+        }
+
+        // Restore projects using recordIDs (쿼리 없이 직접 fetch)
+        var cloudProjects: [Project] = []
+        if !projectRecordNames.isEmpty {
+            let projectRecordIDs = projectRecordNames.map { CKRecord.ID(recordName: $0) }
+
+            // Fetch in batches of 200
+            for batch in projectRecordIDs.chunked(into: 200) {
+                do {
+                    let results = try await database.records(for: batch)
+                    let batchProjects = results.values.compactMap { result in
+                        try? result.get()
+                    }.compactMap { ckRecordToProject($0) }
+                    cloudProjects.append(contentsOf: batchProjects)
+                } catch let error as CKError {
+                    // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
+                    if error.code == .unknownItem {
+                        print("⚠️ Some project records not found (may have been deleted)")
+                    } else {
+                        throw error
+                    }
+                }
+            }
+        }
 
         tasks = cloudTasks
+        projects = cloudProjects
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
-        print("✅ Restored \(cloudTasks.count) tasks from cloud")
+        print("✅ Restored \(cloudTasks.count) tasks and \(cloudProjects.count) projects from cloud")
     }
 
     /// 데이터 초기화 (로컬 + 클라우드)
@@ -708,56 +828,59 @@ class TaskViewModel: ObservableObject {
                 NSLocalizedDescriptionKey: "CloudKit database not available"
             ])
         }
-        try await database.modifyRecords(saving: records, deleting: [])
+
+        do {
+            let (savedRecords, _) = try await database.modifyRecords(saving: records, deleting: [])
+            print("✅ Saved batch of \(savedRecords.count) records")
+        } catch let error as CKError {
+            print("❌ CloudKit save error: \(error.localizedDescription)")
+            print("   Error code: \(error.code.rawValue)")
+            if let partialErrors = error.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] {
+                for (recordID, partialError) in partialErrors {
+                    print("   Failed record: \(recordID.recordName) - \(partialError.localizedDescription)")
+                }
+            }
+            throw error
+        }
     }
 
     private func deleteAllCloudRecords() async throws {
         guard let database = database else { return }
 
+        // Get saved recordNames from UserDefaults (쿼리 없이 삭제)
+        let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
+        let projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
+
         do {
-            let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
-            let (recordIDs, _) = try await fetchRecordIDs(query: query)
+            // Delete all Task records
+            if !taskRecordNames.isEmpty {
+                let taskRecordIDs = taskRecordNames.map { CKRecord.ID(recordName: $0) }
+                for batch in taskRecordIDs.chunked(into: 200) {
+                    let (_, deletedRecordIDs) = try await database.modifyRecords(saving: [], deleting: batch)
+                    print("🗑️ Deleted batch of \(deletedRecordIDs.count) task records")
+                }
+                print("🗑️ Deleted \(taskRecordIDs.count) task records in total")
+            }
 
-            guard !recordIDs.isEmpty else { return }
-
-            for batch in recordIDs.chunked(into: 200) {
-                try await database.modifyRecords(saving: [], deleting: batch)
+            // Delete all Project records
+            if !projectRecordNames.isEmpty {
+                let projectRecordIDs = projectRecordNames.map { CKRecord.ID(recordName: $0) }
+                for batch in projectRecordIDs.chunked(into: 200) {
+                    let (_, deletedRecordIDs) = try await database.modifyRecords(saving: [], deleting: batch)
+                    print("🗑️ Deleted batch of \(deletedRecordIDs.count) project records")
+                }
+                print("🗑️ Deleted \(projectRecordIDs.count) project records in total")
             }
         } catch let error as CKError {
             // "Unknown Item" 에러는 레코드가 없다는 의미이므로 무시
             if error.code == .unknownItem {
-                print("⚠️ No Task records found in CloudKit (this is normal if you haven't saved to cloud yet)")
+                print("⚠️ No records found in CloudKit (this is normal if you haven't saved to cloud yet)")
                 return
             }
             throw error
         }
     }
 
-    private func fetchRecords(query: CKQuery) async throws -> ([Task], CKQueryOperation.Cursor?) {
-        guard let database = database else {
-            throw NSError(domain: "CloudKit", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "CloudKit database not available"
-            ])
-        }
-
-        let (results, cursor) = try await database.records(matching: query)
-        let tasks = results.compactMap { _, result in
-            try? result.get()
-        }.compactMap { ckRecordToTask($0) }
-        return (tasks, cursor)
-    }
-
-    private func fetchRecordIDs(query: CKQuery) async throws -> ([CKRecord.ID], CKQueryOperation.Cursor?) {
-        guard let database = database else {
-            throw NSError(domain: "CloudKit", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "CloudKit database not available"
-            ])
-        }
-
-        let (results, cursor) = try await database.records(matching: query, desiredKeys: [])
-        let ids = results.map { id, _ in id }
-        return (ids, cursor)
-    }
 
     private func taskToCKRecord(_ task: Task) -> CKRecord {
         let recordID = CKRecord.ID(recordName: task.id.uuidString)
@@ -783,6 +906,12 @@ class TaskViewModel: ObservableObject {
         if let targetDate = task.targetDate {
             record["targetDate"] = targetDate as CKRecordValue
         }
+        if let projectId = task.projectId {
+            record["projectId"] = projectId.uuidString as CKRecordValue
+        }
+        if let manualPriority = task.manualPriority {
+            record["manualPriority"] = manualPriority as CKRecordValue
+        }
 
         return record
     }
@@ -796,7 +925,6 @@ class TaskViewModel: ObservableObject {
             let taskTypeRaw = record["taskType"] as? String,
             let taskType = TaskType(rawValue: taskTypeRaw),
             let taskRoleRaw = record["taskRole"] as? String,
-            let taskRole = TaskRole(rawValue: taskRoleRaw),
             let statusRaw = record["status"] as? String,
             let status = TaskStatus(rawValue: statusRaw),
             let createdAt = record["createdAt"] as? Date
@@ -804,16 +932,28 @@ class TaskViewModel: ObservableObject {
             return nil
         }
 
+        // 마이그레이션: "메인" → "루틴"으로 변환
+        let taskRole: TaskRole
+        if taskRoleRaw == "메인" {
+            taskRole = .none
+        } else if let role = TaskRole(rawValue: taskRoleRaw) {
+            taskRole = role
+        } else {
+            taskRole = .none  // 알 수 없는 값은 기본값
+        }
+
         let taskDescription = record["taskDescription"] as? String ?? ""
         let parentTaskId = (record["parentTaskId"] as? String).flatMap { UUID(uuidString: $0) }
         let mainTaskId = (record["mainTaskId"] as? String).flatMap { UUID(uuidString: $0) }
         let targetDate = record["targetDate"] as? Date
+        let projectId = (record["projectId"] as? String).flatMap { UUID(uuidString: $0) }
+        let manualPriority = record["manualPriority"] as? Int
 
         // priority는 optional로 처리 (기존 레코드 호환성)
         let priorityRaw = record["priority"] as? String
         let priority = priorityRaw.flatMap { TaskPriority(rawValue: $0) } ?? .normal
 
-        return Task(
+        var task = Task(
             id: UUID(uuidString: record.recordID.recordName) ?? UUID(),
             title: title,
             description: taskDescription,
@@ -824,10 +964,38 @@ class TaskViewModel: ObservableObject {
             taskRole: taskRole,
             status: status,
             priority: priority,
+            projectId: projectId,
             parentTaskId: parentTaskId,
             mainTaskId: mainTaskId,
             targetDate: targetDate
         )
+        task.manualPriority = manualPriority
+        return task
+    }
+
+    private func projectToCKRecord(_ project: Project) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: project.id.uuidString)
+        let record = CKRecord(recordType: "Project", recordID: recordID)
+
+        record["name"] = project.name as CKRecordValue
+        record["color"] = project.color as CKRecordValue
+        record["icon"] = project.icon as CKRecordValue
+
+        return record
+    }
+
+    private func ckRecordToProject(_ record: CKRecord) -> Project? {
+        guard
+            let name = record["name"] as? String,
+            let color = record["color"] as? String,
+            let icon = record["icon"] as? String
+        else {
+            return nil
+        }
+
+        var project = Project(name: name, color: color, icon: icon)
+        project.id = UUID(uuidString: record.recordID.recordName) ?? UUID()
+        return project
     }
 
     // MARK: - Utilities

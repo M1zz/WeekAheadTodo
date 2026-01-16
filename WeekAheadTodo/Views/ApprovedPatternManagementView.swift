@@ -222,9 +222,9 @@ struct ApprovedPatternRow: View {
                     // Calendar badge
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
-                            .font(.caption)
+                            .font(.callout)
                         Text(pattern.primaryCalendar)
-                            .font(.caption)
+                            .font(.callout)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -238,7 +238,7 @@ struct ApprovedPatternRow: View {
                     Label(pattern.frequency.rawValue, systemImage: "arrow.triangle.2.circlepath")
                     Label(pattern.estimatedTimeFormatted, systemImage: "clock")
                 }
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
 
                 // Next occurrence
@@ -251,7 +251,7 @@ struct ApprovedPatternRow: View {
                         Text("• 마지막 생성: \(lastGenerated.formatted(date: .abbreviated, time: .omitted))")
                     }
                 }
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
 
                 // Status indicator
@@ -261,7 +261,7 @@ struct ApprovedPatternRow: View {
                             .foregroundColor(.orange)
                         Text("비활성 - 자동 생성 중지됨")
                     }
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.orange)
                 }
             }
@@ -272,14 +272,14 @@ struct ApprovedPatternRow: View {
             VStack(spacing: 8) {
                 Button(action: onEdit) {
                     Label("편집", systemImage: "pencil")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
                 Button(action: onDelete) {
                     Label("삭제", systemImage: "trash")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

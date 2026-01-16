@@ -150,7 +150,7 @@ struct PatternReviewView: View {
                 HStack(spacing: 8) {
                     if let filter = selectedCalendarFilter {
                         Label(filter, systemImage: "calendar")
-                            .font(.caption)
+                            .font(.callout)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.blue.opacity(0.1))
@@ -158,7 +158,7 @@ struct PatternReviewView: View {
                             .overlay(
                                 Button(action: { selectedCalendarFilter = nil }) {
                                     Image(systemName: "xmark.circle.fill")
-                                        .font(.caption)
+                                        .font(.callout)
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundColor(.blue)
@@ -169,7 +169,7 @@ struct PatternReviewView: View {
 
                     if groupByCalendar {
                         Label("캘린더별 그룹", systemImage: "square.grid.2x2")
-                            .font(.caption)
+                            .font(.callout)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.green.opacity(0.1))
@@ -198,7 +198,7 @@ struct PatternReviewView: View {
                 Spacer()
 
                 Text("\(patterns.count)개 패턴")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 12)
@@ -255,7 +255,7 @@ struct PatternReviewView: View {
                 Text("\(calendarViewModel.detectedPatterns.count)개 패턴 감지됨")
                     .font(.headline)
                 Text("검토 후 승인하면 할 일이 자동으로 생성됩니다")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
             Spacer()
@@ -391,9 +391,9 @@ struct PatternRowView: View {
                     // 캘린더 정보
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
-                            .font(.caption)
+                            .font(.callout)
                         Text(pattern.primaryCalendar)
-                            .font(.caption)
+                            .font(.callout)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -412,10 +412,10 @@ struct PatternRowView: View {
                 if pattern.calendarTitles.count > 1 {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar.badge.plus")
-                            .font(.caption2)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                         Text("\(pattern.calendarTitles.count)개 캘린더")
-                            .font(.caption2)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -423,7 +423,7 @@ struct PatternRowView: View {
                 // 신뢰도
                 HStack {
                     Text("신뢰도")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
 
                     GeometryReader { geometry in
@@ -440,7 +440,7 @@ struct PatternRowView: View {
                     .frame(height: 8)
 
                     Text("\(pattern.confidencePercent)%")
-                        .font(.caption)
+                        .font(.callout)
                         .fontWeight(.medium)
                         .foregroundColor(confidenceColor)
                         .frame(width: 35, alignment: .trailing)
@@ -449,13 +449,13 @@ struct PatternRowView: View {
                 // 최근 5개 날짜 표시
                 HStack(spacing: 4) {
                     Image(systemName: "calendar.badge.clock")
-                        .font(.caption2)
+                        .font(.callout)
                         .foregroundColor(.blue)
                     Text("최근 5회:")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                     Text(pattern.recentEventDatesFormatted)
-                        .font(.caption)
+                        .font(.callout)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                 }
@@ -466,10 +466,10 @@ struct PatternRowView: View {
                     ForEach(pattern.detectedCharacteristics, id: \.self) { characteristic in
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.caption2)
+                                .font(.callout)
                                 .foregroundColor(.green)
                             Text(characteristic)
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -480,7 +480,7 @@ struct PatternRowView: View {
                 // Task 제안
                 VStack(alignment: .leading, spacing: 4) {
                     Text("제안된 할 일:")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
 
                     HStack {
@@ -495,7 +495,7 @@ struct PatternRowView: View {
                         Label("\(pattern.suggestedTask.leadTimeDays)일 전 시작", systemImage: "arrow.counterclockwise")
                         Label(pattern.suggestedTask.taskType.rawValue, systemImage: pattern.suggestedTask.taskType.icon)
                     }
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                 }
             }

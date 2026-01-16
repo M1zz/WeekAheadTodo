@@ -1,6 +1,25 @@
 import Foundation
 import UserNotifications
 
+// MARK: - Notification Time Model
+
+/// 알림 시간 모델
+struct NotificationTime: Codable, Identifiable, Equatable {
+    let id: UUID
+    var hour: Int           // 0-23
+    var minute: Int         // 0-59
+    var isEnabled: Bool
+    var label: String       // "아침 체크", "점심 후 체크" 등
+
+    init(id: UUID = UUID(), hour: Int, minute: Int, isEnabled: Bool = true, label: String) {
+        self.id = id
+        self.hour = hour
+        self.minute = minute
+        self.isEnabled = isEnabled
+        self.label = label
+    }
+}
+
 /// 리마인더 알림을 관리하는 서비스
 @MainActor
 class NotificationService: NSObject, ObservableObject {
@@ -9,25 +28,85 @@ class NotificationService: NSObject, ObservableObject {
 
     @Published var isNotificationEnabled: Bool = false
     @Published var notificationPermissionStatus: UNAuthorizationStatus = .notDetermined
+    @Published var notificationTimes: [NotificationTime] = []
+    @Published var nudgeNotificationEnabled: Bool = true
 
     private let center = UNUserNotificationCenter.current()
 
-    // 알림 시간 설정 (오전 9시, 오후 3시, 저녁 9시)
-    private let checkTimes: [(hour: Int, minute: Int)] = [
-        (9, 0),   // 오전 9시
-        (15, 0),  // 오후 3시
-        (21, 0)   // 저녁 9시
-    ]
-
     // UserDefaults 키
     private let notificationEnabledKey = "NotificationEnabled"
+    private let notificationTimesKey = "customNotificationTimes"
+    private let nudgeNotificationEnabledKey = "nudgeNotificationEnabled"
 
     private override init() {
         super.init()
         self.isNotificationEnabled = UserDefaults.standard.bool(forKey: notificationEnabledKey)
+        self.nudgeNotificationEnabled = UserDefaults.standard.object(forKey: nudgeNotificationEnabledKey) as? Bool ?? true
+
+        // 알림 시간 로드 (없으면 기본값)
+        loadNotificationTimes()
 
         // Delegate 설정
         center.delegate = self
+    }
+
+    // MARK: - Notification Times Management
+
+    /// UserDefaults에서 알림 시간 로드
+    private func loadNotificationTimes() {
+        if let data = UserDefaults.standard.data(forKey: notificationTimesKey),
+           let times = try? JSONDecoder().decode([NotificationTime].self, from: data) {
+            notificationTimes = times
+            print("✅ [NotificationService] 알림 시간 로드: \(times.count)개")
+        } else {
+            // 기본 알림 시간 (오전 9시, 오후 3시, 저녁 9시)
+            notificationTimes = [
+                NotificationTime(hour: 9, minute: 0, label: "아침 체크"),
+                NotificationTime(hour: 15, minute: 0, label: "오후 체크"),
+                NotificationTime(hour: 21, minute: 0, label: "저녁 체크")
+            ]
+            saveNotificationTimes()
+            print("✅ [NotificationService] 기본 알림 시간 설정")
+        }
+    }
+
+    /// UserDefaults에 알림 시간 저장
+    func saveNotificationTimes() {
+        if let data = try? JSONEncoder().encode(notificationTimes) {
+            UserDefaults.standard.set(data, forKey: notificationTimesKey)
+            print("✅ [NotificationService] 알림 시간 저장: \(notificationTimes.count)개")
+        }
+    }
+
+    /// 새 알림 시간 추가
+    func addNotificationTime(hour: Int, minute: Int, label: String) {
+        let newTime = NotificationTime(hour: hour, minute: minute, label: label)
+        notificationTimes.append(newTime)
+        saveNotificationTimes()
+        print("✅ [NotificationService] 알림 시간 추가: \(hour):\(minute) - \(label)")
+    }
+
+    /// 알림 시간 삭제
+    func removeNotificationTime(id: UUID) {
+        notificationTimes.removeAll { $0.id == id }
+        saveNotificationTimes()
+        print("✅ [NotificationService] 알림 시간 삭제: \(id)")
+    }
+
+    /// 알림 시간 업데이트
+    func updateNotificationTime(id: UUID, hour: Int, minute: Int, label: String, isEnabled: Bool) {
+        if let index = notificationTimes.firstIndex(where: { $0.id == id }) {
+            notificationTimes[index] = NotificationTime(id: id, hour: hour, minute: minute, isEnabled: isEnabled, label: label)
+            saveNotificationTimes()
+            print("✅ [NotificationService] 알림 시간 업데이트: \(hour):\(minute)")
+        }
+    }
+
+    /// 재촉 알림 활성화/비활성화
+    func setNudgeNotificationEnabled(_ enabled: Bool) {
+        nudgeNotificationEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: nudgeNotificationEnabledKey)
+        print("✅ [NotificationService] 재촉 알림: \(enabled ? "활성화" : "비활성화")")
     }
 
     // MARK: - 권한 관리
@@ -91,12 +170,13 @@ class NotificationService: NSObject, ObservableObject {
 
         print("🔔 [NotificationService] 알림 스케줄링 시작...")
 
-        // 하루 3회 체크 알림 설정
-        for checkTime in checkTimes {
+        // 활성화된 알림 시간에 대해 알림 설정
+        let enabledTimes = notificationTimes.filter { $0.isEnabled }
+        for checkTime in enabledTimes {
             await scheduleDailyCheckNotification(hour: checkTime.hour, minute: checkTime.minute, tasks: tasks)
         }
 
-        print("✅ [NotificationService] 알림 스케줄링 완료")
+        print("✅ [NotificationService] 알림 스케줄링 완료 (\(enabledTimes.count)개 시간)")
     }
 
     /// 특정 시간에 태스크 체크 알림 스케줄
@@ -168,6 +248,21 @@ class NotificationService: NSObject, ObservableObject {
             if task.isPreparation && calendar.isDate(task.effectiveStartDate, inSameDayAs: today) && !task.isCompleted {
                 tasksNeedingAttention.append(task)
                 continue
+            }
+
+            // 재촉 알림이 활성화된 경우 추가 조건
+            if nudgeNotificationEnabled {
+                // 5. 마감 2일 이내 + 시작 안함 (재촉)
+                if task.daysUntilDue <= 2 && task.daysUntilDue > 0 && task.isNotStarted {
+                    tasksNeedingAttention.append(task)
+                    continue
+                }
+
+                // 6. 마감 당일 + 진행 중
+                if task.daysUntilDue == 0 && task.isInProgress {
+                    tasksNeedingAttention.append(task)
+                    continue
+                }
             }
         }
 

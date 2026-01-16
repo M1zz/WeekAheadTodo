@@ -136,16 +136,30 @@ struct WeekAheadTodoApp: App {
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1100, height: 700)
+        .commands {
+            CommandMenu("태스크") {
+                Button("빠른 추가...") {
+                    NotificationCenter.default.post(name: .showQuickAdd, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+            }
+        }
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let showQuickAdd = Notification.Name("showQuickAdd")
 }
 
 // Root View with font scaling
 struct RootView: View {
-    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
+    @AppStorage("appFontSizeLevel") private var appFontSizeLevel: Int = 1
 
     var body: some View {
         ContentView()
             .applyDynamicFont()
-            .id(appFontSize) // 폰트 크기 변경 시 모든 텍스트가 즉시 반응
+            .id(appFontSizeLevel) // 폰트 크기 변경 시 모든 텍스트가 즉시 반응
     }
 }

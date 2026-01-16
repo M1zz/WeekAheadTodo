@@ -85,10 +85,10 @@ struct PatternDetailView: View {
                 ForEach(pattern.detectedCharacteristics, id: \.self) { characteristic in
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.green)
                         Text(characteristic)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -123,12 +123,12 @@ struct PatternDetailView: View {
             HStack(spacing: 8) {
                 Image(systemName: "calendar.badge.clock")
                     .foregroundColor(.blue)
-                    .font(.caption)
+                    .font(.callout)
                 Text("최근 5회:")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                 Text(pattern.recentEventDatesFormatted)
-                    .font(.caption)
+                    .font(.callout)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
             }
@@ -144,12 +144,12 @@ struct PatternDetailView: View {
                             Text(event.title)
                                 .font(.subheadline)
                             Text("\(event.startDate.formatted(date: .abbreviated, time: .omitted)) (\(event.dayOfWeekString)) \(event.startTimeFormatted)")
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
                         Text(event.calendarTitle)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -161,7 +161,7 @@ struct PatternDetailView: View {
 
                 if pattern.events.count > 10 {
                     Text("... 외 \(pattern.events.count - 10)개")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                 }
             }
@@ -203,7 +203,7 @@ struct PatternDetailView: View {
                             Image(systemName: "info.circle")
                                 .foregroundColor(.blue)
                             Text("마감 \(leadTimeDays)일 전부터 '오늘 할 일'에 표시됩니다")
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -219,11 +219,11 @@ struct PatternDetailView: View {
 
                     if taskType == .preparable {
                         Text("미리 시간이 있을 때 해둘 수 있는 일입니다")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     } else {
                         Text("해당 날짜에만 할 수 있는 일입니다 (회의, 미팅 등)")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     }
                 }

@@ -69,7 +69,7 @@ struct CalendarIntegrationView: View {
                         .fill(Color.blue)
                         .frame(width: 20, height: 20)
                     Text("\(calendarViewModel.detectedPatterns.count)")
-                        .font(.caption2)
+                        .font(.callout)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                 }
@@ -78,7 +78,7 @@ struct CalendarIntegrationView: View {
                     .foregroundColor(statusColor)
             }
             Text(calendarViewModel.statusString)
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 8)
@@ -166,7 +166,7 @@ struct CalendarIntegrationView: View {
                 Image(systemName: icon)
             }
             Text(text)
-                .font(.caption)
+                .font(.callout)
         }
         .foregroundColor(color)
         .padding(8)
@@ -185,7 +185,7 @@ struct CalendarIntegrationView: View {
                     .fontWeight(.medium)
                 Spacer()
                 Text("\(calendarViewModel.selectedCalendarIds.count)/\(calendarViewModel.availableCalendars.count)")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                 Button(showingCalendarSelection ? "접기" : "펼치기") {
                     withAnimation {
@@ -193,7 +193,7 @@ struct CalendarIntegrationView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.blue)
             }
 
@@ -239,14 +239,14 @@ struct CalendarIntegrationView: View {
             HStack(spacing: 8) {
                 Image(systemName: calendarViewModel.selectedCalendarIds.contains(calendar.calendarIdentifier) ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(calendarViewModel.selectedCalendarIds.contains(calendar.calendarIdentifier) ? .blue : .gray)
-                    .font(.caption)
+                    .font(.callout)
 
                 Circle()
                     .fill(Color(calendar.color))
                     .frame(width: 10, height: 10)
 
                 Text(calendar.title)
-                    .font(.caption)
+                    .font(.callout)
                     .lineLimit(1)
 
                 Spacer()
@@ -275,7 +275,7 @@ struct CalendarIntegrationView: View {
             }
 
             Text("시스템 설정 → Privacy & Security → Calendars → WeekAheadTodo 권한 활성화")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 

@@ -131,7 +131,7 @@ struct ImportView: View {
 
                 if let result = parseResult {
                     Text("\(result.tasks.count)개 태스크 발견")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                 }
             }
@@ -325,7 +325,7 @@ struct ImportView: View {
                     .font(.headline)
                 Spacer()
                 Text("\(tasks.count)개")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -345,7 +345,7 @@ struct ImportView: View {
                             .foregroundColor(task.isCompleted ? .secondary : .primary)
 
                         Text(formatDate(task.dueDate))
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     }
 
@@ -373,7 +373,7 @@ struct ImportView: View {
 
             ForEach(errors.indices, id: \.self) { index in
                 Text("Line \(errors[index].line): \(errors[index].message)")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
         }
@@ -406,7 +406,7 @@ struct ImportView: View {
                 estimatedMinutes: parsedTask.estimatedMinutes,
                 leadTimeDays: parsedTask.leadTimeDays,
                 taskType: .preparable,
-                taskRole: .main,
+                taskRole: .none,
                 status: .notStarted
             )
 
@@ -590,7 +590,7 @@ struct HelpSheetView: View {
                             formatRow("Week 1-2", "→ 시작일 + 10일")
                             formatRow("Week 3", "→ 시작일 + 21일")
                         }
-                        .font(.caption)
+                        .font(.callout)
                     }
                 }
                 .padding(24)
@@ -823,7 +823,7 @@ struct TaskEditSheet: View {
                     .font(.headline)
                 Spacer()
                 Text("\(tasks.count)개")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -856,7 +856,7 @@ struct EditableTaskRow: View {
 
             HStack {
                 Text("기한:")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
 
                 DatePicker("", selection: $task.dueDate, displayedComponents: .date)
@@ -865,7 +865,7 @@ struct EditableTaskRow: View {
                 Spacer()
 
                 Text("예상 시간:")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
 
                 Stepper("\(task.estimatedMinutes)분", value: $task.estimatedMinutes, in: 15...240, step: 15)
@@ -873,7 +873,7 @@ struct EditableTaskRow: View {
                     .frame(width: 100)
 
                 Text("\(task.estimatedMinutes)분")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                     .frame(width: 40, alignment: .trailing)
             }

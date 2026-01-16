@@ -3,13 +3,10 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1TIP11111111111111BUILD /* TaskInputParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TIP00000000000000PARSE /* TaskInputParser.swift */; };
-		A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1MD000000000000000PARSE /* MarkdownParser.swift */; };
-		A1IV111111111111111BUILD /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IV000000000000000VIEWW /* ImportView.swift */; };
 		293A912635E623BE692B94DA /* NotificationPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */; };
 		581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D84A5C8231A5D6F641C7 /* NotificationService.swift */; };
 		A1000001234567890000001 /* WeekAheadTodoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002234567890000001 /* WeekAheadTodoApp.swift */; };
@@ -30,12 +27,23 @@
 		A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DDD444444444444444444D /* EditApprovedPatternView.swift */; };
 		A1EF5AE8B7997DF7B5BB7D8B /* CalendarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */; };
 		A1F1E7A4FDB964A04977DB8A /* RecurrencePattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18D1386D284CA97002326B1 /* RecurrencePattern.swift */; };
+		A1IV111111111111111BUILD /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IV000000000000000VIEWW /* ImportView.swift */; };
+		A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1MD000000000000000PARSE /* MarkdownParser.swift */; };
+		A1TIP11111111111111BUILD /* TaskInputParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TIP00000000000000PARSE /* TaskInputParser.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		9CA0A3D22F19D611004ABF40 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A100000A234567890000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1000006234567890000001;
+			remoteInfo = WeekAheadTodo;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		A1TIP00000000000000PARSE /* TaskInputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInputParser.swift; sourceTree = "<group>"; };
-		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
-		A1IV000000000000000VIEWW /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
+		9CA0A3CE2F19D611004ABF40 /* WeekAheadTodoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeekAheadTodoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000002234567890000001 /* WeekAheadTodoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadTodoApp.swift; sourceTree = "<group>"; };
 		A1000002234567890000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000002234567890000003 /* Task.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Task.swift; sourceTree = "<group>"; };
@@ -55,11 +63,26 @@
 		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
 		A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPatternManagementView.swift; sourceTree = "<group>"; };
 		A1DDD444444444444444444D /* EditApprovedPatternView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditApprovedPatternView.swift; sourceTree = "<group>"; };
+		A1IV000000000000000VIEWW /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
+		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
+		A1TIP00000000000000PARSE /* TaskInputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInputParser.swift; sourceTree = "<group>"; };
 		C793D84A5C8231A5D6F641C7 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationPreviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		9CA0A3CF2F19D611004ABF40 /* WeekAheadTodoTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WeekAheadTodoTests; sourceTree = "<group>"; };
+		9CA0A3E82F19D628004ABF40 /* WeekAheadTodoUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WeekAheadTodoUITests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		9CA0A3CB2F19D611004ABF40 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000004234567890000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -74,6 +97,8 @@
 			isa = PBXGroup;
 			children = (
 				A1000005234567890000002 /* WeekAheadTodo */,
+				9CA0A3CF2F19D611004ABF40 /* WeekAheadTodoTests */,
+				9CA0A3E82F19D628004ABF40 /* WeekAheadTodoUITests */,
 				A1000005234567890000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -96,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000003234567890000001 /* WeekAheadTodo.app */,
+				9CA0A3CE2F19D611004ABF40 /* WeekAheadTodoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -151,6 +177,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		9CA0A3CD2F19D611004ABF40 /* WeekAheadTodoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9CA0A3D62F19D611004ABF40 /* Build configuration list for PBXNativeTarget "WeekAheadTodoTests" */;
+			buildPhases = (
+				9CA0A3CA2F19D611004ABF40 /* Sources */,
+				9CA0A3CB2F19D611004ABF40 /* Frameworks */,
+				9CA0A3CC2F19D611004ABF40 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9CA0A3D32F19D611004ABF40 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				9CA0A3CF2F19D611004ABF40 /* WeekAheadTodoTests */,
+			);
+			name = WeekAheadTodoTests;
+			packageProductDependencies = (
+			);
+			productName = WeekAheadTodoTests;
+			productReference = 9CA0A3CE2F19D611004ABF40 /* WeekAheadTodoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		A1000006234567890000001 /* WeekAheadTodo */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A1000007234567890000001 /* Build configuration list for PBXNativeTarget "WeekAheadTodo" */;
@@ -175,9 +224,13 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					9CA0A3CD2F19D611004ABF40 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = A1000006234567890000001;
+					};
 					A1000006234567890000001 = {
 						CreatedOnToolsVersion = 15.0;
 					};
@@ -198,11 +251,19 @@
 			projectRoot = "";
 			targets = (
 				A1000006234567890000001 /* WeekAheadTodo */,
+				9CA0A3CD2F19D611004ABF40 /* WeekAheadTodoTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		9CA0A3CC2F19D611004ABF40 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000009234567890000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -214,6 +275,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		9CA0A3CA2F19D611004ABF40 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000008234567890000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -245,7 +313,57 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		9CA0A3D32F19D611004ABF40 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1000006234567890000001 /* WeekAheadTodo */;
+			targetProxy = 9CA0A3D22F19D611004ABF40 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		9CA0A3D42F19D611004ABF40 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QGAQ3AY3R3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ysoup.WeekAheadTodoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WeekAheadTodo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WeekAheadTodo";
+			};
+			name = Debug;
+		};
+		9CA0A3D52F19D611004ABF40 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QGAQ3AY3R3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ysoup.WeekAheadTodoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WeekAheadTodo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WeekAheadTodo";
+			};
+			name = Release;
+		};
 		A100000C234567890000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -427,6 +545,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		9CA0A3D62F19D611004ABF40 /* Build configuration list for PBXNativeTarget "WeekAheadTodoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9CA0A3D42F19D611004ABF40 /* Debug */,
+				9CA0A3D52F19D611004ABF40 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A1000007234567890000001 /* Build configuration list for PBXNativeTarget "WeekAheadTodo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

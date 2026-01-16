@@ -30,23 +30,58 @@ enum TaskType: String, CaseIterable, Codable {
     }
 }
 
-/// 태스크 역할 - 메인 실행 태스크 vs 준비 태스크
-enum TaskRole: String, CaseIterable, Codable {
-    case main = "메인"           // 실제 실행해야 하는 일 (회의, 발표, 마감)
+/// 태스크 역할 - 태스크의 성격과 역할 구분
+enum TaskRole: String, CaseIterable {
+    case none = ""               // 역할 없음 (기본값)
     case preparation = "준비"    // 메인 태스크를 위한 준비
+    case followUp = "후속"       // 회의나 이벤트 이후 후속 조치
+    case review = "검토"         // 검토, 피드백, 승인이 필요한 일
+    case learning = "학습"       // 학습, 연구, 조사가 필요한 일
+    case idea = "아이디어"       // 브레인스토밍, 기획, 고민이 필요한 일
 
     var icon: String {
         switch self {
-        case .main: return "star.fill"
+        case .none: return ""
         case .preparation: return "arrow.right.circle"
+        case .followUp: return "arrow.turn.down.right"
+        case .review: return "checkmark.circle.fill"
+        case .learning: return "book.fill"
+        case .idea: return "lightbulb.fill"
         }
     }
 
     var color: String {
         switch self {
-        case .main: return "blue"
+        case .none: return "gray"
         case .preparation: return "orange"
+        case .followUp: return "green"
+        case .review: return "yellow"
+        case .learning: return "cyan"
+        case .idea: return "pink"
         }
+    }
+}
+
+// MARK: - TaskRole Migration Support
+extension TaskRole: Codable {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+
+        // 마이그레이션: "메인", "루틴" → "" (없음)으로 변환
+        if rawValue == "메인" || rawValue == "루틴" {
+            self = .none
+        } else if let role = TaskRole(rawValue: rawValue) {
+            self = role
+        } else {
+            // 알 수 없는 값은 기본값(없음)으로
+            self = .none
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.rawValue)
     }
 }
 
@@ -116,6 +151,7 @@ struct Task: Identifiable, Codable {
     var mainTaskId: UUID?                // 준비 태스크의 경우, 어떤 메인 태스크를 위한 것인지
     var targetDate: Date?                // 준비 태스크의 경우, 메인 태스크의 실제 날짜
     var createdAt: Date
+    var manualPriority: Int?             // 수동 우선순위 (nil = 자동 계산)
 
     // 캘린더 연동 관련
     var calendarEventId: String?         // 원본 EKEvent ID
@@ -131,7 +167,7 @@ struct Task: Identifiable, Codable {
         estimatedMinutes: Int = 30,
         leadTimeDays: Int = 0,
         taskType: TaskType = .preparable,
-        taskRole: TaskRole = .main,
+        taskRole: TaskRole = .none,
         status: TaskStatus = .notStarted,
         priority: TaskPriority = .normal,
         projectId: UUID? = nil,
@@ -211,14 +247,22 @@ struct Task: Identifiable, Codable {
     var urgencyScore: Double {
         let daysLeft = Double(daysUntilStart)
         let effort = Double(estimatedMinutes) / 60.0  // 시간 단위
-        
+
         // 남은 일수가 적고 소요 시간이 길수록 긴급
         if daysLeft <= 0 {
             return -100 + effort  // 이미 늦음
         }
         return daysLeft - (effort * 0.5)
     }
-    
+
+    /// 정렬 순서 (수동 우선순위 > 자동 긴급도)
+    var sortOrder: Int {
+        if let manual = manualPriority {
+            return manual
+        }
+        return Int(urgencyScore * 100)
+    }
+
     /// 예상 소요 시간을 읽기 좋은 형식으로
     var estimatedTimeFormatted: String {
         let hours = estimatedMinutes / 60
@@ -284,11 +328,6 @@ struct Task: Identifiable, Codable {
     /// 준비 태스크인지 확인
     var isPreparation: Bool {
         taskRole == .preparation
-    }
-
-    /// 메인 태스크인지 확인
-    var isMain: Bool {
-        taskRole == .main
     }
 
     /// 타겟 날짜까지 남은 일수 (준비 태스크의 경우)

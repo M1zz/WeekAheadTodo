@@ -4,6 +4,7 @@ import SwiftUI
 struct NotificationPreviewView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @EnvironmentObject var notificationService: NotificationService
+    @EnvironmentObject var assistantService: ProactiveAssistantService
 
     @State private var currentTime = Date()
 
@@ -45,6 +46,14 @@ struct NotificationPreviewView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    // 비서 제안 섹션 (최상단)
+                    if !assistantService.activeSuggestions.isEmpty {
+                        assistantSuggestionsSection
+
+                        Divider()
+                            .padding(.vertical, 8)
+                    }
+
                     if notificationService.isNotificationEnabled {
                         // 알림 활성화되어 있으면 다음 알림 시간들 표시
                         ForEach(Array(notificationTimes.enumerated()), id: \.offset) { index, time in
@@ -68,7 +77,7 @@ struct NotificationPreviewView: View {
                                 .foregroundColor(.secondary)
 
                             Text("설정에서 알림을 활성화하세요")
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundColor(.secondary)
                         }
                         .frame(maxWidth: .infinity)
@@ -77,7 +86,7 @@ struct NotificationPreviewView: View {
                 }
                 .padding(16)
             }
-            .frame(width: 350, height: 400)
+            .frame(width: 450, height: 500)
         }
         .onReceive(timer) { _ in
             currentTime = Date()
@@ -101,7 +110,7 @@ struct NotificationPreviewView: View {
                     .fontWeight(.semibold)
                 Spacer()
                 Text(timeRemaining)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(isPast ? .gray : .orange)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -114,11 +123,11 @@ struct NotificationPreviewView: View {
                 let tasksCount = tasksNeedingAttention.count
                 if tasksCount > 0 {
                     Text("\(tasksCount)개의 할 일이 확인 필요")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                 } else {
                     Text("확인 필요한 할 일 없음")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.green)
                 }
             }
@@ -126,6 +135,37 @@ struct NotificationPreviewView: View {
         .padding(12)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
+    }
+
+    // MARK: - 비서 제안 섹션
+
+    @ViewBuilder
+    private var assistantSuggestionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.purple)
+                Text("비서 제안")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(assistantService.activeSuggestions.count)개")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(assistantService.activeSuggestions) { suggestion in
+                AssistantSuggestionBannerView(
+                    suggestion: suggestion,
+                    onDismiss: {
+                        assistantService.dismissSuggestion(suggestion)
+                    },
+                    onAction: { action in
+                        // TODO: 액션 처리
+                    }
+                )
+            }
+        }
     }
 
     // MARK: - 태스크 미리보기 섹션
@@ -141,13 +181,13 @@ struct NotificationPreviewView: View {
                     .fontWeight(.semibold)
                 Spacer()
                 Text("\(tasksNeedingAttention.count)개")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
             if tasksNeedingAttention.isEmpty {
                 Text("모든 할 일이 정상 진행 중입니다!")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.green)
                     .padding(.vertical, 8)
             } else {
@@ -158,7 +198,7 @@ struct NotificationPreviewView: View {
 
                     if tasksNeedingAttention.count > 5 {
                         Text("외 \(tasksNeedingAttention.count - 5)개")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                             .padding(.leading, 8)
                     }
@@ -176,11 +216,11 @@ struct NotificationPreviewView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .font(.caption)
+                    .font(.callout)
                     .lineLimit(1)
 
                 Text(reasonForAttention(task))
-                    .font(.caption2)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -315,4 +355,5 @@ struct NotificationPreviewView: View {
     NotificationPreviewView()
         .environmentObject(TaskViewModel())
         .environmentObject(NotificationService.shared)
+        .environmentObject(ProactiveAssistantService.shared)
 }

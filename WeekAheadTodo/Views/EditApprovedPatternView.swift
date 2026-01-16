@@ -66,11 +66,11 @@ struct EditApprovedPatternView: View {
 
                     if taskType == .preparable {
                         Text("미리 시간이 있을 때 해둘 수 있는 일입니다")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     } else {
                         Text("해당 날짜에만 할 수 있는 일입니다 (회의, 미팅 등)")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -89,7 +89,7 @@ struct EditApprovedPatternView: View {
                             Text(title)
                                 .font(.subheadline)
                             Text(date.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundColor(.secondary)
                         }
                     }
