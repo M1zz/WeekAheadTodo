@@ -73,6 +73,32 @@ enum TaskStatus: String, CaseIterable, Codable {
     }
 }
 
+/// 태스크 우선순위
+enum TaskPriority: String, CaseIterable, Codable {
+    case low = "낮음"
+    case normal = "보통"
+    case high = "높음"
+    case urgent = "긴급"
+
+    var icon: String {
+        switch self {
+        case .low: return "arrow.down"
+        case .normal: return "equal"
+        case .high: return "arrow.up"
+        case .urgent: return "exclamationmark.2"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .low: return "gray"
+        case .normal: return "blue"
+        case .high: return "orange"
+        case .urgent: return "red"
+        }
+    }
+}
+
 /// 메인 태스크 모델
 struct Task: Identifiable, Codable {
     let id: UUID
@@ -84,6 +110,8 @@ struct Task: Identifiable, Codable {
     var taskType: TaskType
     var taskRole: TaskRole               // 메인 vs 준비
     var status: TaskStatus               // 진행 상태
+    var priority: TaskPriority           // 우선순위
+    var projectId: UUID?                 // 프로젝트 ID
     var parentTaskId: UUID?              // 상위 태스크 (서브태스크 지원)
     var mainTaskId: UUID?                // 준비 태스크의 경우, 어떤 메인 태스크를 위한 것인지
     var targetDate: Date?                // 준비 태스크의 경우, 메인 태스크의 실제 날짜
@@ -105,6 +133,8 @@ struct Task: Identifiable, Codable {
         taskType: TaskType = .preparable,
         taskRole: TaskRole = .main,
         status: TaskStatus = .notStarted,
+        priority: TaskPriority = .normal,
+        projectId: UUID? = nil,
         parentTaskId: UUID? = nil,
         mainTaskId: UUID? = nil,
         targetDate: Date? = nil
@@ -118,10 +148,14 @@ struct Task: Identifiable, Codable {
         self.taskType = taskType
         self.taskRole = taskRole
         self.status = status
+        self.priority = priority
+        self.projectId = projectId
         self.parentTaskId = parentTaskId
         self.mainTaskId = mainTaskId
         self.targetDate = targetDate
         self.createdAt = Date()
+        self.calendarEventId = nil
+        self.patternId = nil
     }
     
     // MARK: - 선행 작업 역산 로직
@@ -341,4 +375,21 @@ struct TaskTemplate {
         .presentationPreparation,
         .reportWriting
     ]
+}
+
+// MARK: - Project
+
+/// 프로젝트 모델
+struct Project: Identifiable, Codable, Hashable {
+    var id: UUID = UUID()
+    var name: String
+    var color: String  // hex color
+    var icon: String   // SF Symbol name
+    var createdAt: Date = Date()
+
+    init(name: String, color: String = "#007AFF", icon: String = "folder.fill") {
+        self.name = name
+        self.color = color
+        self.icon = icon
+    }
 }

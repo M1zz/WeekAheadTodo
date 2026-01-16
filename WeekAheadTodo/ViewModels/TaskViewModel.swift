@@ -13,6 +13,13 @@ class TaskViewModel: ObservableObject {
             saveTasks()
         }
     }
+
+    @Published var projects: [Project] = [] {
+        didSet {
+            saveProjects()
+        }
+    }
+
     @Published var timeBlockManager: WeeklyTimeBlockManager
     @Published var dailyAvailableHours: Double = 6.0
     @Published var selectedDate: Date = Date()
@@ -47,6 +54,12 @@ class TaskViewModel: ObservableObject {
     @Published var targetDaysAhead: Int = 7 {
         didSet {
             UserDefaults.standard.set(targetDaysAhead, forKey: targetDaysAheadKey)
+        }
+    }
+
+    @Published var weekStartDay: Int = 1 {
+        didSet {
+            UserDefaults.standard.set(weekStartDay, forKey: "weekStartDay")
         }
     }
 
@@ -98,6 +111,7 @@ class TaskViewModel: ObservableObject {
         self.lunchBreakMinutes = UserDefaults.standard.object(forKey: lunchBreakKey) as? Int ?? 60
         self.useCalendarForTimeBlocks = UserDefaults.standard.bool(forKey: useCalendarKey)
         self.targetDaysAhead = UserDefaults.standard.object(forKey: targetDaysAheadKey) as? Int ?? 7
+        self.weekStartDay = UserDefaults.standard.object(forKey: "weekStartDay") as? Int ?? 1
 
         if let data = UserDefaults.standard.data(forKey: timeBlockCalendarIdsKey),
            let ids = try? JSONDecoder().decode([String].self, from: data) {
@@ -105,6 +119,7 @@ class TaskViewModel: ObservableObject {
         }
 
         loadTasks()
+        loadProjects()
         print("✅ TaskViewModel initialized")
     }
 
@@ -139,7 +154,38 @@ class TaskViewModel: ObservableObject {
             tasks = []
         }
     }
-    
+
+    // MARK: - Project Persistence
+
+    private let projectsKey = "projects"
+
+    private func saveProjects() {
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(projects)
+            UserDefaults.standard.set(data, forKey: projectsKey)
+            print("✅ Projects saved: \(projects.count)개")
+        } catch {
+            print("❌ Failed to save projects: \(error)")
+        }
+    }
+
+    private func loadProjects() {
+        guard let data = UserDefaults.standard.data(forKey: projectsKey) else {
+            print("ℹ️ No saved projects found")
+            return
+        }
+
+        do {
+            let decoder = JSONDecoder()
+            projects = try decoder.decode([Project].self, from: data)
+            print("✅ Projects loaded: \(projects.count)개")
+        } catch {
+            print("❌ Failed to load projects: \(error)")
+            projects = []
+        }
+    }
+
     // MARK: - Computed Properties
     
     /// 시간 지평선별로 그룹화된 태스크
@@ -182,7 +228,23 @@ class TaskViewModel: ObservableObject {
     var nextWeekIncompleteTasks: [Task] {
         nextWeekTasks.filter { !$0.isCompleted }
     }
-    
+
+    /// 언젠가 할 일 (다음 주 이후의 태스크)
+    var somedayTasks: [Task] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let nextWeekEnd = calendar.date(byAdding: .day, value: 14, to: today)!
+
+        return tasks
+            .filter { $0.dueDate > nextWeekEnd }
+            .sorted { $0.dueDate < $1.dueDate } // 마감일 가까운 순
+    }
+
+    /// 언젠가 할 일 중 미완료만
+    var somedayIncompleteTasks: [Task] {
+        somedayTasks.filter { !$0.isCompleted }
+    }
+
     /// 미리 할 수 있는 태스크 (다음 주 이후 + preparable 타입)
     var preparableFutureTasks: [Task] {
         tasks
@@ -652,13 +714,22 @@ class TaskViewModel: ObservableObject {
     private func deleteAllCloudRecords() async throws {
         guard let database = database else { return }
 
-        let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
-        let (recordIDs, _) = try await fetchRecordIDs(query: query)
+        do {
+            let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
+            let (recordIDs, _) = try await fetchRecordIDs(query: query)
 
-        guard !recordIDs.isEmpty else { return }
+            guard !recordIDs.isEmpty else { return }
 
-        for batch in recordIDs.chunked(into: 200) {
-            try await database.modifyRecords(saving: [], deleting: batch)
+            for batch in recordIDs.chunked(into: 200) {
+                try await database.modifyRecords(saving: [], deleting: batch)
+            }
+        } catch let error as CKError {
+            // "Unknown Item" 에러는 레코드가 없다는 의미이므로 무시
+            if error.code == .unknownItem {
+                print("⚠️ No Task records found in CloudKit (this is normal if you haven't saved to cloud yet)")
+                return
+            }
+            throw error
         }
     }
 
@@ -700,6 +771,7 @@ class TaskViewModel: ObservableObject {
         record["taskType"] = task.taskType.rawValue as CKRecordValue
         record["taskRole"] = task.taskRole.rawValue as CKRecordValue
         record["status"] = task.status.rawValue as CKRecordValue
+        record["priority"] = task.priority.rawValue as CKRecordValue
         record["createdAt"] = task.createdAt as CKRecordValue
 
         if let parentId = task.parentTaskId {
@@ -737,6 +809,10 @@ class TaskViewModel: ObservableObject {
         let mainTaskId = (record["mainTaskId"] as? String).flatMap { UUID(uuidString: $0) }
         let targetDate = record["targetDate"] as? Date
 
+        // priority는 optional로 처리 (기존 레코드 호환성)
+        let priorityRaw = record["priority"] as? String
+        let priority = priorityRaw.flatMap { TaskPriority(rawValue: $0) } ?? .normal
+
         return Task(
             id: UUID(uuidString: record.recordID.recordName) ?? UUID(),
             title: title,
@@ -747,6 +823,7 @@ class TaskViewModel: ObservableObject {
             taskType: taskType,
             taskRole: taskRole,
             status: status,
+            priority: priority,
             parentTaskId: parentTaskId,
             mainTaskId: mainTaskId,
             targetDate: targetDate
@@ -875,6 +952,36 @@ class TaskViewModel: ObservableObject {
         }
 
         try await service.requestAuthorization()
+    }
+
+    // MARK: - Project Management
+
+    func addProject(_ project: Project) {
+        projects.append(project)
+    }
+
+    func deleteProject(_ project: Project) {
+        projects.removeAll { $0.id == project.id }
+        // 프로젝트에 속한 태스크들의 projectId 제거
+        for i in tasks.indices {
+            if tasks[i].projectId == project.id {
+                tasks[i].projectId = nil
+            }
+        }
+    }
+
+    func updateProject(_ project: Project) {
+        if let index = projects.firstIndex(where: { $0.id == project.id }) {
+            projects[index] = project
+        }
+    }
+
+    func tasks(for projectId: UUID) -> [Task] {
+        tasks.filter { $0.projectId == projectId }
+    }
+
+    func incompleteTasks(for projectId: UUID) -> [Task] {
+        tasks.filter { $0.projectId == projectId && !$0.isCompleted }
     }
 }
 

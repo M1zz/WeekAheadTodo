@@ -131,10 +131,21 @@ struct WeekAheadTodoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .modelContainer(modelContainer)
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1100, height: 700)
+    }
+}
+
+// Root View with font scaling
+struct RootView: View {
+    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
+
+    var body: some View {
+        ContentView()
+            .applyDynamicFont()
+            .id(appFontSize) // 폰트 크기 변경 시 모든 텍스트가 즉시 반응
     }
 }

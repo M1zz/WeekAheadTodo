@@ -17,13 +17,28 @@ struct ContentView: View {
     @StateObject private var viewModel = TaskViewModel()
     @StateObject private var calendarViewModel = CalendarViewModel()
     @StateObject private var notificationService = NotificationService.shared
-    @State private var selectedSection: SidebarSection = .today
+    @AppStorage("selectedSection") private var selectedSectionRawValue: String = SidebarSection.today.rawValue
+    @State private var selectedProjectId: UUID? = nil
+    @State private var showingAddProject = false
     @Environment(\.modelContext) private var modelContext
+
+    private var currentSection: SidebarSection {
+        SidebarSection(rawValue: selectedSectionRawValue) ?? .today
+    }
+
+    private var selectedSectionBinding: Binding<SidebarSection> {
+        Binding(
+            get: { SidebarSection(rawValue: selectedSectionRawValue) ?? .today },
+            set: { selectedSectionRawValue = $0.rawValue }
+        )
+    }
 
     enum SidebarSection: String, CaseIterable {
         case today = "오늘"
         case thisWeek = "이번 주"
         case nextWeek = "다음 주"
+        case someday = "언젠가"
+        case todayInsights = "오늘 통계"
         case weekOverview = "주간 개요"
         case importTasks = "가져오기"
         case patterns = "패턴 관리"
@@ -34,6 +49,8 @@ struct ContentView: View {
             case .today: return "sun.max.fill"
             case .thisWeek: return "calendar.badge.clock"
             case .nextWeek: return "calendar.badge.plus"
+            case .someday: return "tray.fill"
+            case .todayInsights: return "chart.line.uptrend.xyaxis"
             case .weekOverview: return "chart.bar.fill"
             case .importTasks: return "square.and.arrow.down"
             case .patterns: return "arrow.triangle.2.circlepath"
@@ -45,14 +62,34 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             // 사이드바
-            List(selection: $selectedSection) {
+            List(selection: selectedSectionBinding) {
                 Section("할 일") {
-                    ForEach([SidebarSection.today, .thisWeek, .nextWeek], id: \.self) { section in
+                    ForEach([SidebarSection.today, .thisWeek, .nextWeek, .someday], id: \.self) { section in
                         sidebarItem(section)
                     }
                 }
-                
+
+                Section {
+                    ForEach(viewModel.projects) { project in
+                        projectSidebarItem(project)
+                    }
+
+                    Button {
+                        showingAddProject = true
+                    } label: {
+                        Label("새 프로젝트", systemImage: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    HStack {
+                        Text("프로젝트")
+                        Spacer()
+                    }
+                }
+
                 Section("관리") {
+                    sidebarItem(.todayInsights)
                     sidebarItem(.weekOverview)
                     sidebarItem(.importTasks)
                     sidebarItem(.patterns)
@@ -69,6 +106,9 @@ struct ContentView: View {
         .environmentObject(viewModel)
         .environmentObject(calendarViewModel)
         .environmentObject(notificationService)
+        .sheet(isPresented: $showingAddProject) {
+            AddProjectView()
+        }
         .onAppear {
             setupServices()
             _Concurrency.Task {
@@ -121,12 +161,41 @@ struct ContentView: View {
         }
         .tag(section)
     }
-    
+
+    @ViewBuilder
+    private func projectSidebarItem(_ project: Project) -> some View {
+        Button {
+            selectedProjectId = project.id
+            selectedSectionRawValue = "" // Clear section selection
+        } label: {
+            HStack {
+                Image(systemName: project.icon)
+                    .foregroundColor(Color(hex: project.color))
+                Text(project.name)
+                Spacer()
+                let count = viewModel.incompleteTasks(for: project.id).count
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: project.color))
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(selectedProjectId == project.id ? Color.blue.opacity(0.15) : Color.clear)
+    }
+
     private func taskCount(for section: SidebarSection) -> Int? {
         switch section {
         case .today: return viewModel.todayIncompleteTasks.count
         case .thisWeek: return viewModel.thisWeekIncompleteTasks.count
         case .nextWeek: return viewModel.nextWeekIncompleteTasks.count
+        case .someday: return viewModel.somedayIncompleteTasks.count
         default: return nil
         }
     }
@@ -136,27 +205,39 @@ struct ContentView: View {
         case .today: return viewModel.isTodayOverCapacity ? .red : .blue
         case .thisWeek: return .orange
         case .nextWeek: return .green
+        case .someday: return .purple
         default: return .gray
         }
     }
     
     @ViewBuilder
     private var mainContent: some View {
-        switch selectedSection {
-        case .today:
-            TodayView()
-        case .thisWeek:
-            ThisWeekView()
-        case .nextWeek:
-            NextWeekView()
-        case .weekOverview:
-            WeekOverviewView()
-        case .importTasks:
-            ImportView()
-        case .patterns:
-            ApprovedPatternManagementView()
-        case .settings:
-            SettingsView()
+        Group {
+            if let projectId = selectedProjectId,
+               let project = viewModel.projects.first(where: { $0.id == projectId }) {
+                ProjectView(project: project)
+            } else {
+                switch currentSection {
+                case .today:
+                    TodayView()
+                case .thisWeek:
+                    ThisWeekView()
+                case .nextWeek:
+                    NextWeekView()
+                case .someday:
+                    SomedayView()
+                case .todayInsights:
+                    TodayInsightsView()
+                case .weekOverview:
+                    WeekOverviewView()
+                case .importTasks:
+                    ImportView()
+                case .patterns:
+                    ApprovedPatternManagementView()
+                case .settings:
+                    SettingsView()
+                }
+            }
         }
     }
 }
@@ -166,11 +247,15 @@ struct ContentView: View {
 struct TodayView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @EnvironmentObject var notificationService: NotificationService
+    @EnvironmentObject var calendarViewModel: CalendarViewModel
     @State private var showingAddTask = false
     @State private var showingNotificationPreview = false
     @State private var isEditMode = false
     @State private var selectedTasks: Set<UUID> = []
     @State private var showingDeleteConfirmation = false
+    @State private var showingCalendarAddConfirmation = false
+    @State private var isAddingToCalendar = false
+    @AppStorage("recommendationSectionExpanded") private var isRecommendationExpanded = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -181,17 +266,6 @@ struct TodayView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // 미래 준비 게이지 - 목표 대비 현재 위치
-                    futurePreparationGaugeView
-
-                    // 시간 블록 상태
-                    timeBlockStatusView
-
-                    // 미래 준비 요약 - 오늘 하는 일이 며칠 뒤를 위한 것인지
-                    if !viewModel.todayTasks.isEmpty {
-                        futurePreparationSummary
-                    }
-
                     // 오늘 할 일
                     if !viewModel.todayTasks.isEmpty {
                         taskSection(
@@ -234,11 +308,18 @@ struct TodayView: View {
         }
     }
     
+    private var todayDateString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: Date())
+    }
+
     private var headerView: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text("오늘")
+                    Text("오늘 \(todayDateString)")
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
@@ -257,44 +338,10 @@ struct TodayView: View {
                     }
                 }
 
-                Text(Date(), style: .date)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                // 요일 표시
+                weekdayIndicator
             }
             Spacer()
-
-            // 편집 모드 버튼 및 삭제 버튼
-            if !viewModel.todayTasks.isEmpty {
-                HStack(spacing: 12) {
-                    // 편집 모드 토글
-                    Button(action: {
-                        isEditMode.toggle()
-                        if !isEditMode {
-                            selectedTasks.removeAll()
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: isEditMode ? "checkmark.circle.fill" : "checkmark.circle")
-                            Text(isEditMode ? "완료" : "선택")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-
-                    // 삭제 버튼 (편집 모드일 때만 표시)
-                    if isEditMode && !selectedTasks.isEmpty {
-                        Button(action: {
-                            showingDeleteConfirmation = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                Text("\(selectedTasks.count)개 삭제")
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                    }
-                }
-            }
 
             // 달성도 표시
             if !viewModel.todayTasks.isEmpty {
@@ -659,12 +706,62 @@ struct TodayView: View {
 
     private func taskSection(title: String, subtitle: String, tasks: [Task]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+
+                // 편집 모드 버튼
+                HStack(spacing: 12) {
+                    Button(action: {
+                        isEditMode.toggle()
+                        if !isEditMode {
+                            selectedTasks.removeAll()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: isEditMode ? "checkmark.circle.fill" : "checkmark.circle")
+                            Text(isEditMode ? "완료" : "선택")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+
+                    // 캘린더 추가 & 삭제 버튼 (편집 모드이고 선택된 항목이 있을 때만)
+                    if isEditMode && !selectedTasks.isEmpty {
+                        Button(action: {
+                            showingCalendarAddConfirmation = true
+                        }) {
+                            HStack(spacing: 4) {
+                                if isAddingToCalendar {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                } else {
+                                    Image(systemName: "calendar.badge.plus")
+                                    Text("\(selectedTasks.count)개 추가")
+                                }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                        .disabled(isAddingToCalendar)
+
+                        Button(action: {
+                            showingDeleteConfirmation = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("\(selectedTasks.count)개 삭제")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                    }
+                }
             }
 
             ForEach(tasks) { task in
@@ -690,8 +787,56 @@ struct TodayView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "선택한 \(selectedTasks.count)개의 태스크를 삭제하시겠습니까?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("삭제", role: .destructive) {
+                deleteSelectedTasks()
+            }
+            Button("취소", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "선택한 \(selectedTasks.count)개의 태스크를 캘린더에 추가하시겠습니까?",
+            isPresented: $showingCalendarAddConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("캘린더에 추가") {
+                _Concurrency.Task {
+                    await addSelectedTasksToCalendar()
+                }
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("태스크의 마감일과 예상 소요 시간을 기반으로 캘린더 이벤트가 생성됩니다.")
+        }
     }
     
+    private var weekdayIndicator: some View {
+        let weekdays = ["월", "화", "수", "목", "금", "토", "일"]
+        let calendar = Calendar.current
+        let today = Date()
+        let todayWeekday = calendar.component(.weekday, from: today)
+        // Swift Calendar: 1=일, 2=월, 3=화, 4=수, 5=목, 6=금, 7=토
+        // 우리 배열: 0=월, 1=화, 2=수, 3=목, 4=금, 5=토, 6=일
+        let todayIndex = (todayWeekday + 5) % 7
+
+        return HStack(spacing: 4) {
+            ForEach(0..<7, id: \.self) { index in
+                Text(weekdays[index])
+                    .font(.subheadline)
+                    .fontWeight(index == todayIndex ? .bold : .regular)
+                    .foregroundColor(index == todayIndex ? .white : .secondary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle()
+                            .fill(index == todayIndex ? Color.blue : Color.clear)
+                    )
+            }
+        }
+    }
+
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle")
@@ -709,22 +854,40 @@ struct TodayView: View {
     
     private var recommendationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundColor(.yellow)
-                Text("여유 시간에 미리 해두면 좋을 일")
-                    .font(.headline)
-            }
-            
-            ForEach(viewModel.recommendPreparableTasks()) { task in
+            Button(action: {
+                withAnimation {
+                    isRecommendationExpanded.toggle()
+                }
+            }) {
                 HStack {
-                    TaskRowView(task: task)
-                    
-                    Button("오늘 하기") {
-                        // 오늘로 당기기 로직
+                    Image(systemName: isRecommendationExpanded ? "chevron.down" : "chevron.right")
+                        .foregroundColor(.yellow)
+                        .font(.caption)
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.yellow)
+                    Text("여유 시간에 미리 해두면 좋을 일")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text("\(viewModel.recommendPreparableTasks().count)개")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isRecommendationExpanded {
+                ForEach(viewModel.recommendPreparableTasks()) { task in
+                    HStack {
+                        TaskRowView(task: task)
+
+                        Button("오늘 하기") {
+                            // 오늘로 당기기 로직
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
                 }
             }
         }
@@ -930,6 +1093,439 @@ struct TodayView: View {
         .background(Color.green.opacity(0.05))
         .cornerRadius(12)
     }
+
+    private func addSelectedTasksToCalendar() async {
+        isAddingToCalendar = true
+        defer { isAddingToCalendar = false }
+
+        // 선택된 태스크들 가져오기
+        let tasksToAdd = viewModel.todayTasks.filter { selectedTasks.contains($0.id) }
+
+        // 태스크를 캘린더 이벤트로 변환
+        var events: [(title: String, startDate: Date, endDate: Date, notes: String?)] = []
+
+        for task in tasksToAdd {
+            // 마감일의 오후 시간으로 설정 (예: 14:00 ~ 14:30)
+            let calendar = Calendar.current
+            var components = calendar.dateComponents([.year, .month, .day], from: task.dueDate)
+            components.hour = 14 // 오후 2시
+            components.minute = 0
+
+            guard let startDate = calendar.date(from: components) else { continue }
+            let endDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: startDate) ?? startDate
+
+            let notes = """
+            예상 소요 시간: \(task.estimatedTimeFormatted)
+            우선순위: \(task.priority.rawValue)
+            \(task.description.isEmpty ? "" : "\n\(task.description)")
+            """
+
+            events.append((
+                title: task.title,
+                startDate: startDate,
+                endDate: endDate,
+                notes: notes
+            ))
+        }
+
+        // CalendarService를 통해 이벤트 생성
+        let calendarService = calendarViewModel.calendarService
+        let result = await calendarService.createEvents(events)
+
+        // 결과 알림
+        await MainActor.run {
+            if result.success > 0 {
+                print("✅ \(result.success)개 태스크를 캘린더에 추가했습니다")
+            }
+            if result.failure > 0 {
+                print("❌ \(result.failure)개 태스크 추가 실패")
+            }
+
+            // 선택 해제 및 편집 모드 종료
+            selectedTasks.removeAll()
+            isEditMode = false
+        }
+    }
+
+    private func deleteSelectedTasks() {
+        let tasksToDelete = viewModel.todayTasks.filter { selectedTasks.contains($0.id) }
+        viewModel.deleteTasks(tasksToDelete)
+        selectedTasks.removeAll()
+        isEditMode = false
+    }
+}
+
+// MARK: - Today Insights View
+
+struct TodayInsightsView: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+
+    private var todayDateString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: Date())
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 헤더
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("오늘 통계 \(todayDateString)")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Text("오늘의 시간 블록과 미래 준비 현황을 확인하세요")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // 오늘의 시간 블록
+                    timeBlockStatusView
+
+                    // 미래 준비 게이지
+                    futurePreparationGaugeView
+
+                    // 미래 준비 요약
+                    if !viewModel.todayTasks.isEmpty {
+                        futurePreparationSummary
+                    }
+
+                    // 오늘 완료한 준비 태스크들의 미래 피드백
+                    let futurePreps = viewModel.futureTasksPreparedToday()
+                    if !futurePreps.isEmpty {
+                        futureFeedbackSection(futurePreps: futurePreps)
+                    }
+                }
+                .padding(24)
+            }
+        }
+    }
+
+    private var timeBlockStatusView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("오늘의 시간 블록")
+                    .font(.headline)
+                Spacer()
+                Text("\(viewModel.formatMinutes(viewModel.todayUsedMinutes)) / \(viewModel.formatMinutes(viewModel.todayAvailableMinutes))")
+                    .font(.subheadline)
+                    .foregroundColor(viewModel.isTodayOverCapacity ? .red : .secondary)
+            }
+
+            // 프로그레스 바
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.2))
+
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(progressColor)
+                        .frame(width: min(geometry.size.width * viewModel.todayUtilization, geometry.size.width))
+                }
+            }
+            .frame(height: 12)
+
+            // 남은 시간 또는 초과 경고
+            HStack {
+                if viewModel.isTodayOverCapacity {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text("\(viewModel.formatMinutes(-viewModel.todayRemainingMinutes)) 초과")
+                        .foregroundColor(.red)
+                } else if viewModel.todayRemainingMinutes > 0 {
+                    Image(systemName: "clock")
+                        .foregroundColor(.green)
+                    Text("\(viewModel.formatMinutes(viewModel.todayRemainingMinutes)) 여유")
+                        .foregroundColor(.green)
+                }
+                Spacer()
+            }
+            .font(.caption)
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+    }
+
+    private var progressColor: Color {
+        if viewModel.todayUtilization > 1.0 {
+            return .red
+        } else if viewModel.todayUtilization > 0.8 {
+            return .orange
+        } else {
+            return .blue
+        }
+    }
+
+    private var futurePreparationGaugeView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 헤더
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("미래 준비 목표")
+                        .font(.headline)
+                    Text("얼마나 미리 준비하고 있나요?")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+
+            // 게이지
+            VStack(spacing: 12) {
+                // 현재 vs 목표
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("현재")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Text("\(currentDaysAhead)")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundColor(gaugeColor)
+                            Text("일 뒤")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("목표")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Text("\(viewModel.targetDaysAhead)")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                            Text("일 뒤")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // 프로그레스 바
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // 배경 (전체)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.15))
+
+                        // 목표 지점 표시
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: geometry.size.width)
+
+                        // 현재 지점 표시
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(gaugeColor)
+                            .frame(width: min(
+                                geometry.size.width * CGFloat(currentDaysAhead) / CGFloat(viewModel.targetDaysAhead),
+                                geometry.size.width
+                            ))
+                    }
+                }
+                .frame(height: 24)
+
+                // 달성률
+                HStack(spacing: 8) {
+                    if currentDaysAhead >= viewModel.targetDaysAhead {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("목표 달성! 🎉")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.green)
+                    } else {
+                        let percentage = min(Int(Double(currentDaysAhead) / Double(viewModel.targetDaysAhead) * 100), 100)
+                        Text("\(percentage)%")
+                            .fontWeight(.semibold)
+                            .foregroundColor(gaugeColor)
+                        Text(gaugeMessage)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+    }
+
+    private var currentDaysAhead: Int {
+        guard !viewModel.todayTasks.isEmpty else { return 0 }
+
+        var maxDays = 0
+        for task in viewModel.todayTasks {
+            if task.isPreparation {
+                if let daysUntilTarget = task.daysUntilTarget, daysUntilTarget > maxDays {
+                    maxDays = daysUntilTarget
+                }
+            } else if task.isMain {
+                if task.daysUntilDue > maxDays {
+                    maxDays = task.daysUntilDue
+                }
+            }
+        }
+        return maxDays
+    }
+
+    private var gaugeColor: Color {
+        let ratio = Double(currentDaysAhead) / Double(viewModel.targetDaysAhead)
+        if ratio >= 1.0 {
+            return .green
+        } else if ratio >= 0.7 {
+            return .blue
+        } else if ratio >= 0.4 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+
+    private var gaugeMessage: String {
+        let ratio = Double(currentDaysAhead) / Double(viewModel.targetDaysAhead)
+        if ratio >= 0.7 {
+            return "좋은 페이스예요! 👍"
+        } else if ratio >= 0.4 {
+            return "\(viewModel.targetDaysAhead)일 뒤를 살기 위해 노력해보세요! 🎯"
+        } else {
+            return "\(viewModel.targetDaysAhead)일 뒤를 살기 위해 노력해보세요! 🎯"
+        }
+    }
+
+    private var futurePreparationSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundColor(.blue)
+                    .font(.title3)
+                Text("미래 준비 현황")
+                    .font(.headline)
+            }
+
+            // 오늘 마감인 메인 태스크
+            let todayDueTasks = viewModel.todayTasks.filter { $0.isMain && $0.daysUntilDue == 0 }
+            if !todayDueTasks.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.circle.fill")
+                            .foregroundColor(.red)
+                        Text("오늘 마감")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.red)
+                        Text("(\(todayDueTasks.count)개)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    ForEach(todayDueTasks.prefix(3)) { task in
+                        Text("⚡ \(task.title)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(12)
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            // 준비 태스크 요약
+            let preparationTasks = viewModel.todayTasks.filter { $0.isPreparation }
+            if !preparationTasks.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .foregroundColor(.orange)
+                        Text("미래 준비 중")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("(\(preparationTasks.count)개)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    ForEach(preparationTasks.prefix(5)) { task in
+                        if let daysText = task.daysUntilTargetText {
+                            HStack(spacing: 4) {
+                                Text("•")
+                                Text("\(daysText)")
+                                    .fontWeight(.semibold)
+                                Text("준비:")
+                                Text(task.title)
+                            }
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+    }
+
+    private func futureFeedbackSection(futurePreps: [(preparationTask: Task, mainTask: Task)]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+                Text("오늘 준비 완료!")
+                    .font(.headline)
+            }
+
+            Text("오늘 완료한 준비로 미래가 준비되었어요 ✨")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            ForEach(futurePreps, id: \.preparationTask.id) { item in
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.preparationTask.title)
+                            .font(.subheadline)
+                            .strikethrough()
+
+                        if let daysText = item.preparationTask.daysUntilTargetText {
+                            HStack(spacing: 4) {
+                                Text("\(daysText)")
+                                    .fontWeight(.semibold)
+                                Text("'\(item.mainTask.title)' 준비됨")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(6)
+            }
+        }
+        .padding(16)
+        .background(Color.green.opacity(0.05))
+        .cornerRadius(12)
+    }
 }
 
 // MARK: - Task Row View
@@ -1080,26 +1676,25 @@ struct TaskRowView: View {
             Spacer()
 
             // 편집/삭제 버튼 (호버 시 표시)
-            if isHovered {
-                HStack(spacing: 4) {
-                    Button(action: { showingEditSheet = true }) {
-                        Image(systemName: "pencil")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    .buttonStyle(.plain)
-                    .help("수정")
-
-                    Button(action: { showingDeleteAlert = true }) {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                    .buttonStyle(.plain)
-                    .help("삭제")
+            HStack(spacing: 4) {
+                Button(action: { showingEditSheet = true }) {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundColor(.blue)
                 }
-                .padding(.horizontal, 8)
+                .buttonStyle(.plain)
+                .help("수정")
+
+                Button(action: { showingDeleteAlert = true }) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
+                .help("삭제")
             }
+            .padding(.horizontal, 8)
+            .opacity(isHovered ? 1.0 : 0.0)
 
             // 긴급도 표시
             urgencyIndicator
@@ -1282,7 +1877,8 @@ struct ThisWeekView: View {
             // 헤더
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("이번 주")
+                    let weekRange = ContentView.weekDateRange(for: Date(), weekStartDay: viewModel.weekStartDay)
+                    Text("이번 주 (\(ContentView.formatDateRange(start: weekRange.start, end: weekRange.end)))")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     Text("\(totalTasksThisWeek)개의 할 일")
@@ -1398,7 +1994,7 @@ struct ThisWeekView: View {
                     switch viewMode {
                     case .calendar:
                         ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                            HStack(alignment: .top, spacing: 16) {
+                            HStack(alignment: .top, spacing: 12) {
                                 ForEach(weekDates, id: \.self) { date in
                                     WeekDayCard(
                                         date: date,
@@ -1408,10 +2004,10 @@ struct ThisWeekView: View {
                                         isEditMode: $isEditMode,
                                         selectedTasks: $selectedTasks
                                     )
-                                    .frame(width: 280)
+                                    .frame(width: 200)
                                 }
                             }
-                            .padding(24)
+                            .padding(16)
                         }
                     case .list:
                         WeekListView(
@@ -1450,7 +2046,7 @@ struct WeekDayCard: View {
     @EnvironmentObject var viewModel: TaskViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             // 날짜 헤더
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -1458,23 +2054,22 @@ struct WeekDayCard: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text(dayAndMonth)
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                        .font(.headline)
                 }
 
                 if isToday {
                     Text("오늘")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
                         .background(Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(4)
                 } else if isTomorrow {
                     Text("내일")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
                         .background(Color.orange)
                         .foregroundColor(.white)
                         .cornerRadius(4)
@@ -1483,18 +2078,13 @@ struct WeekDayCard: View {
                 Spacer()
 
                 if !tasks.isEmpty {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(completedCount)/\(tasks.count)")
-                            .font(.caption)
-                            .foregroundColor(completedCount == tasks.count ? .green : .secondary)
-                        if tasks.count > 0 {
-                            Text("\(completionPercentage)%")
-                                .font(.caption2)
-                                .foregroundColor(completedCount == tasks.count ? .green : .secondary)
-                        }
-                    }
+                    Text("\(completedCount)/\(tasks.count)")
+                        .font(.caption)
+                        .foregroundColor(completedCount == tasks.count ? .green : .secondary)
                 }
             }
+
+            Divider()
 
             // 태스크 목록 또는 빈 상태
             if tasks.isEmpty {
@@ -1515,23 +2105,22 @@ struct WeekDayCard: View {
                             }) {
                                 Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
                                     .foregroundColor(selectedTasks.contains(task.id) ? .blue : .gray)
-                                    .font(.title3)
                             }
                             .buttonStyle(.plain)
 
-                            TaskRowView(task: task)
+                            CompactTaskRow(task: task)
                         }
                     } else {
-                        TaskRowView(task: task)
+                        CompactTaskRow(task: task)
                     }
                 }
             }
         }
-        .padding(16)
+        .padding(12)
         .background(isToday ? Color.blue.opacity(0.05) : Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
+        .cornerRadius(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(isToday ? Color.blue : Color.clear, lineWidth: 2)
         )
     }
@@ -1557,6 +2146,60 @@ struct WeekDayCard: View {
     private var completionPercentage: Int {
         guard tasks.count > 0 else { return 0 }
         return Int(Double(completedCount) / Double(tasks.count) * 100)
+    }
+}
+
+// MARK: - Compact Task Row (for Calendar View)
+
+struct CompactTaskRow: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+    let task: Task
+
+    var body: some View {
+        Button(action: {
+            viewModel.toggleTaskCompletion(task)
+        }) {
+            HStack(spacing: 6) {
+                // 상태 아이콘
+                Image(systemName: task.status.icon)
+                    .font(.caption)
+                    .foregroundColor(statusColor)
+
+                // 제목
+                Text(task.title)
+                    .font(.caption)
+                    .strikethrough(task.isCompleted)
+                    .foregroundColor(task.isCompleted ? .secondary : .primary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                // 우선순위 (긴급/높음만 표시)
+                if task.priority == .urgent || task.priority == .high {
+                    Image(systemName: task.priority.icon)
+                        .font(.caption2)
+                        .foregroundColor(Color(task.priority.color))
+                }
+
+                // 시간
+                Text(task.estimatedTimeFormatted)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(task.isCompleted ? Color.clear : Color.gray.opacity(0.05))
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var statusColor: Color {
+        switch task.status {
+        case .notStarted: return .gray
+        case .inProgress: return .blue
+        case .completed: return .green
+        }
     }
 }
 
@@ -1623,7 +2266,11 @@ struct NextWeekView: View {
             // 헤더
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("다음 주")
+                    let calendar = Calendar.current
+                    let nextWeekStart = calendar.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+                    let weekRange = ContentView.weekDateRange(for: nextWeekStart, weekStartDay: viewModel.weekStartDay)
+
+                    Text("다음 주 (\(ContentView.formatDateRange(start: weekRange.start, end: weekRange.end)))")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     Text("\(totalTasksNextWeek)개의 할 일")
@@ -1756,7 +2403,7 @@ struct NextWeekView: View {
                     switch viewMode {
                     case .calendar:
                         ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                            HStack(alignment: .top, spacing: 16) {
+                            HStack(alignment: .top, spacing: 12) {
                                 ForEach(weekDates, id: \.self) { date in
                                     WeekDayCard(
                                         date: date,
@@ -1766,10 +2413,10 @@ struct NextWeekView: View {
                                         isEditMode: $isEditMode,
                                         selectedTasks: $selectedTasks
                                     )
-                                    .frame(width: 280)
+                                    .frame(width: 200)
                                 }
                             }
-                            .padding(24)
+                            .padding(16)
                         }
                     case .list:
                         WeekListView(
@@ -1898,6 +2545,169 @@ struct WeekListView: View {
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "M월 d일"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Someday View
+
+struct SomedayView: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+    @State private var showingAddTask = false
+    @State private var isEditMode = false
+    @State private var selectedTasks: Set<UUID> = []
+    @State private var showingDeleteConfirmation = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 헤더
+            headerView
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if !viewModel.somedayTasks.isEmpty {
+                        taskSection
+                    } else {
+                        emptyStateView
+                    }
+                }
+                .padding(24)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: { showingAddTask = true }) {
+                    Label("새 할 일", systemImage: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddTask) {
+            AddTaskView()
+        }
+    }
+
+    private var headerView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("언젠가")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+
+                HStack(spacing: 12) {
+                    Text("총 \(viewModel.somedayTasks.count)개")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    if viewModel.somedayIncompleteTasks.count > 0 {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        Text("미완료 \(viewModel.somedayIncompleteTasks.count)개")
+                            .font(.subheadline)
+                            .foregroundColor(.purple)
+                    }
+                }
+            }
+            Spacer()
+
+            // 편집 모드 버튼 및 삭제 버튼
+            if !viewModel.somedayTasks.isEmpty {
+                HStack(spacing: 12) {
+                    Button(action: {
+                        isEditMode.toggle()
+                        if !isEditMode {
+                            selectedTasks.removeAll()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: isEditMode ? "checkmark.circle.fill" : "checkmark.circle")
+                            Text(isEditMode ? "완료" : "선택")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+
+                    if isEditMode && !selectedTasks.isEmpty {
+                        Button(action: {
+                            showingDeleteConfirmation = true
+                        }) {
+                            Label("삭제 (\(selectedTasks.count))", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .confirmationDialog(
+                            "선택한 \(selectedTasks.count)개의 태스크를 삭제하시겠습니까?",
+                            isPresented: $showingDeleteConfirmation,
+                            titleVisibility: .visible
+                        ) {
+                            Button("삭제", role: .destructive) {
+                                deleteSelectedTasks()
+                            }
+                            Button("취소", role: .cancel) {}
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+    }
+
+    private var taskSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("다음 주 이후 할 일")
+                .font(.headline)
+                .padding(.horizontal, 4)
+
+            ForEach(viewModel.somedayTasks) { task in
+                if isEditMode {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            if selectedTasks.contains(task.id) {
+                                selectedTasks.remove(task.id)
+                            } else {
+                                selectedTasks.insert(task.id)
+                            }
+                        }) {
+                            Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(selectedTasks.contains(task.id) ? .blue : .gray)
+                                .font(.title3)
+                        }
+                        .buttonStyle(.plain)
+
+                        TaskRowView(task: task)
+                    }
+                } else {
+                    TaskRowView(task: task)
+                }
+            }
+        }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "tray")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            Text("언젠가 할 일이 없습니다")
+                .font(.title3)
+                .fontWeight(.medium)
+            Text("다음 주 이후의 할 일을 추가해보세요")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 80)
+    }
+
+    private func deleteSelectedTasks() {
+        for taskId in selectedTasks {
+            if let task = viewModel.tasks.first(where: { $0.id == taskId }) {
+                viewModel.deleteTask(task)
+            }
+        }
+        selectedTasks.removeAll()
+        isEditMode = false
     }
 }
 
@@ -2056,8 +2866,10 @@ struct SettingsView: View {
     @State private var showingSaveToCloudAlert = false
     @State private var showingRestoreFromCloudAlert = false
     @State private var showingResetDataAlert = false
+    @State private var showingResetCalendarAlert = false
     @State private var cloudOperationInProgress = false
     @State private var cloudOperationError: String?
+    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -2082,6 +2894,15 @@ struct SettingsView: View {
 
                     // 캘린더 연동
                     CalendarIntegrationView()
+
+                    // 캘린더 초기화
+                    calendarResetSection
+
+                    // 폰트 크기
+                    fontSizeSection
+
+                    // 주 시작 요일
+                    weekStartDaySection
 
                     // 미래 준비 목표
                     futurePreparationGoalSection
@@ -2610,6 +3431,92 @@ struct SettingsView: View {
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
     }
+
+    private var calendarResetSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("캘린더 연동 초기화")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("캘린더 연동 설정과 감지된 패턴을 모두 제거합니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Button(role: .destructive, action: { showingResetCalendarAlert = true }) {
+                    Label("캘린더 연동 초기화", systemImage: "calendar.badge.minus")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(12)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+        }
+        .alert("캘린더 연동 초기화", isPresented: $showingResetCalendarAlert) {
+            Button("취소", role: .cancel) { }
+            Button("초기화", role: .destructive) {
+                calendarViewModel.resetCalendarIntegration()
+            }
+        } message: {
+            Text("캘린더 연동 설정과 감지된 모든 패턴을 제거합니다. 승인된 패턴은 유지됩니다.")
+        }
+    }
+
+    private var fontSizeSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("폰트 크기")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("앱 폰트 크기")
+                        .font(.subheadline)
+                    Spacer()
+                    Slider(value: $appFontSize, in: 16...32, step: 1)
+                        .frame(width: 200)
+                    Text("\(Int(appFontSize))pt")
+                        .frame(width: 50, alignment: .trailing)
+                        .font(.subheadline)
+                }
+
+                Button(action: {
+                    appFontSize = 20.0
+                }) {
+                    Text("기본값으로 재설정")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+
+                Text("슬라이더를 조정하면 즉시 적용됩니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(12)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+        }
+    }
+
+    private var weekStartDaySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("주 시작 요일")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("한 주의 시작", selection: $viewModel.weekStartDay) {
+                    Text("일요일").tag(1)
+                    Text("월요일").tag(2)
+                }
+                .pickerStyle(.segmented)
+
+                Text("이번 주와 다음 주 범위 계산에 적용됩니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(12)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+        }
+    }
 }
 
 // MARK: - Add Task View
@@ -2617,16 +3524,22 @@ struct SettingsView: View {
 struct AddTaskView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @Environment(\.dismiss) var dismiss
-    
+
+    var preselectedProjectId: UUID? = nil
+
+    @State private var quickInput = ""
     @State private var title = ""
     @State private var description = ""
     @State private var dueDate = Date()
     @State private var estimatedHours = 1
     @State private var estimatedMinutes = 0
     @State private var leadTimeDays = 0
+    @State private var priority: TaskPriority = .normal
     @State private var taskType: TaskType = .preparable
     @State private var useTemplate = false
     @State private var selectedTemplate: TaskTemplate?
+    @State private var showDetailedForm = false
+    @State private var selectedProjectId: UUID? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -2638,97 +3551,222 @@ struct AddTaskView: View {
                     .font(.headline)
                 Spacer()
                 Button("추가") { addTask() }
-                    .disabled(title.isEmpty)
+                    .disabled(title.isEmpty && quickInput.isEmpty)
                     .buttonStyle(.borderedProminent)
             }
             .padding()
-            
+
             Divider()
-            
+
             Form {
-                Section("기본 정보") {
-                    TextField("제목", text: $title)
-                    TextField("설명 (선택)", text: $description)
-                    DatePicker("마감일", selection: $dueDate, displayedComponents: .date)
-                }
-                
-                Section("시간 설정") {
-                    HStack {
-                        Text("예상 소요 시간")
-                        Spacer()
-                        Picker("시간", selection: $estimatedHours) {
-                            ForEach(0..<13) { Text("\($0)시간").tag($0) }
+                // 빠른 입력
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("예: 내일까지 회의 자료 준비 2시간 중요", text: $quickInput)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.body)
+                            .onSubmit {
+                                parseQuickInput()
+                            }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                            Text("자연어로 입력하면 자동으로 파싱됩니다")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .frame(width: 80)
-                        Picker("분", selection: $estimatedMinutes) {
-                            ForEach([0, 15, 30, 45], id: \.self) { Text("\($0)분").tag($0) }
+
+                        if !quickInput.isEmpty {
+                            Button(action: parseQuickInput) {
+                                Label("입력 분석", systemImage: "wand.and.stars")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .frame(width: 70)
                     }
-                    
-                    Stepper("선행 소요 일수: \(leadTimeDays)일", value: $leadTimeDays, in: 0...14)
-                    
-                    if leadTimeDays > 0 {
+                } header: {
+                    HStack {
+                        Text("빠른 입력")
+                        Spacer()
+                        Button(action: { showDetailedForm.toggle() }) {
+                            Text(showDetailedForm ? "간단히 보기" : "상세 설정")
+                                .font(.caption)
+                        }
+                    }
+                }
+
+                if showDetailedForm {
+                    Section("기본 정보") {
+                        TextField("제목", text: $title)
+                        TextField("설명 (선택)", text: $description)
+                        DatePicker("마감일", selection: $dueDate, displayedComponents: .date)
+
+                        Picker("우선순위", selection: $priority) {
+                            ForEach(TaskPriority.allCases, id: \.self) { priority in
+                                HStack {
+                                    Image(systemName: priority.icon)
+                                    Text(priority.rawValue)
+                                }
+                                .tag(priority)
+                            }
+                        }
+
+                        Picker("프로젝트", selection: $selectedProjectId) {
+                            Text("프로젝트 없음").tag(nil as UUID?)
+                            ForEach(viewModel.projects) { project in
+                                HStack {
+                                    Image(systemName: project.icon)
+                                        .foregroundColor(Color(hex: project.color))
+                                    Text(project.name)
+                                }
+                                .tag(project.id as UUID?)
+                            }
+                        }
+                    }
+
+                    Section("시간 설정") {
                         HStack {
-                            Image(systemName: "info.circle")
-                                .foregroundColor(.blue)
-                            Text("마감 \(leadTimeDays)일 전부터 '오늘 할 일'에 표시됩니다")
+                            Text("예상 소요 시간")
+                            Spacer()
+                            Picker("시간", selection: $estimatedHours) {
+                                ForEach(0..<13) { Text("\($0)시간").tag($0) }
+                            }
+                            .frame(width: 80)
+                            Picker("분", selection: $estimatedMinutes) {
+                                ForEach([0, 15, 30, 45], id: \.self) { Text("\($0)분").tag($0) }
+                            }
+                            .frame(width: 70)
+                        }
+
+                        Stepper("선행 소요 일수: \(leadTimeDays)일", value: $leadTimeDays, in: 0...14)
+
+                        if leadTimeDays > 0 {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.blue)
+                                Text("마감 \(leadTimeDays)일 전부터 '오늘 할 일'에 표시됩니다")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+
+                    Section("태스크 유형") {
+                        Picker("유형", selection: $taskType) {
+                            ForEach(TaskType.allCases, id: \.self) { type in
+                                Label(type.rawValue, systemImage: type.icon).tag(type)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        if taskType == .preparable {
+                            Text("미리 시간이 있을 때 해둘 수 있는 일입니다")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("해당 날짜에만 할 수 있는 일입니다 (회의, 미팅 등)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
-                }
-                
-                Section("태스크 유형") {
-                    Picker("유형", selection: $taskType) {
-                        ForEach(TaskType.allCases, id: \.self) { type in
-                            Label(type.rawValue, systemImage: type.icon).tag(type)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    if taskType == .preparable {
-                        Text("미리 시간이 있을 때 해둘 수 있는 일입니다")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("해당 날짜에만 할 수 있는 일입니다 (회의, 미팅 등)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section("템플릿 (선택)") {
-                    Toggle("템플릿 사용", isOn: $useTemplate)
-                    
-                    if useTemplate {
-                        ForEach(TaskTemplate.allTemplates, id: \.name) { template in
-                            Button(action: { selectedTemplate = template }) {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(template.name)
-                                        Text("\(template.subtasks.count)개의 서브태스크")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    if selectedTemplate?.name == template.name {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.blue)
+
+                    Section("템플릿 (선택)") {
+                        Toggle("템플릿 사용", isOn: $useTemplate)
+
+                        if useTemplate {
+                            ForEach(TaskTemplate.allTemplates, id: \.name) { template in
+                                Button(action: { selectedTemplate = template }) {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(template.name)
+                                            Text("\(template.subtasks.count)개의 서브태스크")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        if selectedTemplate?.name == template.name {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(.blue)
+                                        }
                                     }
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
+                        }
+                    }
+                } else {
+                    // 간단 모드: 파싱된 정보만 표시
+                    if !title.isEmpty {
+                        Section("파싱 결과") {
+                            LabeledContent("제목", value: title)
+                            LabeledContent("마감일", value: dueDate.formatted(date: .abbreviated, time: .omitted))
+                            LabeledContent("예상 시간", value: "\(estimatedHours)시간 \(estimatedMinutes)분")
+                            if priority != .normal {
+                                LabeledContent("우선순위", value: priority.rawValue)
+                            }
+                            if leadTimeDays > 0 {
+                                LabeledContent("선행 일수", value: "\(leadTimeDays)일 전")
+                            }
                         }
                     }
                 }
             }
             .formStyle(.grouped)
         }
-        .frame(width: 500, height: 600)
+        .frame(width: 500, height: showDetailedForm ? 700 : 400)
+        .onAppear {
+            selectedProjectId = preselectedProjectId
+        }
     }
-    
+
+    private func parseQuickInput() {
+        let parsed = TaskInputParser.parse(quickInput)
+
+        print("📝 입력 분석 시작: '\(quickInput)'")
+        print("   제목: '\(parsed.title)'")
+        print("   마감일: \(parsed.dueDate?.description ?? "없음")")
+        print("   예상 시간: \(parsed.estimatedMinutes ?? 0)분")
+        print("   우선순위: \(parsed.priority?.rawValue ?? "없음")")
+        print("   선행 일수: \(parsed.leadTimeDays ?? 0)일")
+
+        // 제목 설정
+        title = parsed.title
+
+        // 마감일 설정
+        if let date = parsed.dueDate {
+            dueDate = date
+        }
+
+        // 예상 시간 설정
+        if let minutes = parsed.estimatedMinutes {
+            estimatedHours = minutes / 60
+            estimatedMinutes = minutes % 60
+        }
+
+        // 우선순위 설정
+        if let parsedPriority = parsed.priority {
+            priority = parsedPriority
+        }
+
+        // 선행 일수 설정
+        if let days = parsed.leadTimeDays {
+            leadTimeDays = days
+        }
+
+        // 상세 폼 보여주기
+        showDetailedForm = true
+    }
+
     private func addTask() {
+        // 빠른 입력이 비어있지 않으면 먼저 파싱
+        if !quickInput.isEmpty && title.isEmpty {
+            parseQuickInput()
+        }
+
+        guard !title.isEmpty else { return }
+
         var task = Task(
             title: title,
             description: description,
@@ -2736,7 +3774,9 @@ struct AddTaskView: View {
             estimatedMinutes: estimatedHours * 60 + estimatedMinutes,
             leadTimeDays: leadTimeDays,
             taskType: taskType,
-            taskRole: .main  // 기본적으로 메인 태스크
+            taskRole: .main,
+            priority: priority,
+            projectId: selectedProjectId
         )
 
         if useTemplate, let template = selectedTemplate {
@@ -2765,7 +3805,9 @@ struct EditTaskView: View {
     @State private var estimatedHours: Int
     @State private var estimatedMinutes: Int
     @State private var leadTimeDays: Int
+    @State private var priority: TaskPriority
     @State private var taskType: TaskType
+    @State private var selectedProjectId: UUID?
 
     init(task: Task) {
         self.task = task
@@ -2775,7 +3817,9 @@ struct EditTaskView: View {
         _estimatedHours = State(initialValue: task.estimatedMinutes / 60)
         _estimatedMinutes = State(initialValue: task.estimatedMinutes % 60)
         _leadTimeDays = State(initialValue: task.leadTimeDays)
+        _priority = State(initialValue: task.priority)
         _taskType = State(initialValue: task.taskType)
+        _selectedProjectId = State(initialValue: task.projectId)
     }
 
     var body: some View {
@@ -2800,6 +3844,28 @@ struct EditTaskView: View {
                     TextField("제목", text: $title)
                     TextField("설명 (선택)", text: $description)
                     DatePicker("마감일", selection: $dueDate, displayedComponents: .date)
+
+                    Picker("우선순위", selection: $priority) {
+                        ForEach(TaskPriority.allCases, id: \.self) { priority in
+                            HStack {
+                                Image(systemName: priority.icon)
+                                Text(priority.rawValue)
+                            }
+                            .tag(priority)
+                        }
+                    }
+
+                    Picker("프로젝트", selection: $selectedProjectId) {
+                        Text("프로젝트 없음").tag(nil as UUID?)
+                        ForEach(viewModel.projects) { project in
+                            HStack {
+                                Image(systemName: project.icon)
+                                    .foregroundColor(Color(hex: project.color))
+                                Text(project.name)
+                            }
+                            .tag(project.id as UUID?)
+                        }
+                    }
                 }
 
                 Section("시간 설정") {
@@ -2868,9 +3934,553 @@ struct EditTaskView: View {
         updatedTask.dueDate = dueDate
         updatedTask.estimatedMinutes = estimatedHours * 60 + estimatedMinutes
         updatedTask.leadTimeDays = leadTimeDays
+        updatedTask.priority = priority
         updatedTask.taskType = taskType
+        updatedTask.projectId = selectedProjectId
 
         viewModel.updateTask(updatedTask)
         dismiss()
+    }
+}
+
+// MARK: - Date Range Helpers
+
+extension ContentView {
+    static func weekDateRange(for date: Date, weekStartDay: Int) -> (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+
+        // Calculate days to subtract to get to week start
+        let daysFromStart = (weekday - weekStartDay + 7) % 7
+
+        guard let weekStart = calendar.date(byAdding: .day, value: -daysFromStart, to: calendar.startOfDay(for: date)),
+              let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else {
+            return (calendar.startOfDay(for: date), calendar.startOfDay(for: date))
+        }
+
+        return (weekStart, weekEnd)
+    }
+
+    static func formatDateRange(start: Date, end: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M/d"
+
+        return "\(formatter.string(from: start)) ~ \(formatter.string(from: end))"
+    }
+}
+
+// MARK: - Dynamic Font Support
+
+// Font Scale Environment Key
+struct FontScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1.0
+}
+
+extension EnvironmentValues {
+    var fontScale: CGFloat {
+        get { self[FontScaleKey.self] }
+        set { self[FontScaleKey.self] = newValue }
+    }
+}
+
+// Observable Font Manager
+class FontScaleManager: ObservableObject {
+    @Published var scale: CGFloat = 1.0
+
+    init() {
+        // 저장된 폰트 크기를 스케일로 변환 (기본 20pt 기준)
+        let savedSize = UserDefaults.standard.double(forKey: "appFontSize")
+        if savedSize > 0 {
+            self.scale = savedSize / 20.0
+        }
+    }
+
+    func updateScale(from fontSize: Double) {
+        self.scale = fontSize / 20.0
+        UserDefaults.standard.set(fontSize, forKey: "appFontSize")
+    }
+}
+
+struct DynamicFontModifier: ViewModifier {
+    @StateObject private var fontManager = FontScaleManager()
+    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
+
+    func body(content: Content) -> some View {
+        let scale = appFontSize / 20.0
+        let dynamicTypeSize = fontSizeToDynamicTypeSize(appFontSize)
+
+        return content
+            .environment(\.fontScale, scale)
+            .dynamicTypeSize(dynamicTypeSize)
+            .onChange(of: appFontSize) { oldValue, newValue in
+                fontManager.updateScale(from: newValue)
+            }
+            .onAppear {
+                fontManager.updateScale(from: appFontSize)
+            }
+    }
+
+    private func fontSizeToDynamicTypeSize(_ size: Double) -> DynamicTypeSize {
+        // 폰트 크기를 DynamicTypeSize로 매핑 (16pt ~ 32pt 범위)
+        // 20pt를 기준(large)으로 비례 계산
+        switch size {
+        case ..<17: return .xSmall     // 16pt
+        case 17..<18: return .small    // 17pt
+        case 18..<19: return .medium   // 18pt
+        case 19..<21: return .large    // 19-20pt (기본값)
+        case 21..<23: return .xLarge   // 21-22pt
+        case 23..<25: return .xxLarge  // 23-24pt
+        case 25..<27: return .xxxLarge // 25-26pt
+        case 27..<29: return .accessibility1 // 27-28pt
+        case 29..<31: return .accessibility2 // 29-30pt
+        case 31..<32: return .accessibility3 // 31pt
+        default: return .accessibility4      // 32pt+
+        }
+    }
+}
+
+extension View {
+    func applyDynamicFont() -> some View {
+        self.modifier(DynamicFontModifier())
+    }
+
+    // 스케일이 적용된 폰트를 반환하는 헬퍼
+    func scaledFont(_ textStyle: Font.TextStyle = .body, design: Font.Design = .default) -> some View {
+        self.modifier(ScaledFontModifier(textStyle: textStyle, design: design))
+    }
+}
+
+// MARK: - Project View
+
+struct ProjectView: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+    let project: Project
+    @State private var showingAddTask = false
+    @State private var showingEditProject = false
+    @State private var isEditMode = false
+    @State private var selectedTasks: Set<UUID> = []
+    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
+
+    private var projectTasks: [Task] {
+        viewModel.tasks(for: project.id)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: project.icon)
+                    .foregroundColor(Color(hex: project.color))
+                    .font(.title)
+                Text(project.name)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                Spacer()
+
+                Button {
+                    showingEditProject = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showingAddTask = true
+                } label: {
+                    Label("새 할 일", systemImage: "plus.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+
+                if !projectTasks.isEmpty {
+                    Button(isEditMode ? "완료" : "편집") {
+                        isEditMode.toggle()
+                        if !isEditMode {
+                            selectedTasks.removeAll()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding()
+
+            Divider()
+
+            // Task List
+            if projectTasks.isEmpty {
+                VStack(spacing: 20) {
+                    Spacer()
+                    Image(systemName: "tray")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.5))
+                    Text("할 일이 없습니다")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                    Button {
+                        showingAddTask = true
+                    } label: {
+                        Label("첫 할 일 추가", systemImage: "plus.circle")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(projectTasks) { task in
+                            HStack(spacing: 12) {
+                                if isEditMode {
+                                    Button {
+                                        if selectedTasks.contains(task.id) {
+                                            selectedTasks.remove(task.id)
+                                        } else {
+                                            selectedTasks.insert(task.id)
+                                        }
+                                    } label: {
+                                        Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(selectedTasks.contains(task.id) ? .blue : .gray)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                Button {
+                                    viewModel.toggleTaskCompletion(task)
+                                } label: {
+                                    Image(systemName: task.status.icon)
+                                        .foregroundColor(Color(task.status.color))
+                                }
+                                .buttonStyle(.plain)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(task.title)
+                                        .font(.body)
+                                        .strikethrough(task.isCompleted)
+                                    HStack(spacing: 8) {
+                                        Text(task.dueDateWithWeekday)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(task.estimatedTimeFormatted)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        if task.priority != .normal {
+                                            Image(systemName: task.priority.icon)
+                                                .foregroundColor(Color(task.priority.color))
+                                                .font(.caption)
+                                        }
+                                    }
+                                }
+
+                                Spacer()
+
+                                Text(task.dDayText)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(task.daysUntilDue <= 0 ? Color.red.opacity(0.2) : Color.blue.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .padding(12)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                }
+
+                if isEditMode && !selectedTasks.isEmpty {
+                    HStack {
+                        Text("\(selectedTasks.count)개 선택됨")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button(role: .destructive) {
+                            let tasksToDelete = projectTasks.filter { selectedTasks.contains($0.id) }
+                            viewModel.deleteTasks(tasksToDelete)
+                            selectedTasks.removeAll()
+                            isEditMode = false
+                        } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding()
+                    .background(Color(NSColor.controlBackgroundColor))
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddTask) {
+            AddTaskView(preselectedProjectId: project.id)
+        }
+        .sheet(isPresented: $showingEditProject) {
+            EditProjectView(project: project)
+        }
+    }
+}
+
+// MARK: - Add Project View
+
+struct AddProjectView: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var selectedColor = "#007AFF"
+    @State private var selectedIcon = "folder.fill"
+    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
+
+    private let availableColors = [
+        "#007AFF", "#FF3B30", "#34C759", "#FF9500", "#5856D6",
+        "#FF2D55", "#5AC8FA", "#FFCC00", "#AF52DE", "#32ADE6"
+    ]
+
+    private let availableIcons = [
+        "folder.fill", "star.fill", "heart.fill", "bookmark.fill",
+        "flag.fill", "tag.fill", "briefcase.fill", "house.fill",
+        "cart.fill", "book.fill", "graduationcap.fill", "gamecontroller.fill"
+    ]
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("새 프로젝트")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.top)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("프로젝트 이름")
+                    .font(.headline)
+                TextField("프로젝트 이름", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("색상")
+                    .font(.headline)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
+                    ForEach(availableColors, id: \.self) { color in
+                        Circle()
+                            .fill(Color(hex: color))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.primary, lineWidth: selectedColor == color ? 3 : 0)
+                            )
+                            .onTapGesture {
+                                selectedColor = color
+                            }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("아이콘")
+                    .font(.headline)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                    ForEach(availableIcons, id: \.self) { icon in
+                        Image(systemName: icon)
+                            .font(.title2)
+                            .foregroundColor(Color(hex: selectedColor))
+                            .frame(width: 40, height: 40)
+                            .background(selectedIcon == icon ? Color.gray.opacity(0.2) : Color.clear)
+                            .cornerRadius(8)
+                            .onTapGesture {
+                                selectedIcon = icon
+                            }
+                    }
+                }
+            }
+
+            Spacer()
+
+            HStack {
+                Button("취소") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+
+                Button("추가") {
+                    let project = Project(
+                        name: name,
+                        color: selectedColor,
+                        icon: selectedIcon
+                    )
+                    viewModel.addProject(project)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 400, height: 500)
+    }
+}
+
+// MARK: - Edit Project View
+
+struct EditProjectView: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+    @Environment(\.dismiss) private var dismiss
+    let project: Project
+    @State private var name = ""
+    @State private var selectedColor = ""
+    @State private var selectedIcon = ""
+    @State private var showingDeleteConfirmation = false
+    @AppStorage("appFontSize") private var appFontSize: Double = 20.0
+
+    private let availableColors = [
+        "#007AFF", "#FF3B30", "#34C759", "#FF9500", "#5856D6",
+        "#FF2D55", "#5AC8FA", "#FFCC00", "#AF52DE", "#32ADE6"
+    ]
+
+    private let availableIcons = [
+        "folder.fill", "star.fill", "heart.fill", "bookmark.fill",
+        "flag.fill", "tag.fill", "briefcase.fill", "house.fill",
+        "cart.fill", "book.fill", "graduationcap.fill", "gamecontroller.fill"
+    ]
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("프로젝트 편집")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.top)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("프로젝트 이름")
+                    .font(.headline)
+                TextField("프로젝트 이름", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("색상")
+                    .font(.headline)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
+                    ForEach(availableColors, id: \.self) { color in
+                        Circle()
+                            .fill(Color(hex: color))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.primary, lineWidth: selectedColor == color ? 3 : 0)
+                            )
+                            .onTapGesture {
+                                selectedColor = color
+                            }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("아이콘")
+                    .font(.headline)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                    ForEach(availableIcons, id: \.self) { icon in
+                        Image(systemName: icon)
+                            .font(.title2)
+                            .foregroundColor(Color(hex: selectedColor))
+                            .frame(width: 40, height: 40)
+                            .background(selectedIcon == icon ? Color.gray.opacity(0.2) : Color.clear)
+                            .cornerRadius(8)
+                            .onTapGesture {
+                                selectedIcon = icon
+                            }
+                    }
+                }
+            }
+
+            Spacer()
+
+            HStack {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("삭제", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("취소") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+
+                Button("저장") {
+                    var updatedProject = project
+                    updatedProject.name = name
+                    updatedProject.color = selectedColor
+                    updatedProject.icon = selectedIcon
+                    viewModel.updateProject(updatedProject)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 400, height: 500)
+        .onAppear {
+            name = project.name
+            selectedColor = project.color
+            selectedIcon = project.icon
+        }
+        .alert("프로젝트 삭제", isPresented: $showingDeleteConfirmation) {
+            Button("취소", role: .cancel) {}
+            Button("삭제", role: .destructive) {
+                viewModel.deleteProject(project)
+                dismiss()
+            }
+        } message: {
+            Text("프로젝트를 삭제하시겠습니까? 프로젝트에 속한 태스크는 프로젝트 없음으로 변경됩니다.")
+        }
+    }
+}
+
+// MARK: - Color Extension
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
+
+// 각 텍스트 스타일에 스케일을 적용하는 Modifier
+struct ScaledFontModifier: ViewModifier {
+    @Environment(\.fontScale) var fontScale
+    let textStyle: Font.TextStyle
+    let design: Font.Design
+
+    func body(content: Content) -> some View {
+        content.font(.system(textStyle, design: design))
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge) // 최대 크기 제한
+    }
+}
+
+// Font extension for easy scaling
+extension Font {
+    static func scaled(_ style: TextStyle, scale: CGFloat = 1.0) -> Font {
+        return .system(style).weight(.regular)
     }
 }

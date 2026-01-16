@@ -362,6 +362,31 @@ class CalendarViewModel: ObservableObject {
         !isEnabled && (authorizationStatus == .notDetermined || authorizationStatus == .denied)
     }
 
+    // MARK: - Reset
+
+    /// 캘린더 연동 초기화 (모든 설정 및 감지된 패턴 제거)
+    func resetCalendarIntegration() {
+        print("🔄 캘린더 연동 초기화 시작...")
+
+        // 연동 비활성화
+        isEnabled = false
+
+        // 패턴 및 선택 초기화
+        detectedPatterns = []
+        selectedPatterns = []
+        hasNewPatterns = false
+
+        // 캘린더 선택 초기화
+        selectedCalendarIds = []
+
+        // 메시지 초기화
+        errorMessage = nil
+        successMessage = nil
+        statusMessage = nil
+
+        print("✅ 캘린더 연동 초기화 완료")
+    }
+
     // MARK: - Debugging
 
     /// 디버깅 정보 출력

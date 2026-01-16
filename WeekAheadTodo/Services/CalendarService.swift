@@ -297,4 +297,85 @@ class CalendarService: ObservableObject {
 
         return result
     }
+
+    // MARK: - Create Events
+
+    /// 캘린더에 이벤트 생성
+    /// - Parameters:
+    ///   - title: 이벤트 제목
+    ///   - startDate: 시작 날짜/시간
+    ///   - endDate: 종료 날짜/시간
+    ///   - notes: 메모 (선택)
+    ///   - calendarIdentifier: 캘린더 ID (nil이면 기본 캘린더)
+    /// - Returns: 성공 여부
+    func createEvent(
+        title: String,
+        startDate: Date,
+        endDate: Date,
+        notes: String? = nil,
+        calendarIdentifier: String? = nil
+    ) async -> Bool {
+        guard isAuthorized else {
+            print("❌ [CalendarService] 권한 없음 - 이벤트 생성 불가")
+            return false
+        }
+
+        let event = EKEvent(eventStore: eventStore)
+        event.title = title
+        event.startDate = startDate
+        event.endDate = endDate
+        event.notes = notes
+
+        // 캘린더 선택
+        if let calendarId = calendarIdentifier {
+            if let calendar = eventStore.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarId }) {
+                event.calendar = calendar
+            } else {
+                event.calendar = eventStore.defaultCalendarForNewEvents
+            }
+        } else {
+            event.calendar = eventStore.defaultCalendarForNewEvents
+        }
+
+        do {
+            try eventStore.save(event, span: .thisEvent)
+            print("✅ [CalendarService] 이벤트 생성 성공: \(title)")
+            return true
+        } catch {
+            print("❌ [CalendarService] 이벤트 생성 실패: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// 여러 이벤트를 한 번에 생성
+    /// - Parameters:
+    ///   - events: 생성할 이벤트 정보 배열 [(제목, 시작, 종료, 메모)]
+    ///   - calendarIdentifier: 캘린더 ID (nil이면 기본 캘린더)
+    /// - Returns: (성공 개수, 실패 개수)
+    func createEvents(
+        _ events: [(title: String, startDate: Date, endDate: Date, notes: String?)],
+        calendarIdentifier: String? = nil
+    ) async -> (success: Int, failure: Int) {
+        var successCount = 0
+        var failureCount = 0
+
+        for eventInfo in events {
+            let success = await createEvent(
+                title: eventInfo.title,
+                startDate: eventInfo.startDate,
+                endDate: eventInfo.endDate,
+                notes: eventInfo.notes,
+                calendarIdentifier: calendarIdentifier
+            )
+
+            if success {
+                successCount += 1
+            } else {
+                failureCount += 1
+            }
+        }
+
+        print("📊 [CalendarService] 이벤트 생성 완료: 성공 \(successCount)개, 실패 \(failureCount)개")
+        return (successCount, failureCount)
+    }
 }
