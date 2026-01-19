@@ -509,7 +509,7 @@ struct TodayView: View {
                     HStack(spacing: 4) {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("완료")
-                                .font(.body)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                             Text("\(completedTodayCount)")
                                 .font(.title2)
@@ -523,7 +523,7 @@ struct TodayView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("전체")
-                                .font(.body)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                             Text("\(totalTodayCount)")
                                 .font(.title2)
@@ -535,15 +535,15 @@ struct TodayView: View {
                     // 달성률과 남은 개수
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(todayCompletionPercentage)% 달성")
-                            .font(.body)
+                            .font(.caption)
                             .foregroundColor(todayCompletionPercentage == 100 ? .green : .blue)
                         if remainingTodayCount > 0 {
                             Text("남은 \(remainingTodayCount)개")
-                                .font(.body)
+                                .font(.caption)
                                 .foregroundColor(.orange)
                         } else {
                             Text("모두 완료! 🎉")
-                                .font(.body)
+                                .font(.caption)
                                 .foregroundColor(.green)
                         }
                     }
@@ -566,7 +566,7 @@ struct TodayView: View {
                             .frame(width: 10, height: 10)
                             .overlay(
                                 Text("\(min(tasksNeedingAttentionCount, 9))")
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.system(size: 7, weight: .bold))
                                     .foregroundColor(.white)
                             )
                             .offset(x: 8, y: -8)
@@ -657,22 +657,14 @@ struct TodayView: View {
         return maxDays > 0 ? maxDays : nil
     }
 
-    // 오늘 완료한 태스크 수 (오늘 또는 오늘 이후가 마감인 완료된 태스크만)
+    // 오늘 완료한 태스크 수
     private var completedTodayCount: Int {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        return viewModel.todayTasks.filter { task in
-            task.isCompleted && calendar.startOfDay(for: task.dueDate) >= today
-        }.count
+        viewModel.todayTasks.filter { $0.isCompleted }.count
     }
 
-    // 오늘 전체 태스크 수 (미완료 + 오늘 완료한 것만, 과거에 완료한 것 제외)
+    // 오늘 전체 태스크 수 (완료 + 미완료)
     private var totalTodayCount: Int {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        return viewModel.todayTasks.filter { task in
-            !task.isCompleted || calendar.startOfDay(for: task.dueDate) >= today
-        }.count
+        viewModel.todayTasks.count
     }
 
     // 오늘 남은 태스크 수
@@ -1012,7 +1004,7 @@ struct TodayView: View {
                         // Drag handle
                         Image(systemName: "line.3.horizontal")
                             .foregroundColor(.gray)
-                            .font(.body)
+                            .font(.caption)
 
                         TaskRowView(task: task)
                     }
@@ -1075,7 +1067,7 @@ struct TodayView: View {
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle")
-                .font(.system(size: 52))
+                .font(.system(size: 48))
                 .foregroundColor(.green)
             Text("오늘 할 일이 없습니다")
                 .font(.headline)
@@ -1119,7 +1111,7 @@ struct TodayView: View {
 
                         // 며칠 뒤인지 표시
                         Text(daysUntilText(task.dueDate))
-                            .font(.body)
+                            .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.blue)
                             .padding(.horizontal, 8)
@@ -2296,7 +2288,7 @@ struct ThisWeekView: View {
             if totalTasksThisWeek == 0 {
                 VStack(spacing: 12) {
                     Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 52))
+                        .font(.system(size: 48))
                         .foregroundColor(.green)
                     Text("이번 주 예정된 할 일이 없습니다")
                         .font(.headline)
@@ -2583,7 +2575,7 @@ struct NextWeekView: View {
                         .font(.title3)
                         .fontWeight(.semibold)
                     Text("\(totalTasksNextWeek)개의 할 일")
-                        .font(.body)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
@@ -2627,7 +2619,7 @@ struct NextWeekView: View {
                         // 달성도
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("달성도")
-                                .font(.body)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                             HStack(spacing: 2) {
                                 Text("\(completedNextWeekCount)/\(totalTasksNextWeek)")
@@ -2635,7 +2627,7 @@ struct NextWeekView: View {
                                     .fontWeight(.semibold)
                                     .foregroundColor(completedNextWeekCount == totalTasksNextWeek ? .green : .primary)
                                 Text("(\(nextWeekCompletionPercentage)%)")
-                                    .font(.body)
+                                    .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -2644,7 +2636,7 @@ struct NextWeekView: View {
                         let totalMinutes = weekDates.flatMap { tasks(for: $0) }.reduce(0) { $0 + $1.estimatedMinutes }
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("총 예상 시간")
-                                .font(.body)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                             Text(viewModel.formatMinutes(totalMinutes))
                                 .font(.callout)
@@ -2699,7 +2691,7 @@ struct NextWeekView: View {
             if totalTasksNextWeek == 0 {
                 VStack(spacing: 12) {
                     Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 52))
+                        .font(.system(size: 48))
                         .foregroundColor(.blue)
                     Text("다음 주 계획을 세워보세요")
                         .font(.headline)
@@ -2988,7 +2980,7 @@ struct SomedayView: View {
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Image(systemName: "tray")
-                .font(.system(size: 52))
+                .font(.system(size: 48))
                 .foregroundColor(.secondary)
             Text("언젠가 할 일이 없습니다")
                 .font(.title3)
@@ -4626,7 +4618,7 @@ struct ProjectView: View {
                 VStack(spacing: 20) {
                     Spacer()
                     Image(systemName: "tray")
-                        .font(.system(size: 64))
+                        .font(.system(size: 60))
                         .foregroundColor(.gray.opacity(0.5))
                     Text("할 일이 없습니다")
                         .font(.title3)
@@ -5012,7 +5004,7 @@ extension Font {
 
 // MARK: - Month Calendar View (Apple Calendar Style)
 
-enum CalendarViewMode: String, CaseIterable, Codable {
+enum CalendarViewMode: String, CaseIterable {
     case week = "주간"
     case month = "월간"
 }
@@ -5022,7 +5014,7 @@ struct MonthCalendarView: View {
     @State private var currentWeekStart: Date = Date()
     @State private var currentMonthStart: Date = Date()
     @State private var showingAddTask = false
-    @AppStorage("calendarViewMode") private var viewMode: CalendarViewMode = .week
+    @State private var viewMode: CalendarViewMode = .week
 
     private let calendar = Calendar.current
     // 30분 단위로 변경 (설정된 시간 범위만)
@@ -5051,7 +5043,7 @@ struct MonthCalendarView: View {
                         }
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 17))
+                            .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -5064,14 +5056,14 @@ struct MonthCalendarView: View {
                         }
                     }) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 17))
+                            .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
 
                 Text(viewMode == .week ? weekRangeString : monthRangeString)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.primary)
 
                 Button(action: {
@@ -5083,7 +5075,7 @@ struct MonthCalendarView: View {
                     }
                 }) {
                     Text("오늘")
-                        .font(.system(size: 17))
+                        .font(.system(size: 13))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
                 }
@@ -5137,7 +5129,7 @@ struct MonthCalendarView: View {
             HStack(spacing: 0) {
                 // 시간 레이블 공간
                 Text("GMT+9")
-                    .font(.system(size: 17))
+                    .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .frame(width: 50)
                     .opacity(0.5)
@@ -5147,7 +5139,7 @@ struct MonthCalendarView: View {
                     ForEach(weekDates, id: \.self) { date in
                         VStack(spacing: 3) {
                             Text(dayOfWeekString(date))
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(isToday(date) ? .blue : .secondary)
                                 .textCase(.uppercase)
 
@@ -5158,7 +5150,7 @@ struct MonthCalendarView: View {
                                         .frame(width: 28, height: 28)
                                 }
                                 Text(dayString(date))
-                                    .font(.system(size: 17, weight: isToday(date) ? .semibold : .regular))
+                                    .font(.system(size: 13, weight: isToday(date) ? .semibold : .regular))
                                     .foregroundColor(isToday(date) ? .white : .primary)
                             }
                         }
@@ -5180,9 +5172,10 @@ struct MonthCalendarView: View {
                             let isLast = (hour == viewModel.calendarEndHour)
 
                             Text(String(format: "%02d:00", hour))
-                                .font(.system(size: 17))
+                                .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                                 .padding(.trailing, 4)
+                                .offset(y: -6)
                                 .frame(width: 45, height: isLast ? slotHeight : slotHeight * 4, alignment: .topTrailing)
                         }
                     }
@@ -5310,7 +5303,7 @@ struct MonthCalendarView: View {
                 // 요일 헤더
                 ForEach(Array(["일", "월", "화", "수", "목", "금", "토"].enumerated()), id: \.element) { index, day in
                     Text(day)
-                        .font(.body)
+                        .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(index == 0 || index == 6 ? .red : .secondary)
                         .frame(height: 30)
@@ -5472,7 +5465,7 @@ struct MonthDateCell: View {
         VStack(alignment: .leading, spacing: 4) {
             // 날짜 숫자
             Text("\(calendar.component(.day, from: date))")
-                .font(.system(size: 18, weight: isToday ? .bold : .regular))
+                .font(.system(size: 14, weight: isToday ? .bold : .regular))
                 .foregroundColor(dateTextColor)
                 .frame(width: 24, height: 24)
                 .background(isToday ? Color.blue : Color.clear)
@@ -5488,7 +5481,7 @@ struct MonthDateCell: View {
                             .fill(taskColor(task))
                             .frame(width: 6, height: 6)
                         Text(task.title)
-                            .font(.system(size: 17))
+                            .font(.system(size: 10))
                             .lineLimit(1)
                             .foregroundColor(isCurrentMonth ? .primary : .secondary)
                     }
@@ -5497,7 +5490,7 @@ struct MonthDateCell: View {
                 // 더 많은 태스크가 있으면 표시
                 if tasks.count > 3 {
                     Text("+\(tasks.count - 3)개 더")
-                        .font(.system(size: 17))
+                        .font(.system(size: 9))
                         .foregroundColor(.secondary)
                         .padding(.leading, 10)
                 }
@@ -5568,7 +5561,7 @@ struct TimeBasedWeekCalendar: View {
             HStack(spacing: 0) {
                 // 시간 레이블 공간
                 Text("GMT+9")
-                    .font(.system(size: 17))
+                    .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .frame(width: 50)
                     .opacity(0.5)
@@ -5578,7 +5571,7 @@ struct TimeBasedWeekCalendar: View {
                     ForEach(weekDates, id: \.self) { date in
                         VStack(spacing: 3) {
                             Text(dayOfWeekString(date))
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(isToday(date) ? .blue : .secondary)
                                 .textCase(.uppercase)
 
@@ -5589,7 +5582,7 @@ struct TimeBasedWeekCalendar: View {
                                         .frame(width: 28, height: 28)
                                 }
                                 Text(dayString(date))
-                                    .font(.system(size: 17, weight: isToday(date) ? .semibold : .regular))
+                                    .font(.system(size: 13, weight: isToday(date) ? .semibold : .regular))
                                     .foregroundColor(isToday(date) ? .white : .primary)
                             }
                         }
@@ -5612,7 +5605,7 @@ struct TimeBasedWeekCalendar: View {
                                 let isLast = (hour == viewModel.calendarEndHour)
 
                                 Text(String(format: "%02d:00", hour))
-                                    .font(.system(size: 17))
+                                    .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                                     .padding(.trailing, 4)
                                     .offset(y: -6)
@@ -6063,13 +6056,13 @@ struct TaskTimeBlock: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
                     .foregroundColor(.white)
 
                 // 시작 - 종료 시간 표시
                 Text(timeRangeString)
-                    .font(.system(size: 17))
+                    .font(.system(size: 9))
                     .foregroundColor(.white.opacity(0.9))
             }
             .padding(.horizontal, 6)
@@ -6258,7 +6251,7 @@ struct CompletedTasksView: View {
                 // 빈 상태
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.circle")
-                        .font(.system(size: 52))
+                        .font(.system(size: 48))
                         .foregroundColor(.green)
                     Text("완료된 일이 없습니다")
                         .font(.headline)
@@ -7038,7 +7031,7 @@ struct AssistantHistoryView: View {
             if suggestions.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "bell.slash.fill")
-                        .font(.system(size: 64))
+                        .font(.system(size: 60))
                         .foregroundColor(.secondary.opacity(0.5))
 
                     Text("아직 제안이 없어요")
@@ -7100,7 +7093,7 @@ struct AssistantHistoryRow: View {
 
                 // 타임스탬프 (제안이 생성된 시간)
                 Text(timeAgo(from: suggestion.createdAt))
-                    .font(.body)
+                    .font(.caption)
                     .foregroundColor(.secondary)
             }
 
@@ -7219,18 +7212,18 @@ struct TaskSelectionSheet: View {
                                             // 예상 시간
                                             HStack(spacing: 4) {
                                                 Image(systemName: "clock")
-                                                    .font(.body)
+                                                    .font(.caption)
                                                 Text(task.estimatedTimeFormatted)
-                                                    .font(.body)
+                                                    .font(.caption)
                                             }
                                             .foregroundColor(.secondary)
 
                                             // 며칠 뒤인지 강조 표시
                                             HStack(spacing: 4) {
                                                 Image(systemName: "calendar")
-                                                    .font(.body)
+                                                    .font(.caption)
                                                 Text(daysUntil(task.dueDate))
-                                                    .font(.body)
+                                                    .font(.caption)
                                                     .fontWeight(.semibold)
                                             }
                                             .foregroundColor(.blue)

@@ -420,4 +420,90 @@ final class TaskTests: XCTestCase {
         // Then - 알 수 없는 역할이 기본값(없음)으로 변환됨
         XCTAssertEqual(decodedTask.taskRole, .none)
     }
+
+    // MARK: - New Fields Migration Tests
+
+    func test마이그레이션_targetDate없는데이터_정상로딩() throws {
+        // Given - targetDate 필드가 없는 구버전 JSON 생성
+        let jsonString = """
+        {
+            "id": "\(UUID().uuidString)",
+            "title": "Old Task",
+            "description": "",
+            "dueDate": \(Date().timeIntervalSinceReferenceDate),
+            "estimatedMinutes": 30,
+            "leadTimeDays": 0,
+            "taskType": "미리 가능",
+            "taskRole": "",
+            "status": "시작 안함",
+            "priority": "보통",
+            "createdAt": \(Date().timeIntervalSinceReferenceDate),
+            "isFromCalendarPattern": false,
+            "autoRecurring": false
+        }
+        """
+
+        // When - JSON 디코딩
+        let decoder = JSONDecoder()
+        let jsonData = jsonString.data(using: .utf8)!
+        let decodedTask = try decoder.decode(Task.self, from: jsonData)
+
+        // Then - targetDate는 nil이어야 함
+        XCTAssertEqual(decodedTask.title, "Old Task")
+        XCTAssertNil(decodedTask.targetDate)
+        XCTAssertNil(decodedTask.manualPriority)
+    }
+
+    func test마이그레이션_manualPriority없는데이터_정상로딩() throws {
+        // Given - manualPriority 필드가 없는 구버전 JSON 생성
+        let jsonString = """
+        {
+            "id": "\(UUID().uuidString)",
+            "title": "Old Task Without Manual Priority",
+            "description": "",
+            "dueDate": \(Date().timeIntervalSinceReferenceDate),
+            "estimatedMinutes": 60,
+            "leadTimeDays": 1,
+            "taskType": "당일만 가능",
+            "taskRole": "준비",
+            "status": "진행 중",
+            "priority": "높음",
+            "createdAt": \(Date().timeIntervalSinceReferenceDate),
+            "isFromCalendarPattern": false,
+            "autoRecurring": false
+        }
+        """
+
+        // When - JSON 디코딩
+        let decoder = JSONDecoder()
+        let jsonData = jsonString.data(using: .utf8)!
+        let decodedTask = try decoder.decode(Task.self, from: jsonData)
+
+        // Then - manualPriority는 nil, 다른 필드는 정상
+        XCTAssertEqual(decodedTask.title, "Old Task Without Manual Priority")
+        XCTAssertEqual(decodedTask.taskRole, .preparation)
+        XCTAssertNil(decodedTask.manualPriority)
+    }
+
+    func test마이그레이션_새필드포함데이터_정상저장로딩() throws {
+        // Given - 새 필드를 포함한 Task
+        let targetDate = Calendar.current.date(byAdding: .day, value: 2, to: Date())!
+        var task = Task(
+            title: "New Task With All Fields",
+            dueDate: Date(),
+            targetDate: targetDate
+        )
+        task.manualPriority = 5
+
+        // When - JSON 인코딩 후 디코딩
+        let encoder = JSONEncoder()
+        let jsonData = try encoder.encode(task)
+        let decoder = JSONDecoder()
+        let decodedTask = try decoder.decode(Task.self, from: jsonData)
+
+        // Then - 모든 필드가 정상적으로 유지됨
+        XCTAssertEqual(decodedTask.title, "New Task With All Fields")
+        XCTAssertNotNil(decodedTask.targetDate)
+        XCTAssertEqual(decodedTask.manualPriority, 5)
+    }
 }

@@ -7,11 +7,15 @@ class ProactiveAssistantService: ObservableObject {
     static let shared = ProactiveAssistantService()
 
     @Published var activeSuggestions: [AssistantSuggestion] = []
+    @Published var suggestionHistory: [AssistantSuggestion] = []
 
     // UserDefaults 키
     private let dismissedSuggestionsKey = "dismissedSuggestions"
+    private let suggestionHistoryKey = "suggestionHistory"
 
-    private init() {}
+    private init() {
+        loadHistory()
+    }
 
     // MARK: - Public Methods
 
@@ -49,6 +53,21 @@ class ProactiveAssistantService: ObservableObject {
 
         // 최대 3개까지만 표시
         let filteredSuggestions = suggestions.prefix(3)
+
+        // 새로운 제안을 히스토리에 추가 (중복 방지)
+        for suggestion in filteredSuggestions {
+            if !suggestionHistory.contains(where: { $0.uniqueKey == suggestion.uniqueKey }) {
+                suggestionHistory.insert(suggestion, at: 0)  // 최신 항목을 맨 위에
+            }
+        }
+
+        // 히스토리는 최대 50개까지 유지
+        if suggestionHistory.count > 50 {
+            suggestionHistory = Array(suggestionHistory.prefix(50))
+        }
+
+        // 히스토리 저장
+        saveHistory()
 
         // Dismiss된 제안 필터링
         activeSuggestions = Array(filteredSuggestions).filter { !isDismissed($0) }
@@ -256,9 +275,10 @@ class ProactiveAssistantService: ObservableObject {
 
         // 여유 시간이 1시간 이상 있으면
         if idleMinutes >= 60 {
-            // 미리 할 수 있는 일 (이번 주 내 preparable 태스크)
+            // 미리 할 수 있는 일 (내일 이후의 preparable 태스크)
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
             let preparableTasks = tasks.filter {
-                $0.currentHorizon == .thisWeek &&
+                $0.dueDate >= tomorrow &&
                 $0.taskType == .preparable &&
                 !$0.isCompleted &&
                 $0.estimatedMinutes <= idleMinutes
@@ -319,5 +339,39 @@ class ProactiveAssistantService: ObservableObject {
     func clearDismissedSuggestions() {
         UserDefaults.standard.removeObject(forKey: dismissedSuggestionsKey)
         print("✅ [ProactiveAssistantService] Dismissed suggestions cleared")
+    }
+
+    // MARK: - History Persistence
+
+    /// UserDefaults에서 제안 히스토리 로드
+    private func loadHistory() {
+        guard let data = UserDefaults.standard.data(forKey: suggestionHistoryKey),
+              let history = try? JSONDecoder().decode([AssistantSuggestion].self, from: data) else {
+            print("ℹ️ [ProactiveAssistantService] No suggestion history found")
+            return
+        }
+        suggestionHistory = history
+        print("✅ [ProactiveAssistantService] Loaded \(history.count) suggestions from history")
+    }
+
+    /// UserDefaults에 제안 히스토리 저장
+    private func saveHistory() {
+        if let data = try? JSONEncoder().encode(suggestionHistory) {
+            UserDefaults.standard.set(data, forKey: suggestionHistoryKey)
+            print("✅ [ProactiveAssistantService] Saved \(suggestionHistory.count) suggestions to history")
+        }
+    }
+
+    /// 히스토리에서 제안 삭제
+    func removeFromHistory(_ suggestion: AssistantSuggestion) {
+        suggestionHistory.removeAll { $0.id == suggestion.id }
+        saveHistory()
+    }
+
+    /// 모든 히스토리 삭제
+    func clearHistory() {
+        suggestionHistory.removeAll()
+        UserDefaults.standard.removeObject(forKey: suggestionHistoryKey)
+        print("✅ [ProactiveAssistantService] History cleared")
     }
 }

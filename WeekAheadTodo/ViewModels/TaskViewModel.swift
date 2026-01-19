@@ -63,6 +63,23 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Calendar Display Settings
+    @Published var calendarStartHour: Int = 6 {
+        didSet {
+            UserDefaults.standard.set(calendarStartHour, forKey: calendarStartHourKey)
+        }
+    }
+
+    @Published var calendarEndHour: Int = 22 {
+        didSet {
+            UserDefaults.standard.set(calendarEndHour, forKey: calendarEndHourKey)
+        }
+    }
+
+    // MARK: - Drag Preview
+    @Published var dragPreview: DragPreviewInfo? = nil
+    @Published var currentDraggingTaskId: UUID? = nil  // 현재 드래그 중인 태스크 ID
+
     // MARK: - CloudKit
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
@@ -86,6 +103,8 @@ class TaskViewModel: ObservableObject {
     private let useCalendarKey = "UseCalendarForTimeBlocks"
     private let timeBlockCalendarIdsKey = "TimeBlockCalendarIds"
     private let targetDaysAheadKey = "TargetDaysAhead"
+    private let calendarStartHourKey = "CalendarStartHour"
+    private let calendarEndHourKey = "CalendarEndHour"
 
     // MARK: - Initialization
 
@@ -112,6 +131,8 @@ class TaskViewModel: ObservableObject {
         self.useCalendarForTimeBlocks = UserDefaults.standard.bool(forKey: useCalendarKey)
         self.targetDaysAhead = UserDefaults.standard.object(forKey: targetDaysAheadKey) as? Int ?? 7
         self.weekStartDay = UserDefaults.standard.object(forKey: "weekStartDay") as? Int ?? 1
+        self.calendarStartHour = UserDefaults.standard.object(forKey: calendarStartHourKey) as? Int ?? 6
+        self.calendarEndHour = UserDefaults.standard.object(forKey: calendarEndHourKey) as? Int ?? 22
 
         if let data = UserDefaults.standard.data(forKey: timeBlockCalendarIdsKey),
            let ids = try? JSONDecoder().decode([String].self, from: data) {
@@ -125,7 +146,13 @@ class TaskViewModel: ObservableObject {
 
     private func saveTasks() {
         do {
+            // 기존 데이터를 백업으로 저장 (마이그레이션 실패 시 복구용)
+            if let existingData = UserDefaults.standard.data(forKey: tasksKey) {
+                UserDefaults.standard.set(existingData, forKey: "\(tasksKey)_backup")
+            }
+
             let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted  // 디버깅 용이성
             let data = try encoder.encode(tasks)
             UserDefaults.standard.set(data, forKey: tasksKey)
             print("✅ Tasks saved: \(tasks.count)개")
@@ -136,6 +163,7 @@ class TaskViewModel: ObservableObject {
             }
         } catch {
             print("❌ Failed to save tasks: \(error)")
+            print("   Error details: \(error.localizedDescription)")
         }
     }
 
@@ -151,7 +179,27 @@ class TaskViewModel: ObservableObject {
             print("✅ Tasks loaded: \(tasks.count)개")
         } catch {
             print("❌ Failed to load tasks: \(error)")
-            tasks = []
+            print("   Error details: \(error.localizedDescription)")
+
+            // 백업에서 복구 시도
+            if let backupData = UserDefaults.standard.data(forKey: "\(tasksKey)_backup") {
+                print("⚠️ Attempting to restore from backup...")
+                do {
+                    let decoder = JSONDecoder()
+                    tasks = try decoder.decode([Task].self, from: backupData)
+                    print("✅ Tasks restored from backup: \(tasks.count)개")
+
+                    // 복구 성공 시 백업을 현재 데이터로 저장
+                    saveTasks()
+                } catch {
+                    print("❌ Backup restore also failed: \(error)")
+                    print("   Starting with empty task list")
+                    tasks = []
+                }
+            } else {
+                print("   No backup found, starting with empty task list")
+                tasks = []
+            }
         }
     }
 
@@ -284,13 +332,17 @@ class TaskViewModel: ObservableObject {
         somedayTasks.filter { !$0.isCompleted }
     }
 
-    /// 미리 할 수 있는 태스크 (다음 주 이후 + preparable 타입)
+    /// 미리 할 수 있는 태스크 (내일 이후 + preparable 타입)
     var preparableFutureTasks: [Task] {
-        tasks
-            .filter { 
-                !$0.isCompleted && 
-                $0.taskType == .preparable && 
-                ($0.currentHorizon == .nextWeek || $0.currentHorizon == .later)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+
+        return tasks
+            .filter {
+                !$0.isCompleted &&
+                $0.taskType == .preparable &&
+                $0.dueDate >= tomorrow  // 내일 이후의 모든 태스크
             }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }

@@ -135,7 +135,7 @@ enum TaskPriority: String, CaseIterable, Codable {
 }
 
 /// 메인 태스크 모델
-struct Task: Identifiable, Codable {
+struct Task: Identifiable {
     let id: UUID
     var title: String
     var description: String
@@ -368,6 +368,73 @@ struct Task: Identifiable, Codable {
     /// 시작 안했는지 확인
     var isNotStarted: Bool {
         status == .notStarted
+    }
+}
+
+// MARK: - Task Codable Implementation (하위 호환성)
+
+extension Task: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, dueDate, estimatedMinutes, leadTimeDays
+        case taskType, taskRole, status, priority
+        case projectId, parentTaskId, mainTaskId, targetDate, createdAt
+        case manualPriority
+        case calendarEventId, isFromCalendarPattern, patternId, autoRecurring
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // 필수 필드
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decode(String.self, forKey: .description)
+        dueDate = try container.decode(Date.self, forKey: .dueDate)
+        estimatedMinutes = try container.decode(Int.self, forKey: .estimatedMinutes)
+        leadTimeDays = try container.decode(Int.self, forKey: .leadTimeDays)
+        taskType = try container.decode(TaskType.self, forKey: .taskType)
+        taskRole = try container.decode(TaskRole.self, forKey: .taskRole)
+        status = try container.decode(TaskStatus.self, forKey: .status)
+        priority = try container.decode(TaskPriority.self, forKey: .priority)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+
+        // 옵셔널 필드 (없으면 nil)
+        projectId = try container.decodeIfPresent(UUID.self, forKey: .projectId)
+        parentTaskId = try container.decodeIfPresent(UUID.self, forKey: .parentTaskId)
+        mainTaskId = try container.decodeIfPresent(UUID.self, forKey: .mainTaskId)
+        targetDate = try container.decodeIfPresent(Date.self, forKey: .targetDate)
+        manualPriority = try container.decodeIfPresent(Int.self, forKey: .manualPriority)
+        calendarEventId = try container.decodeIfPresent(String.self, forKey: .calendarEventId)
+        patternId = try container.decodeIfPresent(UUID.self, forKey: .patternId)
+
+        // Bool 필드 (없으면 기본값 false)
+        isFromCalendarPattern = try container.decodeIfPresent(Bool.self, forKey: .isFromCalendarPattern) ?? false
+        autoRecurring = try container.decodeIfPresent(Bool.self, forKey: .autoRecurring) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(description, forKey: .description)
+        try container.encode(dueDate, forKey: .dueDate)
+        try container.encode(estimatedMinutes, forKey: .estimatedMinutes)
+        try container.encode(leadTimeDays, forKey: .leadTimeDays)
+        try container.encode(taskType, forKey: .taskType)
+        try container.encode(taskRole, forKey: .taskRole)
+        try container.encode(status, forKey: .status)
+        try container.encode(priority, forKey: .priority)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(projectId, forKey: .projectId)
+        try container.encodeIfPresent(parentTaskId, forKey: .parentTaskId)
+        try container.encodeIfPresent(mainTaskId, forKey: .mainTaskId)
+        try container.encodeIfPresent(targetDate, forKey: .targetDate)
+        try container.encodeIfPresent(manualPriority, forKey: .manualPriority)
+        try container.encodeIfPresent(calendarEventId, forKey: .calendarEventId)
+        try container.encode(isFromCalendarPattern, forKey: .isFromCalendarPattern)
+        try container.encodeIfPresent(patternId, forKey: .patternId)
+        try container.encode(autoRecurring, forKey: .autoRecurring)
     }
 }
 

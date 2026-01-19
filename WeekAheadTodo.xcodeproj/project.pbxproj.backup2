@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AS3DA3DCD1E94F078C61150 /* AssistantSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */; };
-		383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */; };
 		293A912635E623BE692B94DA /* NotificationPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */; };
 		581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D84A5C8231A5D6F641C7 /* NotificationService.swift */; };
 		A1000001234567890000001 /* WeekAheadTodoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002234567890000001 /* WeekAheadTodoApp.swift */; };
@@ -60,7 +58,6 @@
 		A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternDetectionService.swift; sourceTree = "<group>"; };
 		A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		A18D1386D284CA97002326B1 /* RecurrencePattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurrencePattern.swift; sourceTree = "<group>"; };
-		AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantSuggestion.swift; sourceTree = "<group>"; };
 		A1AAA111111111111111111A /* ApprovedPattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPattern.swift; sourceTree = "<group>"; };
 		A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternReviewView.swift; sourceTree = "<group>"; };
 		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
@@ -70,7 +67,6 @@
 		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
 		A1TIP00000000000000PARSE /* TaskInputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInputParser.swift; sourceTree = "<group>"; };
 		C793D84A5C8231A5D6F641C7 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveAssistantService.swift; sourceTree = "<group>"; };
 		ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationPreviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -133,7 +129,6 @@
 		A1000005234567890000004 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */,
 				A1000002234567890000003 /* Task.swift */,
 				A1000002234567890000004 /* TimeBlock.swift */,
 				A1578DEE4987F86FBBAC2939 /* CalendarEvent.swift */,
@@ -169,7 +164,6 @@
 		A1FB72B5092F65279D203C72 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */,
 				A1TIP00000000000000PARSE /* TaskInputParser.swift */,
 				A1MD000000000000000PARSE /* MarkdownParser.swift */,
 				A126E6D23BBEC2B0F3E10552 /* CalendarService.swift */,
@@ -285,7 +279,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,8 +286,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AS3DA3DCD1E94F078C61150 /* AssistantSuggestion.swift in Sources */,
-				383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */,
 				A1TIP11111111111111BUILD /* TaskInputParser.swift in Sources */,
 				A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */,
 				A1IV111111111111111BUILD /* ImportView.swift in Sources */,
