@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - Notification Settings View
+
 /// 알림 시간 커스터마이징 설정 뷰
 struct NotificationSettingsView: View {
     @EnvironmentObject var notificationService: NotificationService
@@ -158,8 +160,8 @@ struct NotificationSettingsView: View {
                                     .tag(hour)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(width: 80, height: 120)
+                        .pickerStyle(.menu)
+                        .frame(width: 100)
                     }
 
                     Text(":")
@@ -176,8 +178,8 @@ struct NotificationSettingsView: View {
                                     .tag(minute)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(width: 80, height: 120)
+                        .pickerStyle(.menu)
+                        .frame(width: 100)
                     }
                 }
             }
@@ -322,8 +324,8 @@ struct NotificationTimeRow: View {
                                 Text("\(hour)").tag(hour)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(width: 80, height: 120)
+                        .pickerStyle(.menu)
+                        .frame(width: 100)
                     }
 
                     Text(":")
@@ -338,8 +340,8 @@ struct NotificationTimeRow: View {
                                 Text(String(format: "%02d", minute)).tag(minute)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(width: 80, height: 120)
+                        .pickerStyle(.menu)
+                        .frame(width: 100)
                     }
                 }
             }
@@ -371,11 +373,4 @@ struct NotificationTimeRow: View {
         .padding(24)
         .frame(width: 400)
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    NotificationSettingsView()
-        .environmentObject(NotificationService.shared)
 }
