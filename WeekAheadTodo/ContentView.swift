@@ -53,6 +53,7 @@ struct ContentView: View {
         case monthCalendar = "캘린더"
         case someday = "언젠가"
         case completed = "완료된 일"
+        case upcomingReminders = "잊지 않으셨죠?"
         case assistantHistory = "알림 히스토리"
         case todayInsights = "오늘 통계"
         case weekOverview = "주간 개요"
@@ -68,6 +69,7 @@ struct ContentView: View {
             case .monthCalendar: return "calendar"
             case .someday: return "tray.fill"
             case .completed: return "checkmark.circle.fill"
+            case .upcomingReminders: return "hand.wave.fill"
             case .assistantHistory: return "bell.badge.fill"
             case .todayInsights: return "chart.line.uptrend.xyaxis"
             case .weekOverview: return "chart.bar.fill"
@@ -91,6 +93,7 @@ struct ContentView: View {
                 }
 
                 Section("비서") {
+                    sidebarItem(.upcomingReminders)
                     sidebarItem(.assistantHistory)
                 }
 
@@ -241,9 +244,19 @@ struct ContentView: View {
         case .thisWeek: return viewModel.thisWeekIncompleteTasks.count
         case .nextWeek: return viewModel.nextWeekIncompleteTasks.count
         case .someday: return viewModel.somedayIncompleteTasks.count
+        case .upcomingReminders: return upcomingRemindersCount
         case .completed: return nil  // 완료된 일은 뱃지 표시 안 함
         default: return nil
         }
+    }
+
+    private var upcomingRemindersCount: Int {
+        let tasks = viewModel.tasks.filter { !$0.isCompleted }
+        let overdue = tasks.filter { $0.daysUntilDue < 0 }.count
+        let dueWithin3Days = tasks.filter { $0.daysUntilDue >= 0 && $0.daysUntilDue <= 3 }.count
+        let shouldStart = tasks.filter { $0.daysUntilStart <= 0 && $0.daysUntilDue > 3 && $0.leadTimeDays > 0 }.count
+        let startingSoon = tasks.filter { $0.daysUntilStart > 0 && $0.daysUntilStart <= 3 && $0.leadTimeDays > 0 }.count
+        return overdue + dueWithin3Days + shouldStart + startingSoon
     }
 
     private func badgeColor(for section: SidebarSection) -> Color {
@@ -252,6 +265,10 @@ struct ContentView: View {
         case .thisWeek: return .orange
         case .nextWeek: return .green
         case .someday: return .purple
+        case .upcomingReminders:
+            // 마감 지난 태스크가 있으면 빨간색
+            let hasOverdue = viewModel.tasks.contains { !$0.isCompleted && $0.daysUntilDue < 0 }
+            return hasOverdue ? .red : .orange
         default: return .gray
         }
     }
@@ -278,6 +295,8 @@ struct ContentView: View {
                     SomedayView()
                 case .completed:
                     CompletedTasksView()
+                case .upcomingReminders:
+                    UpcomingRemindersView()
                 case .assistantHistory:
                     AssistantHistoryView()
                 case .todayInsights:

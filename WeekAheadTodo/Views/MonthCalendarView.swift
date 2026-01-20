@@ -10,18 +10,6 @@ struct MonthCalendarView: View {
     @AppStorage("calendarViewMode") private var viewMode: CalendarViewMode = .week
 
     private let calendar = Calendar.current
-    // 30분 단위로 변경 (설정된 시간 범위만)
-    private var timeSlots: [Double] {
-        let start = Double(viewModel.calendarStartHour)
-        let end = Double(viewModel.calendarEndHour) + 0.75
-        return stride(from: start, through: end, by: 0.25).map { $0 }
-    }
-
-    private let slotHeight: CGFloat = 30  // 15분당 30px (1시간 = 120px)
-    private var totalHeight: CGFloat { CGFloat(timeSlots.count) * slotHeight }
-
-    @State private var currentTimeOffset: CGFloat = 0
-    @State private var timer: Timer?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -117,174 +105,10 @@ struct MonthCalendarView: View {
     // MARK: - Week Calendar View
 
     private var weekCalendarView: some View {
-        VStack(spacing: 0) {
-            // 날짜 헤더 (고정) - 구글 캘린더 스타일
-            HStack(spacing: 0) {
-                // 시간 레이블 공간
-                Text("GMT+9")
-                    .font(.system(size: 17))
-                    .foregroundColor(.secondary)
-                    .frame(width: 50)
-                    .opacity(0.5)
-
-                // 날짜 헤더들
-                HStack(spacing: 0) {
-                    ForEach(weekDates, id: \.self) { date in
-                        VStack(spacing: 3) {
-                            Text(dayOfWeekString(date))
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(isToday(date) ? .blue : .secondary)
-                                .textCase(.uppercase)
-
-                            ZStack {
-                                if isToday(date) {
-                                    Circle()
-                                        .fill(Color.blue)
-                                        .frame(width: 28, height: 28)
-                                }
-                                Text(dayString(date))
-                                    .font(.system(size: 17, weight: isToday(date) ? .semibold : .regular))
-                                    .foregroundColor(isToday(date) ? .white : .primary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
-                }
-            }
-            .background(Color(NSColor.windowBackgroundColor))
-
-            Divider()
-
-            // 스크롤 가능한 시간 그리드 (구글 캘린더 스타일)
-            ScrollView {
-                HStack(alignment: .top, spacing: 0) {
-                    // 시간 레이블 (정각만 표시)
-                    VStack(alignment: .trailing, spacing: 0) {
-                        ForEach(Array(stride(from: viewModel.calendarStartHour, through: viewModel.calendarEndHour, by: 1)), id: \.self) { hour in
-                            let isLast = (hour == viewModel.calendarEndHour)
-
-                            Text(String(format: "%02d:00", hour))
-                                .font(.system(size: 17))
-                                .foregroundColor(.secondary)
-                                .padding(.trailing, 4)
-                                .frame(width: 45, height: isLast ? slotHeight : slotHeight * 4, alignment: .topTrailing)
-                        }
-                    }
-                    .frame(width: 50)
-
-                    Divider()
-
-                    // 날짜별 컬럼
-                    GeometryReader { geometry in
-                        HStack(spacing: 0) {
-                            ForEach(weekDates, id: \.self) { date in
-                                GeometryReader { columnGeometry in
-                                    ZStack(alignment: .topLeading) {
-                                        // 배경 (흰색)
-                                        Rectangle()
-                                            .fill(Color(NSColor.controlBackgroundColor))
-                                            .frame(height: totalHeight)
-
-                                        // 15분 단위 구분선 (Canvas로 정확하게 그리기)
-                                        Canvas { context, size in
-                                            for (index, slot) in timeSlots.enumerated() {
-                                                let remainder = slot.truncatingRemainder(dividingBy: 1.0)
-                                                let isHour = remainder == 0.0
-                                                let isHalfHour = remainder == 0.5
-                                                let isQuarter = remainder == 0.25 || remainder == 0.75
-
-                                                let y = CGFloat(index) * slotHeight
-
-                                                var path = Path()
-                                                path.move(to: CGPoint(x: 0, y: y))
-                                                path.addLine(to: CGPoint(x: size.width, y: y))
-
-                                                // 선 스타일 결정
-                                                if isHour {
-                                                    // 정각: 진한 선
-                                                    context.stroke(
-                                                        path,
-                                                        with: .color(Color.gray.opacity(0.25)),
-                                                        lineWidth: 1.0
-                                                    )
-                                                } else if isHalfHour {
-                                                    // 30분: 중간 선
-                                                    context.stroke(
-                                                        path,
-                                                        with: .color(Color.gray.opacity(0.15)),
-                                                        lineWidth: 0.7
-                                                    )
-                                                } else if isQuarter {
-                                                    // 15분, 45분: 얇은 선
-                                                    context.stroke(
-                                                        path,
-                                                        with: .color(Color.gray.opacity(0.08)),
-                                                        lineWidth: 0.5
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        .frame(height: totalHeight)
-
-                                        // 태스크 배치
-                                        TaskLayoutView(
-                                            tasks: tasksForDate(date),
-                                            hourHeight: slotHeight,
-                                            dayColumnWidth: columnGeometry.size.width,
-                                            date: date
-                                        )
-
-                                        // 현재 시간 표시 (구글 캘린더 스타일)
-                                        if isToday(date) {
-                                            ZStack(alignment: .leading) {
-                                                // 빨간 선
-                                                Rectangle()
-                                                    .fill(Color.red)
-                                                    .frame(height: 2)
-                                                    .offset(y: currentTimeOffset)
-
-                                                // 빨간 원 (왼쪽)
-                                                Circle()
-                                                    .fill(Color.red)
-                                                    .frame(width: 12, height: 12)
-                                                    .offset(x: -6, y: currentTimeOffset - 5)
-                                            }
-                                        }
-                                    }
-                                    .frame(height: totalHeight)
-                                    .onDrop(of: [.text], delegate: TaskDropDelegate(
-                                        date: date,
-                                        slotHeight: slotHeight,
-                                        viewModel: viewModel
-                                    ))
-                                }
-
-                                if date != weekDates.last {
-                                    Divider()
-                                }
-                            }
-                        }
-                    }
-                    .frame(height: totalHeight)
-                }
-            }
-            .onAppear {
-                updateCurrentTimeLine()
-                timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-                    updateCurrentTimeLine()
-                }
-            }
-            .onDisappear {
-                timer?.invalidate()
-            }
-        }
-        .onAppear {
-            updateCurrentTimeLine()
-            timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-                updateCurrentTimeLine()
-            }
-        }
+        TimeBasedWeekCalendar(
+            weekDates: weekDates,
+            tasksForDate: tasksForDate
+        )
     }
 
     // MARK: - Month Calendar View
@@ -400,35 +224,6 @@ struct MonthCalendarView: View {
 
     private func isCurrentMonth(_ date: Date) -> Bool {
         calendar.isDate(date, equalTo: currentMonthStart, toGranularity: .month)
-    }
-
-    private func updateCurrentTimeLine() {
-        let now = Date()
-        let hour = calendar.component(.hour, from: now)
-        let minute = calendar.component(.minute, from: now)
-
-        // 시작 시간을 기준으로 오프셋 계산 (15분 단위)
-        let startHour = viewModel.calendarStartHour
-        let minutesFromStart = (hour - startHour) * 60 + minute
-        currentTimeOffset = (CGFloat(minutesFromStart) / 15.0) * slotHeight
-    }
-
-    private func timeSlotString(_ slot: Double) -> String {
-        let hour = Int(slot)
-        let minute = slot.truncatingRemainder(dividingBy: 1.0) == 0 ? 0 : 30
-        return String(format: "%02d:%02d", hour, minute)
-    }
-
-    private func dayOfWeekString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "E"
-        return formatter.string(from: date)
-    }
-
-    private func dayString(_ date: Date) -> String {
-        let day = calendar.component(.day, from: date)
-        return "\(day)"
     }
 
     private func isToday(_ date: Date) -> Bool {

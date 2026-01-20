@@ -9,19 +9,66 @@ struct TaskRowView: View {
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
     @State private var isHovered = false
+    @State private var isPulsing = false
 
     var body: some View {
         HStack(spacing: 12) {
+            // 진행 중 표시 바 (왼쪽)
+            if task.isInProgress {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.blue)
+                    .frame(width: 4)
+                    .padding(.vertical, -12)
+                    .padding(.leading, -12)
+            }
+
             Button(action: { viewModel.toggleTaskCompletion(task) }) {
-                Image(systemName: task.status.icon)
-                    .font(.title2)
-                    .foregroundColor(statusColor)
+                ZStack {
+                    // 진행 중일 때 펄스 효과
+                    if task.isInProgress {
+                        Circle()
+                            .fill(Color.blue.opacity(0.3))
+                            .frame(width: 32, height: 32)
+                            .scaleEffect(isPulsing ? 1.3 : 1.0)
+                            .opacity(isPulsing ? 0 : 0.5)
+                            .animation(
+                                Animation.easeInOut(duration: 1.5)
+                                    .repeatForever(autoreverses: false),
+                                value: isPulsing
+                            )
+                    }
+
+                    Image(systemName: task.isInProgress ? "play.circle.fill" : task.status.icon)
+                        .font(.title2)
+                        .foregroundColor(statusColor)
+                }
             }
             .buttonStyle(.plain)
             .help(task.status.rawValue)
+            .onAppear {
+                if task.isInProgress {
+                    isPulsing = true
+                }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
+                    // 진행 중 뱃지
+                    if task.isInProgress {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bolt.fill")
+                                .font(.callout)
+                            Text("진행 중")
+                                .font(.callout)
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(4)
+                    }
+
                     if task.taskRole != .none {
                         HStack(spacing: 4) {
                             Image(systemName: task.taskRole.icon)
@@ -38,6 +85,7 @@ struct TaskRowView: View {
 
                     Text(task.title)
                         .font(.body)
+                        .fontWeight(task.isInProgress ? .semibold : .regular)
                         .strikethrough(task.isCompleted)
                         .foregroundColor(task.isCompleted ? .secondary : .primary)
 
@@ -98,8 +146,12 @@ struct TaskRowView: View {
             }
         }
         .padding(12)
-        .background(task.isCompleted ? Color.green.opacity(0.05) : Color(NSColor.controlBackgroundColor))
+        .background(taskBackground)
         .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(task.isInProgress ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 2)
+        )
         .onHover { hovering in
             isHovered = hovering
         }
@@ -121,6 +173,16 @@ struct TaskRowView: View {
         case .notStarted: return .gray
         case .inProgress: return .blue
         case .completed: return .green
+        }
+    }
+
+    private var taskBackground: Color {
+        if task.isCompleted {
+            return Color.green.opacity(0.05)
+        } else if task.isInProgress {
+            return Color.blue.opacity(0.08)
+        } else {
+            return Color(NSColor.controlBackgroundColor)
         }
     }
 
@@ -166,12 +228,31 @@ struct CompactTaskRow: View {
             viewModel.toggleTaskCompletion(task)
         }) {
             HStack(spacing: 6) {
-                Image(systemName: task.status.icon)
+                // 진행 중 표시 바
+                if task.isInProgress {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color.blue)
+                        .frame(width: 3)
+                        .padding(.vertical, -4)
+                }
+
+                Image(systemName: task.isInProgress ? "play.circle.fill" : task.status.icon)
                     .font(.callout)
                     .foregroundColor(statusColor)
 
+                if task.isInProgress {
+                    Text("진행 중")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(3)
+                }
+
                 Text(task.title)
                     .font(.callout)
+                    .fontWeight(task.isInProgress ? .medium : .regular)
                     .strikethrough(task.isCompleted)
                     .foregroundColor(task.isCompleted ? .secondary : .primary)
                     .lineLimit(1)
@@ -190,10 +271,24 @@ struct CompactTaskRow: View {
             }
             .padding(.vertical, 4)
             .padding(.horizontal, 6)
-            .background(task.isCompleted ? Color.clear : Color.gray.opacity(0.05))
+            .background(compactBackground)
             .cornerRadius(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(task.isInProgress ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
+    }
+
+    private var compactBackground: Color {
+        if task.isCompleted {
+            return Color.clear
+        } else if task.isInProgress {
+            return Color.blue.opacity(0.1)
+        } else {
+            return Color.gray.opacity(0.05)
+        }
     }
 
     private var statusColor: Color {

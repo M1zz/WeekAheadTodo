@@ -8,13 +8,14 @@ struct AddTaskView: View {
 
     var preselectedProjectId: UUID? = nil
     var defaultDueDate: Date? = nil
+    var initialTime: Date? = nil
 
     @State private var quickInput = ""
     @State private var title = ""
     @State private var description = ""
     @State private var dueDate: Date
-    @State private var startTime: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
-    @State private var hasStartTime = false
+    @State private var startTime: Date
+    @State private var hasStartTime: Bool
     @State private var estimatedHours = 1
     @State private var estimatedMinutes = 0
     @State private var leadTimeDays = 0
@@ -25,13 +26,23 @@ struct AddTaskView: View {
     @State private var showDetailedForm = false
     @State private var selectedProjectId: UUID? = nil
 
-    init(preselectedProjectId: UUID? = nil, defaultDueDate: Date? = nil) {
+    init(preselectedProjectId: UUID? = nil, defaultDueDate: Date? = nil, initialDate: Date? = nil, initialTime: Date? = nil) {
         self.preselectedProjectId = preselectedProjectId
         self.defaultDueDate = defaultDueDate
+        self.initialTime = initialTime
 
-        let initialDate = defaultDueDate ?? Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
-        _dueDate = State(initialValue: initialDate)
+        let date = initialDate ?? defaultDueDate ?? Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
+        _dueDate = State(initialValue: date)
         _selectedProjectId = State(initialValue: preselectedProjectId)
+
+        // 시간이 지정된 경우 해당 시간 사용
+        if let time = initialTime {
+            _startTime = State(initialValue: time)
+            _hasStartTime = State(initialValue: true)
+        } else {
+            _startTime = State(initialValue: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date())
+            _hasStartTime = State(initialValue: false)
+        }
     }
 
     var body: some View {
