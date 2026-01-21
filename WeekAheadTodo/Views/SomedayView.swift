@@ -78,6 +78,14 @@ struct SomedayView: View {
 
                     if isEditMode && !selectedTasks.isEmpty {
                         Button(action: {
+                            moveSelectedTasksToToday()
+                        }) {
+                            Label("오늘하기 (\(selectedTasks.count))", systemImage: "calendar.badge.clock")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.blue)
+
+                        Button(action: {
                             showingDeleteConfirmation = true
                         }) {
                             Label("삭제 (\(selectedTasks.count))", systemImage: "trash")
@@ -154,6 +162,19 @@ struct SomedayView: View {
         for taskId in selectedTasks {
             if let task = viewModel.tasks.first(where: { $0.id == taskId }) {
                 viewModel.deleteTask(task)
+            }
+        }
+        selectedTasks.removeAll()
+        isEditMode = false
+    }
+
+    private func moveSelectedTasksToToday() {
+        let today = Calendar.current.startOfDay(for: Date())
+        for taskId in selectedTasks {
+            if var task = viewModel.tasks.first(where: { $0.id == taskId }) {
+                task.dueDate = today
+                task.leadTimeDays = 0  // 오늘로 옮기면 선행 일수 초기화
+                viewModel.updateTask(task)
             }
         }
         selectedTasks.removeAll()
