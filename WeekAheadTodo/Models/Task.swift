@@ -134,6 +134,32 @@ enum TaskPriority: String, CaseIterable, Codable {
     }
 }
 
+/// 체크인 응답 타입
+enum CheckinResponse: String, CaseIterable, Codable {
+    case onTrack = "순조로움"       // 잘 진행 중
+    case completed = "완료"         // 태스크 완료
+    case needHelp = "문제 있음"     // 도움 필요/지연
+    case postponed = "연기함"       // 나중에 처리
+
+    var icon: String {
+        switch self {
+        case .onTrack: return "checkmark.circle"
+        case .completed: return "checkmark.circle.fill"
+        case .needHelp: return "exclamationmark.triangle"
+        case .postponed: return "arrow.clockwise"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .onTrack: return "green"
+        case .completed: return "blue"
+        case .needHelp: return "red"
+        case .postponed: return "orange"
+        }
+    }
+}
+
 /// 메인 태스크 모델
 struct Task: Identifiable {
     let id: UUID
@@ -158,6 +184,13 @@ struct Task: Identifiable {
     var isFromCalendarPattern: Bool = false  // 캘린더 패턴에서 생성되었는지
     var patternId: UUID?                 // 어느 패턴에서 생성되었는지
     var autoRecurring: Bool = false      // 자동 반복 생성 여부
+
+    // 체크인 관련
+    var lastCheckinDate: Date?           // 마지막 체크인 시간
+    var consecutiveMissedCheckins: Int = 0  // 연속 미체크인 횟수
+
+    // 완료 관련
+    var completedAt: Date?               // 완료된 시간
     
     init(
         id: UUID = UUID(),
@@ -360,6 +393,12 @@ struct Task: Identifiable {
         status == .completed
     }
 
+    /// 오늘 완료되었는지 확인
+    var isCompletedToday: Bool {
+        guard isCompleted, let completedAt = completedAt else { return false }
+        return Calendar.current.isDateInToday(completedAt)
+    }
+
     /// 진행 중인지 확인
     var isInProgress: Bool {
         status == .inProgress
@@ -380,6 +419,8 @@ extension Task: Codable {
         case projectId, parentTaskId, mainTaskId, targetDate, createdAt
         case manualPriority
         case calendarEventId, isFromCalendarPattern, patternId, autoRecurring
+        case lastCheckinDate, consecutiveMissedCheckins
+        case completedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -410,6 +451,13 @@ extension Task: Codable {
         // Bool 필드 (없으면 기본값 false)
         isFromCalendarPattern = try container.decodeIfPresent(Bool.self, forKey: .isFromCalendarPattern) ?? false
         autoRecurring = try container.decodeIfPresent(Bool.self, forKey: .autoRecurring) ?? false
+
+        // 체크인 필드 (없으면 기본값)
+        lastCheckinDate = try container.decodeIfPresent(Date.self, forKey: .lastCheckinDate)
+        consecutiveMissedCheckins = try container.decodeIfPresent(Int.self, forKey: .consecutiveMissedCheckins) ?? 0
+
+        // 완료 필드
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -435,6 +483,13 @@ extension Task: Codable {
         try container.encode(isFromCalendarPattern, forKey: .isFromCalendarPattern)
         try container.encodeIfPresent(patternId, forKey: .patternId)
         try container.encode(autoRecurring, forKey: .autoRecurring)
+
+        // 체크인 필드
+        try container.encodeIfPresent(lastCheckinDate, forKey: .lastCheckinDate)
+        try container.encode(consecutiveMissedCheckins, forKey: .consecutiveMissedCheckins)
+
+        // 완료 필드
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
     }
 }
 

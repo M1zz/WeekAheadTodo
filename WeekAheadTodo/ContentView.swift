@@ -175,6 +175,9 @@ struct ContentView: View {
         _Concurrency.Task {
             await notificationService.checkAuthorizationStatus()
         }
+
+        // 미체크인 태스크 감지
+        viewModel.detectMissedCheckins()
     }
 
     private func generateTasksIfNeeded() async {

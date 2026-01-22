@@ -1,6 +1,15 @@
 import Foundation
 import UserNotifications
 
+// MARK: - Notification.Name Extensions
+
+extension Notification.Name {
+    /// 태스크 체크인 응답 수신됨
+    static let taskCheckinReceived = Notification.Name("taskCheckinReceived")
+    /// 체크인 UI 표시 요청
+    static let showCheckinUI = Notification.Name("showCheckinUI")
+}
+
 // MARK: - Notification Time Model
 
 /// 알림 시간 모델
@@ -48,6 +57,64 @@ class NotificationService: NSObject, ObservableObject {
 
         // Delegate 설정
         center.delegate = self
+
+        // 알림 카테고리 등록
+        registerNotificationCategories()
+    }
+
+    // MARK: - Notification Categories
+
+    /// 알림 카테고리 및 액션 등록
+    func registerNotificationCategories() {
+        // 진행 확인 알림 액션들
+        let onTrackAction = UNNotificationAction(
+            identifier: "CHECKIN_ON_TRACK",
+            title: "순조로움 ✓",
+            options: []
+        )
+
+        let completedAction = UNNotificationAction(
+            identifier: "CHECKIN_COMPLETED",
+            title: "완료했어요!",
+            options: [.foreground]
+        )
+
+        let needHelpAction = UNNotificationAction(
+            identifier: "CHECKIN_NEED_HELP",
+            title: "문제 있음",
+            options: [.foreground]
+        )
+
+        let postponeAction = UNNotificationAction(
+            identifier: "CHECKIN_POSTPONE",
+            title: "나중에",
+            options: []
+        )
+
+        // 진행 확인 카테고리
+        let checkinCategory = UNNotificationCategory(
+            identifier: "TASK_CHECKIN",
+            actions: [onTrackAction, completedAction, needHelpAction, postponeAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        // 기존 리마인더 카테고리
+        let openAppAction = UNNotificationAction(
+            identifier: "OPEN_APP",
+            title: "앱 열기",
+            options: [.foreground]
+        )
+
+        let reminderCategory = UNNotificationCategory(
+            identifier: "TASK_REMINDER",
+            actions: [openAppAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        center.setNotificationCategories([checkinCategory, reminderCategory])
+        print("✅ [NotificationService] 알림 카테고리 등록 완료")
     }
 
     // MARK: - Notification Times Management
@@ -159,7 +226,7 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - 태스크 알림 스케줄링
 
     /// 모든 태스크에 대해 알림 스케줄 갱신
-    func scheduleNotifications(for tasks: [Task]) async {
+    func scheduleNotifications(for tasks: [WeekAheadTodo.Task]) async {
         guard isNotificationEnabled else {
             print("ℹ️ [NotificationService] 알림이 비활성화되어 있음")
             return
@@ -177,10 +244,68 @@ class NotificationService: NSObject, ObservableObject {
         }
 
         print("✅ [NotificationService] 알림 스케줄링 완료 (\(enabledTimes.count)개 시간)")
+
+        // 진행 중인 태스크에 대한 체크인 알림도 스케줄링
+        await scheduleCheckinNotifications(for: tasks)
+    }
+
+    // MARK: - 진행 확인 알림
+
+    /// 진행 중인 태스크에 대한 체크인 알림 스케줄링
+    func scheduleCheckinNotifications(for tasks: [WeekAheadTodo.Task]) async {
+        guard isNotificationEnabled else { return }
+
+        // 진행 중인 태스크만 필터링
+        let inProgressTasks = tasks.filter { $0.isInProgress }
+
+        guard !inProgressTasks.isEmpty else {
+            print("ℹ️ [NotificationService] 진행 중인 태스크 없음 - 체크인 알림 스킵")
+            return
+        }
+
+        // 활성화된 알림 시간에 체크인 알림 설정
+        let enabledTimes = notificationTimes.filter { $0.isEnabled }
+
+        for task in inProgressTasks {
+            for time in enabledTimes {
+                await scheduleCheckinNotification(for: task, at: time)
+            }
+        }
+
+        print("📊 [NotificationService] 체크인 알림 스케줄 완료: \(inProgressTasks.count)개 태스크")
+    }
+
+    /// 특정 시간에 진행 중 태스크의 체크인 알림 스케줄
+    private func scheduleCheckinNotification(for task: WeekAheadTodo.Task, at time: NotificationTime) async {
+        let notificationId = "checkin-\(task.id.uuidString)-\(time.hour)-\(time.minute)"
+
+        let content = UNMutableNotificationContent()
+        content.title = "진행 상황 확인"
+        content.body = "'\(task.title)' 잘 진행되고 있나요?"
+        content.sound = .default
+        content.categoryIdentifier = "TASK_CHECKIN"
+        content.userInfo = [
+            "taskId": task.id.uuidString,
+            "type": "checkin"
+        ]
+
+        var dateComponents = DateComponents()
+        dateComponents.hour = time.hour
+        dateComponents.minute = time.minute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(identifier: notificationId, content: content, trigger: trigger)
+
+        do {
+            try await center.add(request)
+            print("  ✅ 체크인 알림 등록: \(task.title) at \(time.hour):\(String(format: "%02d", time.minute))")
+        } catch {
+            print("  ❌ 체크인 알림 등록 실패: \(error)")
+        }
     }
 
     /// 특정 시간에 태스크 체크 알림 스케줄
-    private func scheduleDailyCheckNotification(hour: Int, minute: Int, tasks: [Task]) async {
+    private func scheduleDailyCheckNotification(hour: Int, minute: Int, tasks: [WeekAheadTodo.Task]) async {
         let notificationId = "daily-check-\(hour)-\(minute)"
 
         // 알림이 필요한 태스크들 필터링
@@ -218,12 +343,12 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - 태스크 필터링 로직
 
     /// 알림이 필요한 태스크들 필터링
-    private func filterTasksNeedingAttention(_ tasks: [Task]) -> [Task] {
+    private func filterTasksNeedingAttention(_ tasks: [WeekAheadTodo.Task]) -> [WeekAheadTodo.Task] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
 
-        var tasksNeedingAttention: [Task] = []
+        var tasksNeedingAttention: [WeekAheadTodo.Task] = []
 
         for task in tasks where !task.isCompleted {
             // 1. 시작일이 지났는데 아직 시작 안한 일
@@ -270,7 +395,7 @@ class NotificationService: NSObject, ObservableObject {
     }
 
     /// 알림 본문 생성
-    private func generateNotificationBody(for tasks: [Task]) -> String {
+    private func generateNotificationBody(for tasks: [WeekAheadTodo.Task]) -> String {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
@@ -372,7 +497,61 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        print("🔔 [NotificationService] 사용자가 알림을 탭함: \(response.notification.request.identifier)")
-        // TODO: 앱 내에서 해당 태스크로 네비게이션
+        let userInfo = response.notification.request.content.userInfo
+        let actionIdentifier = response.actionIdentifier
+
+        print("🔔 [NotificationService] 알림 응답: \(actionIdentifier)")
+
+        // 체크인 알림 응답 처리
+        if let taskIdString = userInfo["taskId"] as? String,
+           let taskId = UUID(uuidString: taskIdString) {
+
+            await MainActor.run {
+                handleCheckinResponse(actionIdentifier: actionIdentifier, taskId: taskId)
+            }
+        }
+    }
+
+    /// 체크인 응답 처리
+    @MainActor
+    private func handleCheckinResponse(actionIdentifier: String, taskId: UUID) {
+        let checkinResponse: CheckinResponse?
+
+        switch actionIdentifier {
+        case "CHECKIN_ON_TRACK":
+            checkinResponse = .onTrack
+            print("✅ [NotificationService] 체크인 응답: 순조로움")
+        case "CHECKIN_COMPLETED":
+            checkinResponse = .completed
+            print("✅ [NotificationService] 체크인 응답: 완료")
+        case "CHECKIN_NEED_HELP":
+            checkinResponse = .needHelp
+            print("⚠️ [NotificationService] 체크인 응답: 문제 있음")
+        case "CHECKIN_POSTPONE":
+            checkinResponse = .postponed
+            print("📅 [NotificationService] 체크인 응답: 연기")
+        case UNNotificationDefaultActionIdentifier:
+            // 알림 탭 시 앱 열기 및 체크인 UI 표시
+            checkinResponse = nil
+            NotificationCenter.default.post(
+                name: .showCheckinUI,
+                object: nil,
+                userInfo: ["taskId": taskId]
+            )
+            return
+        default:
+            checkinResponse = nil
+        }
+
+        if let response = checkinResponse {
+            NotificationCenter.default.post(
+                name: .taskCheckinReceived,
+                object: nil,
+                userInfo: [
+                    "taskId": taskId,
+                    "response": response.rawValue
+                ]
+            )
+        }
     }
 }

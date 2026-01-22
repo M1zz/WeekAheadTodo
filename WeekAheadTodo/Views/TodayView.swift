@@ -20,8 +20,15 @@ struct TodayView: View {
     @State private var taskIdsToSelect: [UUID] = []
     @AppStorage("recommendationSectionExpanded") private var isRecommendationExpanded = true
 
+    // 체크인 관련
+    @State private var showingCheckinSheet = false
+    @State private var selectedCheckinTask: Task?
+
     private var displayedTasks: [Task] {
-        return viewModel.todayTasks.filter { !$0.isCompleted }
+        // 미완료 태스크 + 오늘 완료된 태스크 (취소선으로 표시)
+        return viewModel.todayTasks.filter { task in
+            !task.isCompleted || task.isCompletedToday
+        }
     }
 
     var body: some View {
@@ -43,6 +50,18 @@ struct TodayView: View {
                             }
                         )
                     }
+
+                    // 미체크인 경고 배너
+                    MissedCheckinBanner(
+                        showingCheckinSheet: $showingCheckinSheet,
+                        selectedCheckinTask: $selectedCheckinTask
+                    )
+
+                    // 체크인 필요 태스크 목록
+                    CheckinNeededListView(
+                        showingCheckinSheet: $showingCheckinSheet,
+                        selectedCheckinTask: $selectedCheckinTask
+                    )
 
                     if !viewModel.todayTasks.isEmpty {
                         taskSection(
@@ -88,6 +107,11 @@ struct TodayView: View {
                     showingTaskSelectionSheet = false
                 }
             )
+        }
+        .sheet(isPresented: $showingCheckinSheet) {
+            if let task = selectedCheckinTask {
+                CheckinView(task: task, isPresented: $showingCheckinSheet)
+            }
         }
         .alert("오늘로 이동 완료", isPresented: $showingMoveToTodayAlert) {
             Button("확인", role: .cancel) { }

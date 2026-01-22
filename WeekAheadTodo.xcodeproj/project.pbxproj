@@ -7,10 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AS3DA3DCD1E94F078C61150 /* AssistantSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */; };
-		383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */; };
+		0B74DC5E5F1F42619E4749F9 /* AddTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 433A661E04984D0DB89CDACF /* AddTaskView.swift */; };
+		0D2DACC501F94EE79677F103 /* DateHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */; };
+		273C935096424C9D8DB11BA9 /* ProjectViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29B339CEF69F48BB996C643C /* ProjectViews.swift */; };
 		293A912635E623BE692B94DA /* NotificationPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */; };
+		2B7B67E91B614A2EA9216F51 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4062740E3F5473CA643B58E /* SettingsView.swift */; };
+		32814C9E84224CFCA5FDE64D /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7625CEC7174C49BC84F85DF5 /* TodayView.swift */; };
+		3459A39304A94A81B7921779 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6492F14261394545B95A33BB /* NotificationSettingsView.swift */; };
+		383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */; };
+		3971D3AB777E4853B8F33871 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */; };
+		4221730C4AC74093BA1A9CC8 /* AssistantHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C853D0F6044304A30DE249 /* AssistantHistoryView.swift */; };
+		57AFF640B877461DBC07347D /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393F9661AAA14A049B8CBCC0 /* TaskRowView.swift */; };
 		581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D84A5C8231A5D6F641C7 /* NotificationService.swift */; };
+		6AB531D70BF14284B4C630AA /* EditTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB9CDE00E19B43078D3A8CD5 /* EditTaskView.swift */; };
+		6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */; };
+		8CF6E866F2714F108C425F91 /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */; };
+		9468934550894104B9A68228 /* TaskSelectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */; };
+		9A2E8D22B9864B26AB02122B /* ColorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */; };
+		9C3B2ECF2F22023800E535DB /* ProactiveAssistantService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */; };
+		9C3B2ED02F22023800E535DB /* UpcomingRemindersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */; };
+		9C40EC9585D24046A1CB958A /* CompletedTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00C2B6260404860B5B9EC18 /* CompletedTasksView.swift */; };
 		A1000001234567890000001 /* WeekAheadTodoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002234567890000001 /* WeekAheadTodoApp.swift */; };
 		A1000001234567890000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002234567890000002 /* ContentView.swift */; };
 		A1000001234567890000003 /* Task.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002234567890000003 /* Task.swift */; };
@@ -32,28 +48,15 @@
 		A1IV111111111111111BUILD /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IV000000000000000VIEWW /* ImportView.swift */; };
 		A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1MD000000000000000PARSE /* MarkdownParser.swift */; };
 		A1TIP11111111111111BUILD /* TaskInputParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TIP00000000000000PARSE /* TaskInputParser.swift */; };
-		3971D3AB777E4853B8F33871 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */; };
-		32814C9E84224CFCA5FDE64D /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7625CEC7174C49BC84F85DF5 /* TodayView.swift */; };
-		EAF392B156854E358E4CBB47 /* TodayInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */; };
-		57AFF640B877461DBC07347D /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393F9661AAA14A049B8CBCC0 /* TaskRowView.swift */; };
 		AB8ED9EFA2F548C8BB18302D /* ThisWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED4D94B0815645FD832A7A51 /* ThisWeekView.swift */; };
-		E0A9B9E71EA64E40B49887E2 /* NextWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9723B9D230434FBB93EBEE /* NextWeekView.swift */; };
-		D38F945F45D24E618775DE4C /* SomedayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010532356AA3497A9B77816D /* SomedayView.swift */; };
-		8CF6E866F2714F108C425F91 /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */; };
-		2B7B67E91B614A2EA9216F51 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4062740E3F5473CA643B58E /* SettingsView.swift */; };
-		0B74DC5E5F1F42619E4749F9 /* AddTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 433A661E04984D0DB89CDACF /* AddTaskView.swift */; };
-		6AB531D70BF14284B4C630AA /* EditTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB9CDE00E19B43078D3A8CD5 /* EditTaskView.swift */; };
-		273C935096424C9D8DB11BA9 /* ProjectViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29B339CEF69F48BB996C643C /* ProjectViews.swift */; };
-		BD2FEE0FD4C9451282D78E19 /* MonthCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B6E15FA4424F33AEDF8B47 /* MonthCalendarView.swift */; };
-		F6C42520668C4612BFE0DEC9 /* TimeBasedWeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F878F664DAB24B31A160A340 /* TimeBasedWeekCalendar.swift */; };
-		9C40EC9585D24046A1CB958A /* CompletedTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00C2B6260404860B5B9EC18 /* CompletedTasksView.swift */; };
-		4221730C4AC74093BA1A9CC8 /* AssistantHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C853D0F6044304A30DE249 /* AssistantHistoryView.swift */; };
-		9468934550894104B9A68228 /* TaskSelectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */; };
+		AS3DA3DCD1E94F078C61150 /* AssistantSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */; };
 		B575498D038744CDBA484308 /* QuickAddView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F2778A6CC4D5AA970D762 /* QuickAddView.swift */; };
-		3459A39304A94A81B7921779 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6492F14261394545B95A33BB /* NotificationSettingsView.swift */; };
-		9A2E8D22B9864B26AB02122B /* ColorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */; };
-		0D2DACC501F94EE79677F103 /* DateHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */; };
-		6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */; };
+		BD2FEE0FD4C9451282D78E19 /* MonthCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B6E15FA4424F33AEDF8B47 /* MonthCalendarView.swift */; };
+		CHECKIN1111111111BUILD /* CheckinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHECKIN0000000000VIEWW /* CheckinView.swift */; };
+		D38F945F45D24E618775DE4C /* SomedayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010532356AA3497A9B77816D /* SomedayView.swift */; };
+		E0A9B9E71EA64E40B49887E2 /* NextWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9723B9D230434FBB93EBEE /* NextWeekView.swift */; };
+		EAF392B156854E358E4CBB47 /* TodayInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */; };
+		F6C42520668C4612BFE0DEC9 /* TimeBasedWeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F878F664DAB24B31A160A340 /* TimeBasedWeekCalendar.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +70,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		010532356AA3497A9B77816D /* SomedayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SomedayView.swift; sourceTree = "<group>"; };
+		07C853D0F6044304A30DE249 /* AssistantHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantHistoryView.swift; sourceTree = "<group>"; };
+		1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateHelpers.swift; sourceTree = "<group>"; };
+		29B339CEF69F48BB996C643C /* ProjectViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViews.swift; sourceTree = "<group>"; };
+		393F9661AAA14A049B8CBCC0 /* TaskRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRowView.swift; sourceTree = "<group>"; };
+		433A661E04984D0DB89CDACF /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
+		46B6E15FA4424F33AEDF8B47 /* MonthCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthCalendarView.swift; sourceTree = "<group>"; };
+		4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekOverviewView.swift; sourceTree = "<group>"; };
+		6492F14261394545B95A33BB /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
+		680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
+		7625CEC7174C49BC84F85DF5 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		9CA0A3CE2F19D611004ABF40 /* WeekAheadTodoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeekAheadTodoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000002234567890000001 /* WeekAheadTodoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadTodoApp.swift; sourceTree = "<group>"; };
 		A1000002234567890000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -82,7 +96,6 @@
 		A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternDetectionService.swift; sourceTree = "<group>"; };
 		A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		A18D1386D284CA97002326B1 /* RecurrencePattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurrencePattern.swift; sourceTree = "<group>"; };
-		AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantSuggestion.swift; sourceTree = "<group>"; };
 		A1AAA111111111111111111A /* ApprovedPattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPattern.swift; sourceTree = "<group>"; };
 		A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternReviewView.swift; sourceTree = "<group>"; };
 		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
@@ -91,30 +104,21 @@
 		A1IV000000000000000VIEWW /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
 		A1TIP00000000000000PARSE /* TaskInputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInputParser.swift; sourceTree = "<group>"; };
+		AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskSelectionSheet.swift; sourceTree = "<group>"; };
+		AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantSuggestion.swift; sourceTree = "<group>"; };
+		BF9723B9D230434FBB93EBEE /* NextWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWeekView.swift; sourceTree = "<group>"; };
+		C4062740E3F5473CA643B58E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		C793D84A5C8231A5D6F641C7 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		CHECKIN0000000000VIEWW /* CheckinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckinView.swift; sourceTree = "<group>"; };
+		D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayInsightsView.swift; sourceTree = "<group>"; };
+		DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtension.swift; sourceTree = "<group>"; };
+		E00C2B6260404860B5B9EC18 /* CompletedTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletedTasksView.swift; sourceTree = "<group>"; };
 		E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveAssistantService.swift; sourceTree = "<group>"; };
 		ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationPreviewView.swift; sourceTree = "<group>"; };
-		680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
-		7625CEC7174C49BC84F85DF5 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
-		D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayInsightsView.swift; sourceTree = "<group>"; };
-		393F9661AAA14A049B8CBCC0 /* TaskRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRowView.swift; sourceTree = "<group>"; };
 		ED4D94B0815645FD832A7A51 /* ThisWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThisWeekView.swift; sourceTree = "<group>"; };
-		BF9723B9D230434FBB93EBEE /* NextWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWeekView.swift; sourceTree = "<group>"; };
-		010532356AA3497A9B77816D /* SomedayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SomedayView.swift; sourceTree = "<group>"; };
-		4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekOverviewView.swift; sourceTree = "<group>"; };
-		C4062740E3F5473CA643B58E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		433A661E04984D0DB89CDACF /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
-		FB9CDE00E19B43078D3A8CD5 /* EditTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTaskView.swift; sourceTree = "<group>"; };
-		29B339CEF69F48BB996C643C /* ProjectViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViews.swift; sourceTree = "<group>"; };
-		46B6E15FA4424F33AEDF8B47 /* MonthCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthCalendarView.swift; sourceTree = "<group>"; };
 		F878F664DAB24B31A160A340 /* TimeBasedWeekCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeBasedWeekCalendar.swift; sourceTree = "<group>"; };
-		E00C2B6260404860B5B9EC18 /* CompletedTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletedTasksView.swift; sourceTree = "<group>"; };
-		07C853D0F6044304A30DE249 /* AssistantHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantHistoryView.swift; sourceTree = "<group>"; };
-		AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskSelectionSheet.swift; sourceTree = "<group>"; };
+		FB9CDE00E19B43078D3A8CD5 /* EditTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTaskView.swift; sourceTree = "<group>"; };
 		FF9F2778A6CC4D5AA970D762 /* QuickAddView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAddView.swift; sourceTree = "<group>"; };
-		6492F14261394545B95A33BB /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
-		DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtension.swift; sourceTree = "<group>"; };
-		1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateHelpers.swift; sourceTree = "<group>"; };
 		X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingRemindersView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -206,7 +210,6 @@
 				A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */,
 				A1DDD444444444444444444D /* EditApprovedPatternView.swift */,
 				ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */,
-			
 				680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */,
 				7625CEC7174C49BC84F85DF5 /* TodayView.swift */,
 				D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */,
@@ -228,7 +231,9 @@
 				6492F14261394545B95A33BB /* NotificationSettingsView.swift */,
 				DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */,
 				1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */,
-				X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */,);
+				X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */,
+				CHECKIN0000000000VIEWW /* CheckinView.swift */,
+			);
 			path = Views;
 			sourceTree = "<group>";
 		};
@@ -351,9 +356,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */,
-			
-				6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */,);
+				9C3B2ECF2F22023800E535DB /* ProactiveAssistantService.swift in Sources */,
+				9C3B2ED02F22023800E535DB /* UpcomingRemindersView.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A1000008234567890000001 /* Sources */ = {
@@ -384,7 +389,6 @@
 				A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */,
 				581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */,
 				293A912635E623BE692B94DA /* NotificationPreviewView.swift in Sources */,
-			
 				3971D3AB777E4853B8F33871 /* SharedTypes.swift in Sources */,
 				32814C9E84224CFCA5FDE64D /* TodayView.swift in Sources */,
 				EAF392B156854E358E4CBB47 /* TodayInsightsView.swift in Sources */,
@@ -406,7 +410,9 @@
 				3459A39304A94A81B7921779 /* NotificationSettingsView.swift in Sources */,
 				9A2E8D22B9864B26AB02122B /* ColorExtension.swift in Sources */,
 				0D2DACC501F94EE79677F103 /* DateHelpers.swift in Sources */,
-				6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */,);
+				6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */,
+				CHECKIN1111111111BUILD /* CheckinView.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
@@ -592,17 +598,14 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = QGAQ3AY3R3;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeekAheadTodo/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "일정 비서";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다. 앱은 일정을 읽기만 하며 수정하지 않습니다.";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.weekahead.todo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -622,17 +625,14 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = QGAQ3AY3R3;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeekAheadTodo/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "일정 비서";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다. 앱은 일정을 읽기만 하며 수정하지 않습니다.";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.weekahead.todo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

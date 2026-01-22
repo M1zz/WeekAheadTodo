@@ -85,6 +85,9 @@ class TaskViewModel: ObservableObject {
     @Published var lastSyncDate: Date?
     @Published var syncError: String?
 
+    // MARK: - Checkin
+    @Published var pendingCheckinTaskId: UUID? = nil  // 체크인 UI 표시 대상 태스크
+
     private var container: CKContainer?
     private var database: CKDatabase?
 
@@ -141,7 +144,48 @@ class TaskViewModel: ObservableObject {
 
         loadTasks()
         loadProjects()
+
+        // 체크인 관련 옵저버 등록
+        setupCheckinObservers()
+
         print("✅ TaskViewModel initialized")
+    }
+
+    // MARK: - Checkin Observer Setup
+
+    private func setupCheckinObservers() {
+        // 체크인 응답 수신 옵저버
+        NotificationCenter.default.addObserver(
+            forName: .taskCheckinReceived,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let userInfo = notification.userInfo,
+                  let taskId = userInfo["taskId"] as? UUID,
+                  let responseRaw = userInfo["response"] as? String,
+                  let response = CheckinResponse(rawValue: responseRaw) else {
+                return
+            }
+
+            self.handleCheckinResponse(taskId: taskId, response: response)
+        }
+
+        // 체크인 UI 표시 요청 옵저버
+        NotificationCenter.default.addObserver(
+            forName: .showCheckinUI,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let userInfo = notification.userInfo,
+                  let taskId = userInfo["taskId"] as? UUID else {
+                return
+            }
+
+            // 해당 태스크의 체크인 UI 표시 요청
+            self.pendingCheckinTaskId = taskId
+        }
     }
 
     private func saveTasks() {
@@ -410,10 +454,13 @@ class TaskViewModel: ObservableObject {
             switch tasks[index].status {
             case .notStarted:
                 tasks[index].status = .inProgress
+                tasks[index].completedAt = nil
             case .inProgress:
                 tasks[index].status = .completed
+                tasks[index].completedAt = Date()  // 완료 시간 기록
             case .completed:
                 tasks[index].status = .notStarted
+                tasks[index].completedAt = nil     // 완료 취소 시 초기화
             }
         }
     }
@@ -1172,6 +1219,91 @@ class TaskViewModel: ObservableObject {
         }
 
         try await service.requestAuthorization()
+    }
+
+    // MARK: - Checkin Management
+
+    /// 체크인 응답 처리
+    func handleCheckinResponse(taskId: UUID, response: CheckinResponse) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskId }) else {
+            print("⚠️ [TaskViewModel] 체크인 대상 태스크를 찾을 수 없음: \(taskId)")
+            return
+        }
+
+        // 체크인 시간 기록
+        tasks[index].lastCheckinDate = Date()
+        tasks[index].consecutiveMissedCheckins = 0
+
+        switch response {
+        case .onTrack:
+            // 순조롭게 진행 중 - 상태 유지
+            print("✅ [TaskViewModel] 체크인: \(tasks[index].title) - 순조로움")
+
+        case .completed:
+            // 완료 처리
+            tasks[index].status = .completed
+            print("✅ [TaskViewModel] 체크인: \(tasks[index].title) - 완료")
+
+        case .needHelp:
+            // 문제 있음 - 우선순위 상향
+            if tasks[index].priority != .urgent {
+                tasks[index].priority = .high
+            }
+            print("⚠️ [TaskViewModel] 체크인: \(tasks[index].title) - 문제 있음")
+
+        case .postponed:
+            // 연기 - 마감일 하루 연장
+            if let newDueDate = Calendar.current.date(byAdding: .day, value: 1, to: tasks[index].dueDate) {
+                tasks[index].dueDate = newDueDate
+            }
+            print("📅 [TaskViewModel] 체크인: \(tasks[index].title) - 연기됨")
+        }
+    }
+
+    /// 미체크인 태스크 감지 (앱 시작 시 호출)
+    func detectMissedCheckins() {
+        let calendar = Calendar.current
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: Date())!
+
+        for index in tasks.indices {
+            guard tasks[index].isInProgress else { continue }
+
+            // 어제 체크인하지 않은 경우
+            if let lastCheckin = tasks[index].lastCheckinDate {
+                if lastCheckin < calendar.startOfDay(for: yesterday) {
+                    tasks[index].consecutiveMissedCheckins += 1
+                    print("⚠️ [TaskViewModel] 미체크인 감지: \(tasks[index].title) - \(tasks[index].consecutiveMissedCheckins)일 연속")
+                }
+            } else if tasks[index].status == .inProgress {
+                // 진행 중인데 한 번도 체크인한 적 없음
+                tasks[index].consecutiveMissedCheckins += 1
+                print("⚠️ [TaskViewModel] 미체크인 감지 (첫 체크인 없음): \(tasks[index].title)")
+            }
+        }
+    }
+
+    /// 연속 미체크인 태스크 목록
+    var tasksWithMissedCheckins: [Task] {
+        tasks.filter { $0.isInProgress && $0.consecutiveMissedCheckins > 0 }
+            .sorted { $0.consecutiveMissedCheckins > $1.consecutiveMissedCheckins }
+    }
+
+    /// 체크인이 필요한 태스크 (진행 중인 태스크 중 오늘 체크인하지 않은 것)
+    var tasksNeedingCheckin: [Task] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        return tasks.filter { task in
+            guard task.isInProgress else { return false }
+
+            if let lastCheckin = task.lastCheckinDate {
+                // 오늘 체크인하지 않은 경우
+                return lastCheckin < today
+            } else {
+                // 한 번도 체크인하지 않은 경우
+                return true
+            }
+        }
     }
 
     // MARK: - Project Management
