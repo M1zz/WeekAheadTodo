@@ -184,6 +184,42 @@ class TaskViewModel: ObservableObject {
         migrateTaskTimes()
     }
 
+    /// 특정 태스크의 모든 데이터 출력 (디버깅용)
+    func debugTask(title: String) {
+        guard let task = tasks.first(where: { $0.title.contains(title) }) else {
+            print("❌ 태스크를 찾을 수 없음: \(title)")
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "ko_KR")
+
+        print("\n╔════════════════════════════════════════════════════════╗")
+        print("║  태스크 전체 데이터: \(task.title)")
+        print("╚════════════════════════════════════════════════════════╝")
+        print("   ID: \(task.id)")
+        print("   제목: \(task.title)")
+        print("   설명: \(task.description)")
+        print("   📅 dueDate: \(formatter.string(from: task.dueDate))")
+        print("   🎯 targetDate: \(task.targetDate.map { formatter.string(from: $0) } ?? "nil")")
+        print("   ⏰ scheduledStartTime: \(task.scheduledStartTime.map { formatter.string(from: $0) } ?? "nil")")
+        print("   ⏱️ estimatedMinutes: \(task.estimatedMinutes)분")
+        print("   📝 leadTimeDays: \(task.leadTimeDays)일")
+        print("   ▶️ actualStartTime: \(formatter.string(from: task.actualStartTime))")
+        print("   ▶️ actualEndTime: \(formatter.string(from: task.actualEndTime))")
+        print("   📊 effectiveStartDate: \(formatter.string(from: task.effectiveStartDate))")
+        print("   🏷️ status: \(task.status.rawValue)")
+        print("   ⭐️ priority: \(task.priority.rawValue)")
+        print("   🎯 taskType: \(task.taskType.rawValue)")
+        print("   🔖 taskRole: \(task.taskRole.rawValue)")
+        print("   📂 projectId: \(task.projectId?.uuidString ?? "nil")")
+        print("   🔗 calendarEventId: \(task.calendarEventId ?? "nil")")
+        print("   🔁 isFromCalendarPattern: \(task.isFromCalendarPattern)")
+        print("   📅 createdAt: \(formatter.string(from: task.createdAt))")
+        print("════════════════════════════════════════════════════════\n")
+    }
+
     /// 캘린더 배치 정보를 기반으로 dueDate를 동기화
     /// scheduledStartTime이 설정된 경우, dueDate = scheduledStartTime + estimatedMinutes로 자동 계산
     private func migrateTaskTimes() {
@@ -197,8 +233,24 @@ class TaskViewModel: ObservableObject {
         for index in tasks.indices {
             let task = tasks[index]
 
-            // scheduledStartTime이 있으면 dueDate를 재계산
-            if let startTime = task.scheduledStartTime {
+            // 1. targetDate가 있으면 dueDate = targetDate + estimatedMinutes
+            if let targetDate = task.targetDate {
+                let calculatedDueDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: targetDate) ?? targetDate
+
+                if !calendar.isDate(task.dueDate, equalTo: calculatedDueDate, toGranularity: .minute) {
+                    print("   🔧 [\(task.title)]")
+                    print("      ✅ targetDate 발견: \(formatDate(targetDate))")
+                    print("      estimatedMinutes: \(task.estimatedMinutes)분")
+                    print("      기존 dueDate: \(formatDate(task.dueDate))")
+                    print("      새 dueDate: \(formatDate(calculatedDueDate))")
+
+                    tasks[index].dueDate = calculatedDueDate
+                    tasks[index].scheduledStartTime = targetDate
+                    migrationCount += 1
+                }
+            }
+            // 2. scheduledStartTime이 있으면 dueDate를 재계산
+            else if let startTime = task.scheduledStartTime {
                 let calculatedDueDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: startTime) ?? startTime
 
                 // dueDate가 계산된 값과 다르면 동기화
@@ -213,7 +265,7 @@ class TaskViewModel: ObservableObject {
                     migrationCount += 1
                 }
             }
-            // scheduledStartTime이 없고 dueDate가 자정(00:00)인 경우
+            // 3. scheduledStartTime이 없고 dueDate가 자정(00:00)인 경우
             else if isDueDateMidnight(task.dueDate) {
                 // dueDate를 해당 날짜 23:59로 변경 (자정보다 현실적)
                 var components = calendar.dateComponents([.year, .month, .day], from: task.dueDate)

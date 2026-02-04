@@ -319,6 +319,13 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
                 .disabled(cloudOperationInProgress)
 
+                Button(action: {
+                    viewModel.debugTask(title: "LO 배치")
+                }) {
+                    Label("LO 배치 태스크 데이터 출력", systemImage: "info.circle")
+                }
+                .buttonStyle(.bordered)
+
                 Divider()
 
                 Button(role: .destructive, action: { showingResetDataAlert = true }) {
