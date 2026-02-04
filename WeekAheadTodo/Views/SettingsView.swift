@@ -309,6 +309,18 @@ struct SettingsView: View {
 
                 Divider()
 
+                Button(action: {
+                    _Concurrency.Task {
+                        await viewModel.fixTaskTimeMigration()
+                    }
+                }) {
+                    Label("시간 데이터 수정 (자정 → 올바른 시간)", systemImage: "clock.arrow.circlepath")
+                }
+                .buttonStyle(.bordered)
+                .disabled(cloudOperationInProgress)
+
+                Divider()
+
                 Button(role: .destructive, action: { showingResetDataAlert = true }) {
                     Label("모든 데이터 초기화", systemImage: "trash")
                 }

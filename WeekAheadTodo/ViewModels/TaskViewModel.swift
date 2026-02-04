@@ -179,6 +179,11 @@ class TaskViewModel: ObservableObject {
 
     // MARK: - Task Time Migration
 
+    /// 시간 데이터 수동 수정 (설정 뷰에서 호출)
+    func fixTaskTimeMigration() async {
+        migrateTaskTimes()
+    }
+
     /// 캘린더 배치 정보를 기반으로 dueDate를 동기화
     /// scheduledStartTime이 설정된 경우, dueDate = scheduledStartTime + estimatedMinutes로 자동 계산
     private func migrateTaskTimes() {
@@ -210,14 +215,23 @@ class TaskViewModel: ObservableObject {
             }
             // scheduledStartTime이 없고 dueDate가 자정(00:00)인 경우
             else if isDueDateMidnight(task.dueDate) {
-                // dueDate에서 estimatedMinutes를 빼서 scheduledStartTime 생성
-                let calculatedStartTime = calendar.date(byAdding: .minute, value: -task.estimatedMinutes, to: task.dueDate) ?? task.dueDate
+                // dueDate를 해당 날짜 23:59로 변경 (자정보다 현실적)
+                var components = calendar.dateComponents([.year, .month, .day], from: task.dueDate)
+                components.hour = 23
+                components.minute = 59
+                components.second = 0
+                let newDueDate = calendar.date(from: components) ?? task.dueDate
+
+                // scheduledStartTime = dueDate - estimatedMinutes
+                let calculatedStartTime = calendar.date(byAdding: .minute, value: -task.estimatedMinutes, to: newDueDate) ?? newDueDate
 
                 print("   🔧 [\(task.title)]")
-                print("      dueDate가 자정: \(formatDate(task.dueDate))")
+                print("      기존 dueDate (자정): \(formatDate(task.dueDate))")
+                print("      새 dueDate (23:59): \(formatDate(newDueDate))")
                 print("      estimatedMinutes: \(task.estimatedMinutes)분")
                 print("      계산된 scheduledStartTime: \(formatDate(calculatedStartTime))")
 
+                tasks[index].dueDate = newDueDate
                 tasks[index].scheduledStartTime = calculatedStartTime
                 migrationCount += 1
             }
