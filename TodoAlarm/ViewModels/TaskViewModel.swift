@@ -8,6 +8,7 @@
 import SwiftUI
 import CloudKit
 import Foundation
+import Combine
 
 // Swift Concurrency Task와 구분하기 위한 typealias
 typealias TaskModel = Task

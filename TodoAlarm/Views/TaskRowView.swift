@@ -7,9 +7,6 @@
 
 import SwiftUI
 
-// Swift Concurrency Task와 구분
-typealias TaskModel = Task
-
 struct TaskRowView: View {
     let task: TaskModel
     @EnvironmentObject var viewModel: TaskViewModel
