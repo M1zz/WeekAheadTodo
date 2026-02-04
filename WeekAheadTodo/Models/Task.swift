@@ -259,7 +259,6 @@ struct Task: Identifiable {
         let now = Date()
         let today = calendar.startOfDay(for: now)
         let startDate = calendar.startOfDay(for: effectiveStartDate)
-        let dueDay = calendar.startOfDay(for: dueDate)
 
         let daysUntilStart = calendar.dateComponents([.day], from: today, to: startDate).day ?? 0
 
@@ -272,12 +271,14 @@ struct Task: Identifiable {
         print("📊 [Task.currentHorizon] \"\(title)\"")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("   🕐 현재 시각: \(dateFormatter.string(from: now))")
-        print("   📅 오늘 (startOfDay): \(dateFormatter.string(from: today))")
-        print("   🎯 마감일 (dueDate): \(dateFormatter.string(from: dueDate))")
-        print("   🎯 마감일 (startOfDay): \(dateFormatter.string(from: dueDay))")
+        print("   📅 오늘: \(dateFormatter.string(from: today))")
+        print("")
+        print("   ⏰ 실제 시작 시간 (actualStartTime): \(dateFormatter.string(from: actualStartTime))")
+        print("   🎯 실제 마감 시간 (actualEndTime): \(dateFormatter.string(from: actualEndTime))")
+        print("   ⏱️ 예상 소요 시간: \(estimatedMinutes)분")
+        print("")
         print("   📝 선행 소요 일수 (leadTimeDays): \(leadTimeDays)일")
-        print("   ▶️ 시작일 (effectiveStartDate): \(dateFormatter.string(from: effectiveStartDate))")
-        print("   ▶️ 시작일 (startOfDay): \(dateFormatter.string(from: startDate))")
+        print("   ▶️ 역산 시작일 (effectiveStartDate): \(dateFormatter.string(from: effectiveStartDate))")
         print("   ⏱️ 시작까지 남은 일수 (daysUntilStart): \(daysUntilStart)일")
 
         // 이미 시작해야 했거나 오늘 시작해야 함
