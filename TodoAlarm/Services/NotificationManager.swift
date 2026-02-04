@@ -77,6 +77,9 @@ class NotificationManager: ObservableObject {
 
         // 1시간마다 반복 알림 (오늘 할 일 리마인더)
         await scheduleRepeatingReminders(tasks: tasks)
+
+        // 마감 시간 알림 (각 태스크의 마감 시간에)
+        await scheduleDeadlineAlerts(tasks: tasks)
     }
 
     /// 즉시 알림 (오늘 할 일 있음)
@@ -168,6 +171,89 @@ class NotificationManager: ObservableObject {
         }
     }
 
+    /// 마감 시간 알림 (각 태스크의 마감 시간에)
+    private func scheduleDeadlineAlerts(tasks: [TaskModel]) async {
+        print("   ⏰ 마감 시간 알림 생성")
+
+        let now = Date()
+        let incompleteTasks = tasks.filter { !$0.isCompleted && $0.dueDate > now }
+
+        print("      미완료 태스크: \(incompleteTasks.count)개")
+
+        for task in incompleteTasks {
+            let timeInterval = task.dueDate.timeIntervalSince(now)
+
+            // 미래의 태스크만 스케줄링
+            guard timeInterval > 0 else { continue }
+
+            // 마감 시간 알림
+            await scheduleDeadlineAlert(
+                task: task,
+                timeInterval: timeInterval,
+                suffix: "deadline"
+            )
+
+            // 마감 10분 후 알림 (완료 안 했을 경우)
+            await scheduleDeadlineAlert(
+                task: task,
+                timeInterval: timeInterval + 600, // +10분
+                suffix: "overdue-10m"
+            )
+
+            // 마감 30분 후 알림
+            await scheduleDeadlineAlert(
+                task: task,
+                timeInterval: timeInterval + 1800, // +30분
+                suffix: "overdue-30m"
+            )
+
+            // 마감 1시간 후 알림
+            await scheduleDeadlineAlert(
+                task: task,
+                timeInterval: timeInterval + 3600, // +1시간
+                suffix: "overdue-1h"
+            )
+        }
+    }
+
+    /// 개별 마감 알림 스케줄링
+    private func scheduleDeadlineAlert(task: TaskModel, timeInterval: TimeInterval, suffix: String) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d HH:mm"
+        formatter.locale = Locale(identifier: "ko_KR")
+        let dueDateStr = formatter.string(from: task.dueDate)
+
+        let content = UNMutableNotificationContent()
+
+        if suffix == "deadline" {
+            content.title = "⏰ 마감 시간입니다!"
+            content.body = "\(task.title)\n마감: \(dueDateStr)"
+            content.sound = .default
+        } else if suffix.hasPrefix("overdue") {
+            content.title = "⚠️ 마감 시간이 지났습니다!"
+            content.body = "\(task.title)\n마감: \(dueDateStr)\n지금 바로 완료하세요!"
+            content.sound = .defaultCritical // 중요 알림
+        }
+
+        content.badge = 1
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "task-\(task.id.uuidString)-\(suffix)",
+            content: content,
+            trigger: trigger
+        )
+
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            let alertTime = Date().addingTimeInterval(timeInterval)
+            let alertTimeStr = formatter.string(from: alertTime)
+            print("      ✅ [\(task.title)] \(suffix) 알림 스케줄: \(alertTimeStr)")
+        } catch {
+            print("      ❌ [\(task.title)] \(suffix) 알림 스케줄 실패: \(error)")
+        }
+    }
+
     /// 특정 시간에 알림 (예: 오전 9시, 오후 3시, 오후 9시)
     func scheduleTimedReminders(tasks: [TaskModel]) async {
         print("   ⏰ 시간별 리마인더 생성")
@@ -216,6 +302,19 @@ class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         print("🗑️ [NotificationManager] 모든 알림 제거됨")
+    }
+
+    /// 특정 태스크의 알림 제거 (완료 시)
+    func removeNotifications(for taskId: UUID) async {
+        let identifierPrefixes = [
+            "task-\(taskId.uuidString)-deadline",
+            "task-\(taskId.uuidString)-overdue-10m",
+            "task-\(taskId.uuidString)-overdue-30m",
+            "task-\(taskId.uuidString)-overdue-1h"
+        ]
+
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifierPrefixes)
+        print("🗑️ [NotificationManager] 태스크 알림 제거: \(taskId)")
     }
 
     /// 예약된 알림 목록 확인

@@ -250,8 +250,16 @@ class TaskViewModel: ObservableObject {
     /// 태스크 완료 토글 (알림 업데이트 포함)
     func toggleTaskCompletion(_ task: TaskModel) {
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-            tasks[index].status = tasks[index].status == .completed ? .notStarted : .completed
+            let wasCompleted = tasks[index].status == .completed
+            tasks[index].status = wasCompleted ? .notStarted : .completed
             print("✅ [TaskViewModel] 태스크 상태 변경: \(tasks[index].title) - \(tasks[index].status.rawValue)")
+
+            // 완료 시 해당 태스크의 마감 알림 제거
+            if !wasCompleted {
+                _Concurrency.Task {
+                    await notificationManager.removeNotifications(for: task.id)
+                }
+            }
         }
     }
 }
