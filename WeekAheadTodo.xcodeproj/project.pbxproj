@@ -18,6 +18,9 @@
 		3971D3AB777E4853B8F33871 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */; };
 		4221730C4AC74093BA1A9CC8 /* AssistantHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C853D0F6044304A30DE249 /* AssistantHistoryView.swift */; };
 		57AFF640B877461DBC07347D /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393F9661AAA14A049B8CBCC0 /* TaskRowView.swift */; };
+		581565DD2F335C4800B03B5A /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 581565DC2F335C4800B03B5A /* WidgetKit.framework */; };
+		581565DF2F335C4800B03B5A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 581565DE2F335C4800B03B5A /* SwiftUI.framework */; };
+		581565F02F335C4900B03B5A /* widgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 581565DA2F335C4800B03B5A /* widgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D84A5C8231A5D6F641C7 /* NotificationService.swift */; };
 		6AB531D70BF14284B4C630AA /* EditTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB9CDE00E19B43078D3A8CD5 /* EditTaskView.swift */; };
 		6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */; };
@@ -60,6 +63,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		581565EE2F335C4900B03B5A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A100000A234567890000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 581565D92F335C4800B03B5A;
+			remoteInfo = widgetExtension;
+		};
 		9CA0A3D22F19D611004ABF40 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A100000A234567890000001 /* Project object */;
@@ -68,6 +78,20 @@
 			remoteInfo = WeekAheadTodo;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		581565F52F335C4900B03B5A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				581565F02F335C4900B03B5A /* widgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		010532356AA3497A9B77816D /* SomedayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SomedayView.swift; sourceTree = "<group>"; };
@@ -78,6 +102,10 @@
 		433A661E04984D0DB89CDACF /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
 		46B6E15FA4424F33AEDF8B47 /* MonthCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthCalendarView.swift; sourceTree = "<group>"; };
 		4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekOverviewView.swift; sourceTree = "<group>"; };
+		581565DA2F335C4800B03B5A /* widgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = widgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		581565DC2F335C4800B03B5A /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		581565DE2F335C4800B03B5A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		581565F62F335C5A00B03B5A /* widgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = widgetExtension.entitlements; sourceTree = "<group>"; };
 		6492F14261394545B95A33BB /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
 		7625CEC7174C49BC84F85DF5 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
@@ -123,13 +151,40 @@
 		X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingRemindersView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		581565F12F335C4900B03B5A /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 581565D92F335C4800B03B5A /* widgetExtension */;
+		};
+		581566042F3383B900B03B5A /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TaskActivityAttributes.swift,
+			);
+			target = 9C3D6D392F33248B00D67B5B /* TodoAlarm */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		581565E02F335C4800B03B5A /* widget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (581566042F3383B900B03B5A /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 581565F12F335C4900B03B5A /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = widget; sourceTree = "<group>"; };
 		9C3D6D3B2F33248B00D67B5B /* TodoAlarm */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = TodoAlarm; sourceTree = "<group>"; };
 		9CA0A3CF2F19D611004ABF40 /* WeekAheadTodoTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WeekAheadTodoTests; sourceTree = "<group>"; };
 		9CA0A3E82F19D628004ABF40 /* WeekAheadTodoUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = WeekAheadTodoUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		581565D72F335C4800B03B5A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				581565DF2F335C4800B03B5A /* SwiftUI.framework in Frameworks */,
+				581565DD2F335C4800B03B5A /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9C3D6D372F33248B00D67B5B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -154,13 +209,25 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		581565DB2F335C4800B03B5A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				581565DC2F335C4800B03B5A /* WidgetKit.framework */,
+				581565DE2F335C4800B03B5A /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		A1000005234567890000001 = {
 			isa = PBXGroup;
 			children = (
+				581565F62F335C5A00B03B5A /* widgetExtension.entitlements */,
 				A1000005234567890000002 /* WeekAheadTodo */,
 				9CA0A3CF2F19D611004ABF40 /* WeekAheadTodoTests */,
 				9CA0A3E82F19D628004ABF40 /* WeekAheadTodoUITests */,
 				9C3D6D3B2F33248B00D67B5B /* TodoAlarm */,
+				581565E02F335C4800B03B5A /* widget */,
+				581565DB2F335C4800B03B5A /* Frameworks */,
 				A1000005234567890000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -185,6 +252,7 @@
 				A1000003234567890000001 /* WeekAheadTodo.app */,
 				9CA0A3CE2F19D611004ABF40 /* WeekAheadTodoTests.xctest */,
 				9C3D6D3A2F33248B00D67B5B /* TodoAlarm.app */,
+				581565DA2F335C4800B03B5A /* widgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -265,6 +333,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		581565D92F335C4800B03B5A /* widgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 581565F22F335C4900B03B5A /* Build configuration list for PBXNativeTarget "widgetExtension" */;
+			buildPhases = (
+				581565D62F335C4800B03B5A /* Sources */,
+				581565D72F335C4800B03B5A /* Frameworks */,
+				581565D82F335C4800B03B5A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				581565E02F335C4800B03B5A /* widget */,
+			);
+			name = widgetExtension;
+			packageProductDependencies = (
+			);
+			productName = widgetExtension;
+			productReference = 581565DA2F335C4800B03B5A /* widgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		9C3D6D392F33248B00D67B5B /* TodoAlarm */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9C3D6D442F33248B00D67B5B /* Build configuration list for PBXNativeTarget "TodoAlarm" */;
@@ -272,10 +362,12 @@
 				9C3D6D362F33248B00D67B5B /* Sources */,
 				9C3D6D372F33248B00D67B5B /* Frameworks */,
 				9C3D6D382F33248B00D67B5B /* Resources */,
+				581565F52F335C4900B03B5A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				581565EF2F335C4900B03B5A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				9C3D6D3B2F33248B00D67B5B /* TodoAlarm */,
@@ -334,9 +426,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2620;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					581565D92F335C4800B03B5A = {
+						CreatedOnToolsVersion = 26.0;
+					};
 					9C3D6D392F33248B00D67B5B = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -365,12 +460,20 @@
 			targets = (
 				A1000006234567890000001 /* WeekAheadTodo */,
 				9C3D6D392F33248B00D67B5B /* TodoAlarm */,
+				581565D92F335C4800B03B5A /* widgetExtension */,
 				9CA0A3CD2F19D611004ABF40 /* WeekAheadTodoTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		581565D82F335C4800B03B5A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9C3D6D382F33248B00D67B5B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -396,6 +499,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		581565D62F335C4800B03B5A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9C3D6D362F33248B00D67B5B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -469,6 +579,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		581565EF2F335C4900B03B5A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 581565D92F335C4800B03B5A /* widgetExtension */;
+			targetProxy = 581565EE2F335C4900B03B5A /* PBXContainerItemProxy */;
+		};
 		9CA0A3D32F19D611004ABF40 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A1000006234567890000001 /* WeekAheadTodo */;
@@ -477,6 +592,73 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		581565F32F335C4900B03B5A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = widgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QGAQ3AY3R3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = widget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.leeo.TodoAlarm.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		581565F42F335C4900B03B5A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = widgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QGAQ3AY3R3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = widget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.leeo.TodoAlarm.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		9C3D6D422F33248B00D67B5B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -488,12 +670,13 @@
 				DEVELOPMENT_TEAM = QGAQ3AY3R3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -525,12 +708,13 @@
 				DEVELOPMENT_TEAM = QGAQ3AY3R3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -769,6 +953,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		581565F22F335C4900B03B5A /* Build configuration list for PBXNativeTarget "widgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				581565F32F335C4900B03B5A /* Debug */,
+				581565F42F335C4900B03B5A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		9C3D6D442F33248B00D67B5B /* Build configuration list for PBXNativeTarget "TodoAlarm" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -166,6 +166,7 @@ struct Task: Identifiable {
     var title: String
     var description: String
     var dueDate: Date                    // 최종 마감일
+    var scheduledStartTime: Date?        // 캘린더 배치 시작 시간 (nil이면 dueDate - estimatedMinutes로 계산)
     var estimatedMinutes: Int            // 예상 소요 시간 (분)
     var leadTimeDays: Int                // 선행 소요 일수 (역산용)
     var taskType: TaskType
@@ -227,8 +228,26 @@ struct Task: Identifiable {
         self.patternId = nil
     }
     
+    // MARK: - 시간 계산
+
+    /// 캘린더 배치 실제 시작 시간 (scheduledStartTime이 있으면 사용, 없으면 dueDate - estimatedMinutes)
+    var actualStartTime: Date {
+        if let scheduled = scheduledStartTime {
+            return scheduled
+        }
+        return Calendar.current.date(byAdding: .minute, value: -estimatedMinutes, to: dueDate) ?? dueDate
+    }
+
+    /// 캘린더 배치 실제 종료 시간 (scheduledStartTime 기준)
+    var actualEndTime: Date {
+        if let scheduled = scheduledStartTime {
+            return Calendar.current.date(byAdding: .minute, value: estimatedMinutes, to: scheduled) ?? scheduled
+        }
+        return dueDate
+    }
+
     // MARK: - 선행 작업 역산 로직
-    
+
     /// 실제로 시작해야 하는 날짜 (마감일 - 선행 소요 일수)
     var effectiveStartDate: Date {
         Calendar.current.date(byAdding: .day, value: -leadTimeDays, to: dueDate) ?? dueDate
@@ -237,25 +256,52 @@ struct Task: Identifiable {
     /// 현재 시간 지평선 계산
     var currentHorizon: TimeHorizon {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let now = Date()
+        let today = calendar.startOfDay(for: now)
         let startDate = calendar.startOfDay(for: effectiveStartDate)
-        
+        let dueDay = calendar.startOfDay(for: dueDate)
+
         let daysUntilStart = calendar.dateComponents([.day], from: today, to: startDate).day ?? 0
-        
+
+        // 로깅
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm"
+        dateFormatter.locale = Locale(identifier: "ko_KR")
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📊 [Task.currentHorizon] \"\(title)\"")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("   🕐 현재 시각: \(dateFormatter.string(from: now))")
+        print("   📅 오늘 (startOfDay): \(dateFormatter.string(from: today))")
+        print("   🎯 마감일 (dueDate): \(dateFormatter.string(from: dueDate))")
+        print("   🎯 마감일 (startOfDay): \(dateFormatter.string(from: dueDay))")
+        print("   📝 선행 소요 일수 (leadTimeDays): \(leadTimeDays)일")
+        print("   ▶️ 시작일 (effectiveStartDate): \(dateFormatter.string(from: effectiveStartDate))")
+        print("   ▶️ 시작일 (startOfDay): \(dateFormatter.string(from: startDate))")
+        print("   ⏱️ 시작까지 남은 일수 (daysUntilStart): \(daysUntilStart)일")
+
         // 이미 시작해야 했거나 오늘 시작해야 함
         if daysUntilStart <= 0 {
+            print("   ✅ 판정: .today (daysUntilStart <= 0)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .today
         }
         // 이번 주 내에 시작해야 함 (7일 이내)
         else if daysUntilStart <= 7 {
+            print("   ✅ 판정: .thisWeek (1 <= daysUntilStart <= 7)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .thisWeek
         }
         // 다음 주에 시작 (8-14일)
         else if daysUntilStart <= 14 {
+            print("   ✅ 판정: .nextWeek (8 <= daysUntilStart <= 14)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .nextWeek
         }
         // 그 이후
         else {
+            print("   ✅ 판정: .later (daysUntilStart > 14)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .later
         }
     }

@@ -259,6 +259,40 @@ struct SettingsView: View {
                     .cornerRadius(6)
                 }
 
+                // 자동 백업 설정
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(isOn: $viewModel.isAutoBackupEnabled) {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath.icloud")
+                                .foregroundColor(viewModel.isAutoBackupEnabled ? .green : .gray)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("자동 백업")
+                                    .font(.callout)
+                                Text("변경 후 10초 뒤 자동으로 클라우드에 저장")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .toggleStyle(.switch)
+
+                    if let lastAutoBackup = viewModel.lastAutoBackupDate {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(.blue)
+                                .font(.caption)
+                            Text("마지막 자동 백업: \(lastAutoBackup.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(viewModel.isAutoBackupEnabled ? Color.green.opacity(0.05) : Color.gray.opacity(0.05))
+                .cornerRadius(8)
+
+                Divider()
+
                 HStack(spacing: 12) {
                     Button(action: { checkDataDifferenceBeforeSync(operation: .save) }) {
                         Label("클라우드에 저장", systemImage: "icloud.and.arrow.up")

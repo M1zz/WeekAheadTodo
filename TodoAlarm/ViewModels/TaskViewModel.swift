@@ -15,13 +15,51 @@ typealias TaskModel = Task
 
 @MainActor
 class TaskViewModel: ObservableObject {
-    @Published var tasks: [TaskModel] = []
+    @Published var tasks: [TaskModel] = [] {
+        didSet {
+            // 태스크가 변경되면 알림과 Live Activity 업데이트
+            _Concurrency.Task {
+                await updateNotificationsAndActivity()
+            }
+        }
+    }
     @Published var projects: [Project] = []
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: String?
 
+    // 자동 동기화 설정
+    @Published var isAutoSyncEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isAutoSyncEnabled, forKey: "isAutoSyncEnabled")
+            if isAutoSyncEnabled {
+                startPeriodicSync()
+            } else {
+                stopPeriodicSync()
+            }
+        }
+    }
+
     private let cloudService = CloudKitService()
+    private let notificationManager = NotificationManager.shared
+    private var periodicSyncTimer: Timer?
+
+    #if os(iOS)
+    @available(iOS 16.1, *)
+    private lazy var liveActivityManager = LiveActivityManager.shared
+    #endif
+
+    // MARK: - Initialization
+
+    init() {
+        // UserDefaults에서 자동 동기화 설정 로드
+        self.isAutoSyncEnabled = UserDefaults.standard.object(forKey: "isAutoSyncEnabled") as? Bool ?? true
+
+        // 자동 동기화가 켜져 있으면 타이머 시작
+        if isAutoSyncEnabled {
+            startPeriodicSync()
+        }
+    }
 
     // MARK: - Cloud Sync
 
@@ -96,10 +134,39 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Periodic Sync
+
+    /// 주기적 동기화 시작 (1시간마다)
+    private func startPeriodicSync() {
+        print("🔄 [TaskViewModel] 주기적 동기화 시작 (1시간마다)")
+
+        // 기존 타이머 정지
+        stopPeriodicSync()
+
+        // 1시간 = 3600초
+        periodicSyncTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+            print("⏰ [TaskViewModel] 주기적 동기화 실행")
+            _Concurrency.Task { @MainActor in
+                await self?.syncFromCloud()
+            }
+        }
+
+        print("✅ [TaskViewModel] 주기적 동기화 타이머 설정 완료")
+    }
+
+    /// 주기적 동기화 중지
+    private func stopPeriodicSync() {
+        if periodicSyncTimer != nil {
+            print("⏹️ [TaskViewModel] 주기적 동기화 중지")
+            periodicSyncTimer?.invalidate()
+            periodicSyncTimer = nil
+        }
+    }
+
     // MARK: - Computed Properties (macOS TaskViewModel 참고)
 
     /// 오늘 할 일 (effectiveStartDate 기준)
-    var todayTasks: [Task] {
+    var todayTasks: [TaskModel] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
@@ -110,7 +177,7 @@ class TaskViewModel: ObservableObject {
     }
 
     /// 이번 주 할 일
-    var thisWeekTasks: [Task] {
+    var thisWeekTasks: [TaskModel] {
         let calendar = Calendar.current
         let today = Date()
         let weekStart = calendar.startOfDay(for: today)
@@ -125,7 +192,7 @@ class TaskViewModel: ObservableObject {
     }
 
     /// 다음 주 할 일
-    var nextWeekTasks: [Task] {
+    var nextWeekTasks: [TaskModel] {
         let calendar = Calendar.current
         let today = Date()
         guard let nextWeekStart = calendar.date(byAdding: .day, value: 7, to: today),
@@ -143,5 +210,48 @@ class TaskViewModel: ObservableObject {
     func projectName(for projectId: UUID?) -> String? {
         guard let id = projectId else { return nil }
         return projects.first { $0.id == id }?.name
+    }
+
+    // MARK: - Notifications & Live Activity
+
+    /// 알림 권한 요청
+    func requestNotificationPermission() async {
+        print("🔔 [TaskViewModel] 알림 권한 요청")
+        do {
+            try await notificationManager.requestAuthorization()
+        } catch {
+            print("❌ [TaskViewModel] 알림 권한 요청 실패: \(error)")
+        }
+    }
+
+    /// 알림 및 Live Activity 업데이트
+    private func updateNotificationsAndActivity() async {
+        print("🔄 [TaskViewModel] 알림 및 Live Activity 업데이트")
+
+        let today = todayTasks
+        print("   오늘 할 일: \(today.count)개")
+
+        // 로컬 푸시 알림 스케줄링
+        await notificationManager.scheduleTodayTasksNotifications(tasks: today)
+
+        // Live Activity 관리 (다이나믹 아일랜드) - iOS 16.1+ only
+        #if os(iOS)
+        if #available(iOS 16.1, *) {
+            liveActivityManager.manageTodayTasksActivity(tasks: today)
+        }
+        #endif
+    }
+
+    /// 수동으로 알림 및 Live Activity 업데이트
+    func refreshNotificationsAndActivity() async {
+        await updateNotificationsAndActivity()
+    }
+
+    /// 태스크 완료 토글 (알림 업데이트 포함)
+    func toggleTaskCompletion(_ task: TaskModel) {
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index].status = tasks[index].status == .completed ? .notStarted : .completed
+            print("✅ [TaskViewModel] 태스크 상태 변경: \(tasks[index].title) - \(tasks[index].status.rawValue)")
+        }
     }
 }

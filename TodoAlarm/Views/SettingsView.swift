@@ -9,12 +9,48 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var viewModel: TaskViewModel
+    @StateObject private var notificationManager = NotificationManager.shared
 
     var body: some View {
         NavigationStack {
             List {
+                // 알림 섹션
+                Section("알림 설정") {
+                    HStack {
+                        Image(systemName: authStatusIcon)
+                            .foregroundColor(authStatusColor)
+                        Text(authStatusText)
+                            .font(.callout)
+                    }
+
+                    if notificationManager.authorizationStatus != .authorized {
+                        Button("알림 권한 요청") {
+                            _Concurrency.Task {
+                                await viewModel.requestNotificationPermission()
+                            }
+                        }
+                    }
+
+                    Button("알림 즉시 업데이트") {
+                        _Concurrency.Task {
+                            await viewModel.refreshNotificationsAndActivity()
+                        }
+                    }
+                }
+
                 // 동기화 섹션
                 Section("동기화") {
+                    // 자동 동기화 토글
+                    Toggle(isOn: $viewModel.isAutoSyncEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("자동 동기화")
+                                .font(.callout)
+                            Text("1시간마다 자동으로 클라우드에서 데이터 가져오기")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     if let lastSync = viewModel.lastSyncDate {
                         LabeledContent("마지막 동기화") {
                             Text(lastSync, style: .relative)
@@ -76,6 +112,47 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("더보기")
+        }
+    }
+
+    // MARK: - Computed Properties
+
+    private var authStatusIcon: String {
+        switch notificationManager.authorizationStatus {
+        case .authorized:
+            return "checkmark.circle.fill"
+        case .denied:
+            return "xmark.circle.fill"
+        case .notDetermined:
+            return "questionmark.circle"
+        default:
+            return "exclamationmark.circle"
+        }
+    }
+
+    private var authStatusColor: Color {
+        switch notificationManager.authorizationStatus {
+        case .authorized:
+            return .green
+        case .denied:
+            return .red
+        case .notDetermined:
+            return .orange
+        default:
+            return .gray
+        }
+    }
+
+    private var authStatusText: String {
+        switch notificationManager.authorizationStatus {
+        case .authorized:
+            return "알림 권한 승인됨"
+        case .denied:
+            return "알림 권한 거부됨 (설정에서 변경)"
+        case .notDetermined:
+            return "알림 권한 미요청"
+        default:
+            return "알림 권한 상태 불명"
         }
     }
 }

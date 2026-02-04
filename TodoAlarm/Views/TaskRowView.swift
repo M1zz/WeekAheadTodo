@@ -32,13 +32,26 @@ struct TaskRowView: View {
                 }
             }
 
-            // 마감일 + 예상 시간 + 프로젝트
-            HStack(spacing: 12) {
-                Label(dueDateText, systemImage: "calendar")
+            // 시작/마감 시간 범위
+            HStack(spacing: 4) {
+                Image(systemName: isPastDue ? "exclamationmark.triangle.fill" : "clock.fill")
+                    .foregroundStyle(isPastDue ? .red : .orange)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
 
-                Label("\(task.estimatedMinutes)분", systemImage: "clock")
+                Text(timeRangeText)
+                    .font(.caption)
+                    .foregroundStyle(isPastDue ? .red : .primary)
+                    .fontWeight(.medium)
+
+                if isPastDue {
+                    Text("⚠️")
+                        .font(.caption)
+                }
+            }
+
+            // 예상 시간 + 프로젝트
+            HStack(spacing: 12) {
+                Label("\(task.estimatedMinutes)분", systemImage: "timer")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -97,10 +110,25 @@ struct TaskRowView: View {
         }
     }
 
-    private var dueDateText: String {
+    private var isPastDue: Bool {
+        task.dueDate < Date()
+    }
+
+    /// 예상 소요 시간을 기반으로 계산된 시작 시간
+    private var calculatedStartTime: Date {
+        let calendar = Calendar.current
+        return calendar.date(byAdding: .minute, value: -task.estimatedMinutes, to: task.dueDate) ?? task.dueDate
+    }
+
+    /// 시간 범위 텍스트 (macOS처럼 HH:mm - HH:mm 형식)
+    private var timeRangeText: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "M/d (E)"
-        return formatter.string(from: task.dueDate)
+        formatter.dateFormat = "HH:mm"
+
+        let startTime = formatter.string(from: calculatedStartTime)
+        let endTime = formatter.string(from: task.dueDate)
+
+        return "\(startTime) - \(endTime)"
     }
 }

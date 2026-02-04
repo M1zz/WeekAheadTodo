@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import CloudKit
+import Combine
 
 /// 앱의 핵심 비즈니스 로직을 담당하는 ViewModel
 @MainActor
@@ -11,12 +12,14 @@ class TaskViewModel: ObservableObject {
     @Published var tasks: [Task] = [] {
         didSet {
             saveTasks()
+            triggerAutoBackup()
         }
     }
 
     @Published var projects: [Project] = [] {
         didSet {
             saveProjects()
+            triggerAutoBackup()
         }
     }
 
@@ -84,12 +87,23 @@ class TaskViewModel: ObservableObject {
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: String?
+    @Published var isAutoBackupEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isAutoBackupEnabled, forKey: autoBackupEnabledKey)
+        }
+    }
+    @Published var lastAutoBackupDate: Date?
 
     // MARK: - Checkin
     @Published var pendingCheckinTaskId: UUID? = nil  // 체크인 UI 표시 대상 태스크
 
     private var container: CKContainer?
     private var database: CKDatabase?
+
+    // MARK: - Auto Backup
+    private var autoBackupTimer: Timer?
+    private var lastChangeDate: Date?
+    private let autoBackupDelay: TimeInterval = 10.0 // 10초 후 자동 백업
 
     // Calendar reference for time block calculation
     weak var calendarViewModel: CalendarViewModel?
@@ -108,6 +122,7 @@ class TaskViewModel: ObservableObject {
     private let targetDaysAheadKey = "TargetDaysAhead"
     private let calendarStartHourKey = "CalendarStartHour"
     private let calendarEndHourKey = "CalendarEndHour"
+    private let autoBackupEnabledKey = "AutoBackupEnabled"
 
     // MARK: - Initialization
 
@@ -142,6 +157,10 @@ class TaskViewModel: ObservableObject {
             self.timeBlockCalendarIds = Set(ids)
         }
 
+        // Auto backup 설정 로드 (기본값: true)
+        self.isAutoBackupEnabled = UserDefaults.standard.object(forKey: autoBackupEnabledKey) as? Bool ?? true
+        print("   자동 백업: \(isAutoBackupEnabled ? "활성화" : "비활성화")")
+
         print("   📂 loadTasks() 호출...")
         loadTasks()
         print("   📂 loadProjects() 호출...")
@@ -153,6 +172,81 @@ class TaskViewModel: ObservableObject {
         print("✅ [TaskViewModel.init] TaskViewModel initialized")
         print("   최종 태스크 개수: \(tasks.count)")
         print("   최종 프로젝트 개수: \(projects.count)")
+
+        // 태스크 시간 데이터 마이그레이션 (scheduledStartTime 기반으로 dueDate 동기화)
+        migrateTaskTimes()
+    }
+
+    // MARK: - Task Time Migration
+
+    /// 캘린더 배치 정보를 기반으로 dueDate를 동기화
+    /// scheduledStartTime이 설정된 경우, dueDate = scheduledStartTime + estimatedMinutes로 자동 계산
+    private func migrateTaskTimes() {
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🔄 [TaskViewModel] 태스크 시간 데이터 마이그레이션 시작")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        var migrationCount = 0
+        let calendar = Calendar.current
+
+        for index in tasks.indices {
+            let task = tasks[index]
+
+            // scheduledStartTime이 있으면 dueDate를 재계산
+            if let startTime = task.scheduledStartTime {
+                let calculatedDueDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: startTime) ?? startTime
+
+                // dueDate가 계산된 값과 다르면 동기화
+                if !calendar.isDate(task.dueDate, equalTo: calculatedDueDate, toGranularity: .minute) {
+                    print("   🔧 [\(task.title)]")
+                    print("      scheduledStartTime: \(formatDate(startTime))")
+                    print("      estimatedMinutes: \(task.estimatedMinutes)분")
+                    print("      기존 dueDate: \(formatDate(task.dueDate))")
+                    print("      새 dueDate: \(formatDate(calculatedDueDate))")
+
+                    tasks[index].dueDate = calculatedDueDate
+                    migrationCount += 1
+                }
+            }
+            // scheduledStartTime이 없고 dueDate가 자정(00:00)인 경우
+            else if isDueDateMidnight(task.dueDate) {
+                // dueDate에서 estimatedMinutes를 빼서 scheduledStartTime 생성
+                let calculatedStartTime = calendar.date(byAdding: .minute, value: -task.estimatedMinutes, to: task.dueDate) ?? task.dueDate
+
+                print("   🔧 [\(task.title)]")
+                print("      dueDate가 자정: \(formatDate(task.dueDate))")
+                print("      estimatedMinutes: \(task.estimatedMinutes)분")
+                print("      계산된 scheduledStartTime: \(formatDate(calculatedStartTime))")
+
+                tasks[index].scheduledStartTime = calculatedStartTime
+                migrationCount += 1
+            }
+        }
+
+        if migrationCount > 0 {
+            print("\n✅ [TaskViewModel] 마이그레이션 완료: \(migrationCount)개 태스크 수정됨")
+            saveTasks()
+            print("   💾 변경사항 저장 완료")
+        } else {
+            print("\n✅ [TaskViewModel] 마이그레이션 불필요 (모든 태스크가 올바른 상태)")
+        }
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+    }
+
+    /// dueDate가 자정(00:00)인지 확인
+    private func isDueDateMidnight(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.hour, .minute, .second], from: date)
+        return components.hour == 0 && components.minute == 0 && components.second == 0
+    }
+
+    /// 날짜 포맷팅 (로깅용)
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "ko_KR")
+        return formatter.string(from: date)
     }
 
     // MARK: - Checkin Observer Setup
@@ -306,9 +400,33 @@ class TaskViewModel: ObservableObject {
     
     /// 오늘 할 일 (역산 결과 기준) - 완료된 것 포함
     var todayTasks: [Task] {
-        tasks
-            .filter { $0.currentHorizon == .today }
+        print("\n╔════════════════════════════════════════════════════════╗")
+        print("║  TaskViewModel.todayTasks 계산 시작                    ║")
+        print("╚════════════════════════════════════════════════════════╝")
+        print("   📊 전체 태스크 개수: \(tasks.count)개\n")
+
+        let result = tasks
+            .filter { task in
+                let horizon = task.currentHorizon
+                let isToday = horizon == .today
+                if !isToday {
+                    print("   ❌ 제외: \"\(task.title)\" → \(horizon.rawValue)")
+                }
+                return isToday
+            }
             .sorted { $0.sortOrder < $1.sortOrder }
+
+        print("\n╔════════════════════════════════════════════════════════╗")
+        print("║  TaskViewModel.todayTasks 계산 완료                    ║")
+        print("╚════════════════════════════════════════════════════════╝")
+        print("   ✅ 오늘 할 일: \(result.count)개")
+        for (index, task) in result.enumerated() {
+            let statusIcon = task.isCompleted ? "✅" : "⏳"
+            print("   [\(index + 1)] \(statusIcon) \(task.title)")
+        }
+        print("════════════════════════════════════════════════════════\n")
+
+        return result
     }
 
     /// 오늘 할 일 중 미완료만
@@ -950,6 +1068,68 @@ class TaskViewModel: ObservableObject {
         print("   유의미한 차이: \(result.hasSignificantDifference ? "예" : "아니오")")
 
         return result
+    }
+
+    // MARK: - Auto Backup
+
+    /// 자동 백업 트리거 (변경 감지 후 일정 시간 후 실행)
+    private func triggerAutoBackup() {
+        guard isAutoBackupEnabled else {
+            print("ℹ️ [TaskViewModel] 자동 백업 비활성화됨")
+            return
+        }
+
+        // 현재 동기화 중이면 스킵
+        guard !isSyncing else {
+            print("ℹ️ [TaskViewModel] 이미 동기화 중 - 자동 백업 스킵")
+            return
+        }
+
+        // 마지막 변경 시간 기록
+        lastChangeDate = Date()
+
+        // 기존 타이머 취소
+        autoBackupTimer?.invalidate()
+
+        // 새 타이머 시작 (10초 후 실행)
+        autoBackupTimer = Timer.scheduledTimer(withTimeInterval: autoBackupDelay, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+
+            _Concurrency.Task { @MainActor in
+                await self.performAutoBackup()
+            }
+        }
+
+        print("⏱️ [TaskViewModel] 자동 백업 예약: \(Int(autoBackupDelay))초 후")
+    }
+
+    /// 자동 백업 실행
+    private func performAutoBackup() async {
+        // 마지막 변경 후 충분한 시간이 지났는지 확인
+        guard let lastChange = lastChangeDate else {
+            print("ℹ️ [TaskViewModel] 마지막 변경 없음 - 자동 백업 스킵")
+            return
+        }
+
+        let timeSinceChange = Date().timeIntervalSince(lastChange)
+        guard timeSinceChange >= autoBackupDelay else {
+            print("ℹ️ [TaskViewModel] 변경 후 시간 부족 (\(Int(timeSinceChange))초) - 자동 백업 스킵")
+            return
+        }
+
+        print("🔄 [TaskViewModel] 자동 백업 시작...")
+        print("   마지막 변경: \(Int(timeSinceChange))초 전")
+        print("   태스크: \(tasks.count)개")
+        print("   프로젝트: \(projects.count)개")
+
+        do {
+            try await saveToCloud()
+            lastAutoBackupDate = Date()
+            print("✅ [TaskViewModel] 자동 백업 완료")
+        } catch {
+            print("❌ [TaskViewModel] 자동 백업 실패: \(error.localizedDescription)")
+            // 자동 백업 실패는 사용자에게 알리지 않음 (조용히 실패)
+        }
     }
 
     /// 클라우드에 저장
