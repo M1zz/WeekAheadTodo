@@ -22,34 +22,67 @@ class CloudKitService {
 
     /// CloudKit에서 모든 Task 가져오기 (CKQuery 방식)
     func fetchAllTasks() async throws -> [TaskModel] {
+        print("📥 [iOS CloudKitService.fetchAllTasks] 시작")
+        print("   Container ID: \(container.containerIdentifier ?? "nil")")
+
         let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
-        // 중요: desiredKeys에 최소 하나 이상 필드 지정 (쿼리 제약 우회)
-        let results = try await database.records(
-            matching: query,
-            desiredKeys: ["title"] // 빈 배열 사용 시 에러
-        )
+        print("   🔍 CKQuery 실행 중... (recordType: Task)")
 
-        return results.matchResults.compactMap { (_, result) in
-            guard let record = try? result.get() else { return nil }
-            return ckRecordToTask(record)
+        // 모든 필드를 가져오기 위해 desiredKeys 제거 (macOS와 동일)
+        let results = try await database.records(matching: query)
+
+        print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
+
+        let tasks = results.matchResults.compactMap { (recordID, result) -> TaskModel? in
+            guard let record = try? result.get() else {
+                print("   ⚠️ 레코드 가져오기 실패: \(recordID.recordName)")
+                return nil
+            }
+            let task = ckRecordToTask(record)
+            if task == nil {
+                print("   ⚠️ Task 변환 실패: \(recordID.recordName)")
+                print("      title: \(record["title"] as? String ?? "없음")")
+                print("      dueDate: \(record["dueDate"] as? Date ?? Date())")
+            }
+            return task
         }
+
+        print("✅ [iOS CloudKitService.fetchAllTasks] \(tasks.count)개 태스크 변환 성공 (총 \(results.matchResults.count)개 레코드)")
+
+        return tasks
     }
 
     /// CloudKit에서 모든 Project 가져오기
     func fetchAllProjects() async throws -> [Project] {
+        print("📥 [iOS CloudKitService.fetchAllProjects] 시작")
+
         let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
 
-        let results = try await database.records(
-            matching: query,
-            desiredKeys: ["name"]
-        )
+        print("   🔍 CKQuery 실행 중... (recordType: Project)")
 
-        return results.matchResults.compactMap { (_, result) in
-            guard let record = try? result.get() else { return nil }
-            return ckRecordToProject(record)
+        // 모든 필드를 가져오기 위해 desiredKeys 제거 (macOS와 동일)
+        let results = try await database.records(matching: query)
+
+        print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
+
+        let projects = results.matchResults.compactMap { (recordID, result) -> Project? in
+            guard let record = try? result.get() else {
+                print("   ⚠️ 레코드 가져오기 실패: \(recordID.recordName)")
+                return nil
+            }
+            let project = ckRecordToProject(record)
+            if project == nil {
+                print("   ⚠️ Project 변환 실패: \(recordID.recordName)")
+                print("      name: \(record["name"] as? String ?? "없음")")
+            }
+            return project
         }
+
+        print("✅ [iOS CloudKitService.fetchAllProjects] \(projects.count)개 프로젝트 변환 성공 (총 \(results.matchResults.count)개 레코드)")
+
+        return projects
     }
 
     // MARK: - CKRecord 변환
@@ -97,7 +130,7 @@ class CloudKitService {
             return nil
         }
 
-        return Task(
+        var task = Task(
             id: taskId,
             title: title,
             description: taskDescription,
@@ -111,18 +144,14 @@ class CloudKitService {
             projectId: projectId,
             parentTaskId: parentTaskId,
             mainTaskId: mainTaskId,
-            targetDate: targetDate,
-            createdAt: createdAt,
-            manualPriority: manualPriority,
-            // 기타 필드는 기본값 사용
-            calendarEventId: nil,
-            isFromCalendarPattern: false,
-            patternId: nil,
-            autoRecurring: false,
-            lastCheckinDate: nil,
-            consecutiveMissedCheckins: 0,
-            completedAt: nil
+            targetDate: targetDate
         )
+
+        // 생성자에 없는 필드들은 직접 할당
+        task.manualPriority = manualPriority
+        task.completedAt = record["completedAt"] as? Date
+
+        return task
     }
 
     /// CKRecord → Project 변환
@@ -135,6 +164,8 @@ class CloudKitService {
             return nil
         }
 
-        return Project(id: projectId, name: name, color: color, icon: icon)
+        var project = Project(name: name, color: color, icon: icon)
+        project.id = projectId
+        return project
     }
 }

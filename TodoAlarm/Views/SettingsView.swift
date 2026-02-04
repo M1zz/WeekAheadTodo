@@ -22,7 +22,12 @@ struct SettingsView: View {
                     }
 
                     Button {
-                        _Concurrency.Task { await viewModel.syncFromCloud() }
+                        print("🔘 [iOS SettingsView] 지금 동기화 버튼 클릭")
+                        _Concurrency.Task {
+                            print("🚀 [iOS SettingsView] Task 시작 - syncFromCloud() 호출")
+                            await viewModel.syncFromCloud()
+                            print("✅ [iOS SettingsView] syncFromCloud() 완료")
+                        }
                     } label: {
                         HStack {
                             if viewModel.isSyncing {

@@ -2,6 +2,11 @@ import SwiftUI
 
 // MARK: - Settings View
 
+enum SyncOperation {
+    case save
+    case restore
+}
+
 struct SettingsView: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @EnvironmentObject var calendarViewModel: CalendarViewModel
@@ -16,6 +21,27 @@ struct SettingsView: View {
     @AppStorage("appFontSizeLevel") private var appFontSizeLevel: Int = 1
     @AppStorage("taskSectionOrder") private var taskSectionOrderData: Data = Data()
     @State private var editableTaskSections: [ContentView.SidebarSection] = []
+
+    // 데이터 차이 확인 관련
+    @State private var showingDataDifferenceAlert = false
+    @State private var dataComparison: TaskViewModel.DataComparisonResult?
+    @State private var pendingSyncOperation: SyncOperation = .save
+
+    // 클라우드 데이터 미리보기
+    @State private var showingCloudPreviewAlert = false
+    @State private var cloudPreview: TaskViewModel.CloudDataPreview?
+
+    // MARK: - Computed Properties
+
+    /// 클라우드에 동기화된 태스크 개수
+    private var cloudTaskCount: Int {
+        UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames")?.count ?? 0
+    }
+
+    /// 클라우드에 동기화된 프로젝트 개수
+    private var cloudProjectCount: Int {
+        UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames")?.count ?? 0
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -161,15 +187,64 @@ struct SettingsView: View {
                 .font(.headline)
 
             VStack(spacing: 12) {
-                if let lastSync = viewModel.lastSyncDate {
-                    HStack {
-                        Image(systemName: "checkmark.icloud")
-                            .foregroundColor(.green)
-                        Text("마지막 동기화: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.callout)
-                            .foregroundColor(.secondary)
+                // 클라우드 동기화 정보
+                VStack(alignment: .leading, spacing: 8) {
+                    if let lastSync = viewModel.lastSyncDate {
+                        HStack {
+                            Image(systemName: "checkmark.icloud")
+                                .foregroundColor(.green)
+                            Text("마지막 동기화: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    // 클라우드 동기화된 데이터 개수
+                    HStack(spacing: 16) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.blue)
+                                .font(.caption)
+                            Text("클라우드: 태스크 \(cloudTaskCount)개")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text("프로젝트 \(cloudProjectCount)개")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    // 로컬 데이터 개수
+                    HStack(spacing: 16) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "laptopcomputer")
+                                .foregroundColor(.purple)
+                                .font(.caption)
+                            Text("로컬: 태스크 \(viewModel.tasks.count)개")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text("프로젝트 \(viewModel.projects.count)개")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.blue.opacity(0.05))
+                .cornerRadius(8)
 
                 if let error = cloudOperationError {
                     HStack {
@@ -185,13 +260,13 @@ struct SettingsView: View {
                 }
 
                 HStack(spacing: 12) {
-                    Button(action: { showingSaveToCloudAlert = true }) {
+                    Button(action: { checkDataDifferenceBeforeSync(operation: .save) }) {
                         Label("클라우드에 저장", systemImage: "icloud.and.arrow.up")
                     }
                     .buttonStyle(.bordered)
                     .disabled(cloudOperationInProgress)
 
-                    Button(action: { showingRestoreFromCloudAlert = true }) {
+                    Button(action: { showCloudDataPreview() }) {
                         Label("클라우드에서 복원", systemImage: "icloud.and.arrow.down")
                     }
                     .buttonStyle(.bordered)
@@ -220,6 +295,28 @@ struct SettingsView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(12)
         }
+        .alert("데이터 차이 확인", isPresented: $showingDataDifferenceAlert) {
+            Button("취소", role: .cancel) { }
+            Button("로컬로 클라우드 덮어쓰기") {
+                _Concurrency.Task { await saveToCloud() }
+            }
+            Button("클라우드로 로컬 덮어쓰기", role: .destructive) {
+                _Concurrency.Task { await restoreFromCloud() }
+            }
+        } message: {
+            if let comparison = dataComparison {
+                Text("""
+                로컬과 클라우드 데이터에 큰 차이가 있습니다:
+
+                로컬: 태스크 \(comparison.localTaskCount)개, 프로젝트 \(comparison.localProjectCount)개
+                클라우드: 태스크 \(comparison.cloudTaskCount)개, 프로젝트 \(comparison.cloudProjectCount)개
+
+                어떻게 하시겠습니까?
+                """)
+            } else {
+                Text("데이터를 동기화하시겠습니까?")
+            }
+        }
         .alert("클라우드에 저장", isPresented: $showingSaveToCloudAlert) {
             Button("취소", role: .cancel) { }
             Button("저장") {
@@ -227,6 +324,44 @@ struct SettingsView: View {
             }
         } message: {
             Text("현재 \(viewModel.tasks.count)개의 할 일을 클라우드에 저장합니다. 기존 클라우드 데이터는 덮어씌워집니다.")
+        }
+        .alert("클라우드 데이터 미리보기", isPresented: $showingCloudPreviewAlert) {
+            Button("취소", role: .cancel) { }
+            Button("이 데이터로 복원", role: .destructive) {
+                _Concurrency.Task { await restoreFromCloud() }
+            }
+        } message: {
+            if let preview = cloudPreview {
+                if preview.isEmpty {
+                    Text("클라우드에 저장된 데이터가 없습니다.")
+                } else {
+                    if let lastSync = preview.lastSyncDate {
+                        Text("""
+                        클라우드 데이터 정보:
+
+                        • 태스크: \(preview.taskCount)개
+                        • 프로젝트: \(preview.projectCount)개
+                        • 마지막 동기화: \(lastSync.formatted(date: .abbreviated, time: .shortened))
+
+                        이 데이터로 복원하시겠습니까?
+                        현재 로컬 데이터(\(viewModel.tasks.count)개 태스크)는 덮어씌워집니다.
+                        """)
+                    } else {
+                        Text("""
+                        클라우드 데이터 정보:
+
+                        • 태스크: \(preview.taskCount)개
+                        • 프로젝트: \(preview.projectCount)개
+                        • 마지막 동기화: 기록 없음
+
+                        이 데이터로 복원하시겠습니까?
+                        현재 로컬 데이터(\(viewModel.tasks.count)개 태스크)는 덮어씌워집니다.
+                        """)
+                    }
+                }
+            } else {
+                Text("클라우드 데이터를 확인하는 중...")
+            }
         }
         .alert("클라우드에서 복원", isPresented: $showingRestoreFromCloudAlert) {
             Button("취소", role: .cancel) { }
@@ -243,6 +378,59 @@ struct SettingsView: View {
             }
         } message: {
             Text("로컬 및 클라우드의 모든 데이터를 삭제합니다. 이 작업은 되돌릴 수 없습니다!")
+        }
+    }
+
+    /// 클라우드 데이터 미리보기 표시
+    private func showCloudDataPreview() {
+        _Concurrency.Task {
+            do {
+                let preview = try await viewModel.getCloudDataPreview()
+
+                await MainActor.run {
+                    cloudPreview = preview
+                    showingCloudPreviewAlert = true
+                }
+            } catch {
+                await MainActor.run {
+                    cloudOperationError = "클라우드 데이터 확인 실패: \(error.localizedDescription)"
+                }
+                print("❌ Failed to get cloud preview: \(error)")
+            }
+        }
+    }
+
+    /// 동기화 전 데이터 차이 확인
+    private func checkDataDifferenceBeforeSync(operation: SyncOperation) {
+        pendingSyncOperation = operation
+
+        _Concurrency.Task {
+            do {
+                let comparison = try await viewModel.compareLocalAndCloudData()
+
+                // 차이가 큰 경우 사용자에게 확인
+                if comparison.hasSignificantDifference {
+                    await MainActor.run {
+                        dataComparison = comparison
+                        showingDataDifferenceAlert = true
+                    }
+                } else {
+                    // 차이가 작으면 기존 확인 alert 표시
+                    await MainActor.run {
+                        switch operation {
+                        case .save:
+                            showingSaveToCloudAlert = true
+                        case .restore:
+                            showingRestoreFromCloudAlert = true
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    cloudOperationError = "데이터 비교 실패: \(error.localizedDescription)"
+                }
+                print("❌ Failed to compare data: \(error)")
+            }
         }
     }
 

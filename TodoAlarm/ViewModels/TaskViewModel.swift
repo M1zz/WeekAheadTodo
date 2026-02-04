@@ -26,38 +26,73 @@ class TaskViewModel: ObservableObject {
     // MARK: - Cloud Sync
 
     func syncFromCloud() async {
-        guard !isSyncing else { return }
+        print("☁️ [iOS TaskViewModel.syncFromCloud] 시작")
+        print("   현재 태스크: \(tasks.count)개")
+        print("   현재 프로젝트: \(projects.count)개")
+
+        guard !isSyncing else {
+            print("⚠️ [iOS TaskViewModel.syncFromCloud] 이미 동기화 중")
+            return
+        }
 
         isSyncing = true
         syncError = nil
-        defer { isSyncing = false }
+        defer {
+            print("   [iOS TaskViewModel.syncFromCloud] defer - isSyncing = false")
+            isSyncing = false
+        }
 
         do {
+            print("   📥 CloudKitService.fetchAllTasks() 호출...")
             // Task와 Project 동시 가져오기
             async let taskResults = cloudService.fetchAllTasks()
+            print("   📥 CloudKitService.fetchAllProjects() 호출...")
             async let projectResults = cloudService.fetchAllProjects()
 
-            self.tasks = try await taskResults
-            self.projects = try await projectResults
+            print("   ⏳ 결과 대기 중...")
+            let fetchedTasks = try await taskResults
+            print("   ✅ fetchAllTasks() 완료: \(fetchedTasks.count)개")
+
+            let fetchedProjects = try await projectResults
+            print("   ✅ fetchAllProjects() 완료: \(fetchedProjects.count)개")
+
+            print("   📝 tasks 배열에 할당 중...")
+            self.tasks = fetchedTasks
+            print("   ✅ tasks 배열 할당 완료: \(self.tasks.count)개")
+
+            print("   📝 projects 배열에 할당 중...")
+            self.projects = fetchedProjects
+            print("   ✅ projects 배열 할당 완료: \(self.projects.count)개")
+
             self.lastSyncDate = Date()
 
-            print("✅ Synced: \(tasks.count) tasks, \(projects.count) projects")
+            print("✅ [iOS TaskViewModel.syncFromCloud] Synced: \(tasks.count) tasks, \(projects.count) projects")
         } catch let error as CKError {
+            print("❌ [iOS TaskViewModel.syncFromCloud] CKError 발생")
+            print("   Error code: \(error.code.rawValue)")
+            print("   Error: \(error)")
+            print("   LocalizedDescription: \(error.localizedDescription)")
+
             // CloudKit 에러 상세 처리
             switch error.code {
             case .networkUnavailable:
                 syncError = "네트워크 연결을 확인하세요"
+                print("   → 네트워크 없음")
             case .notAuthenticated:
                 syncError = "iCloud에 로그인하세요"
+                print("   → iCloud 미인증")
             case .unknownItem:
                 syncError = "macOS 앱에서 먼저 데이터를 저장하세요"
+                print("   → 레코드 없음")
             default:
                 syncError = error.localizedDescription
+                print("   → 기타 에러: \(error.code.rawValue)")
             }
-            print("❌ Sync failed: \(error)")
         } catch {
+            print("❌ [iOS TaskViewModel.syncFromCloud] 일반 에러 발생")
+            print("   Error: \(error)")
+            print("   LocalizedDescription: \(error.localizedDescription)")
             syncError = error.localizedDescription
-            print("❌ Sync failed: \(error)")
         }
     }
 

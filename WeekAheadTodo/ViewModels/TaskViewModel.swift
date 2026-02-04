@@ -112,15 +112,15 @@ class TaskViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        print("🚀 [TaskViewModel.init] 시작")
+
         // Initialize CloudKit (optional, may fail if not configured)
-        do {
-            self.container = CKContainer.default()
-            self.database = container?.privateCloudDatabase
-            print("✅ CloudKit initialized successfully")
-        } catch {
-            print("⚠️ CloudKit initialization failed: \(error)")
-            print("⚠️ Cloud sync features will be disabled")
-        }
+        // iOS와 같은 Container 사용 (명시적 지정)
+        self.container = CKContainer(identifier: "iCloud.com.weekahead.todo")
+        self.database = container?.privateCloudDatabase
+        print("✅ [macOS TaskViewModel.init] CloudKit initialized successfully")
+        print("   Container ID: \(container?.containerIdentifier ?? "nil")")
+        print("   Database: privateCloudDatabase")
 
         self.timeBlockManager = WeeklyTimeBlockManager(defaultDailyMinutes: 360)
 
@@ -142,13 +142,17 @@ class TaskViewModel: ObservableObject {
             self.timeBlockCalendarIds = Set(ids)
         }
 
+        print("   📂 loadTasks() 호출...")
         loadTasks()
+        print("   📂 loadProjects() 호출...")
         loadProjects()
 
         // 체크인 관련 옵저버 등록
         setupCheckinObservers()
 
-        print("✅ TaskViewModel initialized")
+        print("✅ [TaskViewModel.init] TaskViewModel initialized")
+        print("   최종 태스크 개수: \(tasks.count)")
+        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     // MARK: - Checkin Observer Setup
@@ -190,53 +194,68 @@ class TaskViewModel: ObservableObject {
 
     private func saveTasks() {
         do {
+            print("💾 [TaskViewModel.saveTasks] 시작 - 저장할 태스크: \(tasks.count)개")
+            print("   호출 스택:")
+            Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
+
             // 기존 데이터를 백업으로 저장 (마이그레이션 실패 시 복구용)
             if let existingData = UserDefaults.standard.data(forKey: tasksKey) {
                 UserDefaults.standard.set(existingData, forKey: "\(tasksKey)_backup")
+                print("   📦 백업 저장 완료")
             }
 
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted  // 디버깅 용이성
             let data = try encoder.encode(tasks)
             UserDefaults.standard.set(data, forKey: tasksKey)
-            print("✅ Tasks saved: \(tasks.count)개")
+            print("✅ [TaskViewModel.saveTasks] Tasks saved: \(tasks.count)개")
 
             // 태스크가 변경되면 알림 스케줄 갱신
             _Concurrency.Task {
                 await updateNotificationSchedule()
             }
         } catch {
-            print("❌ Failed to save tasks: \(error)")
+            print("❌ [TaskViewModel.saveTasks] Failed to save tasks: \(error)")
             print("   Error details: \(error.localizedDescription)")
         }
     }
 
     private func loadTasks() {
+        print("📂 [TaskViewModel.loadTasks] 시작")
+        print("   호출 스택:")
+        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
+
         guard let data = UserDefaults.standard.data(forKey: tasksKey) else {
-            print("ℹ️ No saved tasks found")
+            print("ℹ️ [TaskViewModel.loadTasks] No saved tasks found in UserDefaults")
             return
         }
+
+        print("   📦 UserDefaults에서 데이터 발견: \(data.count) bytes")
 
         do {
             let decoder = JSONDecoder()
             tasks = try decoder.decode([Task].self, from: data)
-            print("✅ Tasks loaded: \(tasks.count)개")
+            print("✅ [TaskViewModel.loadTasks] Tasks loaded: \(tasks.count)개")
+            if tasks.count > 0 {
+                print("   첫 번째 태스크: \(tasks[0].title)")
+            }
         } catch {
-            print("❌ Failed to load tasks: \(error)")
+            print("❌ [TaskViewModel.loadTasks] Failed to load tasks: \(error)")
             print("   Error details: \(error.localizedDescription)")
 
             // 백업에서 복구 시도
             if let backupData = UserDefaults.standard.data(forKey: "\(tasksKey)_backup") {
-                print("⚠️ Attempting to restore from backup...")
+                print("⚠️ [TaskViewModel.loadTasks] Attempting to restore from backup...")
+                print("   📦 백업 데이터 크기: \(backupData.count) bytes")
                 do {
                     let decoder = JSONDecoder()
                     tasks = try decoder.decode([Task].self, from: backupData)
-                    print("✅ Tasks restored from backup: \(tasks.count)개")
+                    print("✅ [TaskViewModel.loadTasks] Tasks restored from backup: \(tasks.count)개")
 
                     // 복구 성공 시 백업을 현재 데이터로 저장
                     saveTasks()
                 } catch {
-                    print("❌ Backup restore also failed: \(error)")
+                    print("❌ [TaskViewModel.loadTasks] Backup restore also failed: \(error)")
                     print("   Starting with empty task list")
                     tasks = []
                 }
@@ -786,6 +805,153 @@ class TaskViewModel: ObservableObject {
 
     // MARK: - Cloud Sync
 
+    /// 데이터 비교 결과
+    struct DataComparisonResult {
+        let localTaskCount: Int
+        let cloudTaskCount: Int
+        let localProjectCount: Int
+        let cloudProjectCount: Int
+
+        var taskCountDifference: Int {
+            abs(localTaskCount - cloudTaskCount)
+        }
+
+        var projectCountDifference: Int {
+            abs(localProjectCount - cloudProjectCount)
+        }
+
+        var taskDifferencePercentage: Double {
+            let maxCount = max(localTaskCount, cloudTaskCount)
+            guard maxCount > 0 else { return 0 }
+            return Double(taskCountDifference) / Double(maxCount) * 100
+        }
+
+        var projectDifferencePercentage: Double {
+            let maxCount = max(localProjectCount, cloudProjectCount)
+            guard maxCount > 0 else { return 0 }
+            return Double(projectCountDifference) / Double(maxCount) * 100
+        }
+
+        /// 차이가 큰지 여부 (태스크 10개 이상 차이 또는 30% 이상 차이)
+        var hasSignificantDifference: Bool {
+            return taskCountDifference >= 10 || taskDifferencePercentage >= 30
+        }
+    }
+
+    /// 클라우드 데이터 미리보기
+    struct CloudDataPreview {
+        let taskCount: Int
+        let projectCount: Int
+        let lastSyncDate: Date?
+
+        var isEmpty: Bool {
+            taskCount == 0 && projectCount == 0
+        }
+    }
+
+    /// 클라우드 데이터 미리보기 가져오기
+    func getCloudDataPreview() async throws -> CloudDataPreview {
+        guard let database = database else {
+            throw NSError(domain: "CloudKit", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "CloudKit이 초기화되지 않았습니다. iCloud 설정을 확인하세요."
+            ])
+        }
+
+        print("🔍 [TaskViewModel.getCloudDataPreview] 클라우드 데이터 미리보기 가져오기...")
+
+        // Get saved recordNames from UserDefaults
+        var taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
+        var projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
+        let lastSync = UserDefaults.standard.object(forKey: syncDateKey) as? Date
+
+        print("   📦 UserDefaults에 저장된 개수: 태스크 \(taskRecordNames.count)개, 프로젝트 \(projectRecordNames.count)개")
+
+        // recordNames가 없으면 실제로 CloudKit에서 확인
+        if taskRecordNames.isEmpty {
+            print("   ⚠️ recordNames가 비어있음. CKQuery로 실제 개수 확인 중...")
+            let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
+            do {
+                let results = try await database.records(matching: query, desiredKeys: ["title"])
+                taskRecordNames = results.matchResults.compactMap { (recordID, result) in
+                    guard (try? result.get()) != nil else { return nil }
+                    return recordID.recordName
+                }
+                print("   ✅ 실제 CloudKit에서 \(taskRecordNames.count)개 태스크 발견")
+            } catch {
+                print("   ⚠️ CKQuery 실패: \(error)")
+                // 에러가 나도 계속 진행 (빈 배열로)
+            }
+        }
+
+        if projectRecordNames.isEmpty {
+            print("   ⚠️ recordNames가 비어있음. CKQuery로 실제 개수 확인 중...")
+            let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
+            do {
+                let results = try await database.records(matching: query, desiredKeys: ["name"])
+                projectRecordNames = results.matchResults.compactMap { (recordID, result) in
+                    guard (try? result.get()) != nil else { return nil }
+                    return recordID.recordName
+                }
+                print("   ✅ 실제 CloudKit에서 \(projectRecordNames.count)개 프로젝트 발견")
+            } catch {
+                print("   ⚠️ CKQuery 실패: \(error)")
+                // 에러가 나도 계속 진행 (빈 배열로)
+            }
+        }
+
+        let preview = CloudDataPreview(
+            taskCount: taskRecordNames.count,
+            projectCount: projectRecordNames.count,
+            lastSyncDate: lastSync
+        )
+
+        print("📊 [TaskViewModel.getCloudDataPreview] 클라우드 데이터:")
+        print("   태스크: \(preview.taskCount)개")
+        print("   프로젝트: \(preview.projectCount)개")
+        if let lastSync = preview.lastSyncDate {
+            print("   마지막 동기화: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
+        } else {
+            print("   마지막 동기화: 없음")
+        }
+
+        return preview
+    }
+
+    /// 로컬과 클라우드 데이터 비교
+    func compareLocalAndCloudData() async throws -> DataComparisonResult {
+        guard let database = database else {
+            throw NSError(domain: "CloudKit", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "CloudKit이 초기화되지 않았습니다. iCloud 설정을 확인하세요."
+            ])
+        }
+
+        print("🔍 로컬과 클라우드 데이터 비교 시작...")
+
+        // Get saved recordNames from UserDefaults
+        let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
+        let projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
+
+        let localTaskCount = tasks.count
+        let localProjectCount = projects.count
+        let cloudTaskCount = taskRecordNames.count
+        let cloudProjectCount = projectRecordNames.count
+
+        let result = DataComparisonResult(
+            localTaskCount: localTaskCount,
+            cloudTaskCount: cloudTaskCount,
+            localProjectCount: localProjectCount,
+            cloudProjectCount: cloudProjectCount
+        )
+
+        print("📊 비교 결과:")
+        print("   로컬: 태스크 \(localTaskCount)개, 프로젝트 \(localProjectCount)개")
+        print("   클라우드: 태스크 \(cloudTaskCount)개, 프로젝트 \(cloudProjectCount)개")
+        print("   차이: 태스크 \(result.taskCountDifference)개 (\(String(format: "%.1f", result.taskDifferencePercentage))%)")
+        print("   유의미한 차이: \(result.hasSignificantDifference ? "예" : "아니오")")
+
+        return result
+    }
+
     /// 클라우드에 저장
     func saveToCloud() async throws {
         guard let database = database else {
@@ -794,7 +960,12 @@ class TaskViewModel: ObservableObject {
             ])
         }
 
-        print("☁️ Starting cloud save...")
+        print("☁️ [macOS TaskViewModel.saveToCloud] Starting cloud save...")
+        print("   Container ID: \(container?.containerIdentifier ?? "nil")")
+        print("   Database: privateCloudDatabase")
+        print("   저장할 태스크: \(tasks.count)개")
+        print("   저장할 프로젝트: \(projects.count)개")
+
         isSyncing = true
         syncError = nil
 
@@ -830,6 +1001,12 @@ class TaskViewModel: ObservableObject {
 
     /// 클라우드에서 복원
     func restoreFromCloud() async throws {
+        print("☁️ [TaskViewModel.restoreFromCloud] 시작")
+        print("   호출 스택:")
+        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
+        print("   현재 로컬 태스크: \(tasks.count)개")
+        print("   현재 로컬 프로젝트: \(projects.count)개")
+
         guard let database = database else {
             throw NSError(domain: "CloudKit", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "CloudKit이 초기화되지 않았습니다. iCloud 설정을 확인하세요."
@@ -846,11 +1023,14 @@ class TaskViewModel: ObservableObject {
         let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
         let projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
 
-        print("📋 Found \(taskRecordNames.count) task records and \(projectRecordNames.count) project records to restore")
+        print("📋 [TaskViewModel.restoreFromCloud] Found \(taskRecordNames.count) task records and \(projectRecordNames.count) project records in UserDefaults")
 
-        // Restore tasks using recordIDs (쿼리 없이 직접 fetch)
+        // Restore tasks
         var cloudTasks: [Task] = []
+
         if !taskRecordNames.isEmpty {
+            print("   📥 recordNames로 태스크 복원 시도...")
+            // recordNames가 있으면 직접 fetch
             let taskRecordIDs = taskRecordNames.map { CKRecord.ID(recordName: $0) }
 
             // Fetch in batches of 200
@@ -861,6 +1041,7 @@ class TaskViewModel: ObservableObject {
                         try? result.get()
                     }.compactMap { ckRecordToTask($0) }
                     cloudTasks.append(contentsOf: batchTasks)
+                    print("   ✅ 배치에서 \(batchTasks.count)개 태스크 복원")
                 } catch let error as CKError {
                     // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
                     if error.code == .unknownItem {
@@ -870,11 +1051,47 @@ class TaskViewModel: ObservableObject {
                     }
                 }
             }
+        } else {
+            print("   ⚠️ recordNames가 비어있음. CKQuery로 모든 태스크 검색...")
+            // recordNames가 없으면 CKQuery로 모든 레코드 가져오기
+            let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
+            query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+
+            do {
+                // 모든 필드를 가져오기 위해 desiredKeys를 지정하지 않음 (또는 nil)
+                let results = try await database.records(matching: query)
+                print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
+
+                cloudTasks = results.matchResults.compactMap { (recordID, result) in
+                    guard let record = try? result.get() else {
+                        print("   ⚠️ 레코드 가져오기 실패: \(recordID.recordName)")
+                        return nil
+                    }
+                    let task = ckRecordToTask(record)
+                    if task == nil {
+                        print("   ⚠️ Task 변환 실패: \(recordID.recordName)")
+                        print("      title: \(record["title"] as? String ?? "없음")")
+                    }
+                    return task
+                }
+                print("   ✅ CKQuery로 \(cloudTasks.count)개 태스크 발견 (총 \(results.matchResults.count)개 레코드)")
+
+                // 가져온 레코드 ID를 UserDefaults에 저장
+                let fetchedRecordNames = cloudTasks.map { $0.id.uuidString }
+                UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudTaskRecordNames")
+                print("   💾 recordNames를 UserDefaults에 저장: \(fetchedRecordNames.count)개")
+            } catch {
+                print("   ❌ CKQuery 실패: \(error)")
+                throw error
+            }
         }
 
-        // Restore projects using recordIDs (쿼리 없이 직접 fetch)
+        // Restore projects
         var cloudProjects: [Project] = []
+
         if !projectRecordNames.isEmpty {
+            print("   📥 recordNames로 프로젝트 복원 시도...")
+            // recordNames가 있으면 직접 fetch
             let projectRecordIDs = projectRecordNames.map { CKRecord.ID(recordName: $0) }
 
             // Fetch in batches of 200
@@ -885,6 +1102,7 @@ class TaskViewModel: ObservableObject {
                         try? result.get()
                     }.compactMap { ckRecordToProject($0) }
                     cloudProjects.append(contentsOf: batchProjects)
+                    print("   ✅ 배치에서 \(batchProjects.count)개 프로젝트 복원")
                 } catch let error as CKError {
                     // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
                     if error.code == .unknownItem {
@@ -894,29 +1112,117 @@ class TaskViewModel: ObservableObject {
                     }
                 }
             }
+        } else {
+            print("   ⚠️ recordNames가 비어있음. CKQuery로 모든 프로젝트 검색...")
+            // recordNames가 없으면 CKQuery로 모든 레코드 가져오기
+            let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
+
+            do {
+                // 모든 필드를 가져오기 위해 desiredKeys를 지정하지 않음
+                let results = try await database.records(matching: query)
+                print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
+
+                cloudProjects = results.matchResults.compactMap { (recordID, result) in
+                    guard let record = try? result.get() else {
+                        print("   ⚠️ 레코드 가져오기 실패: \(recordID.recordName)")
+                        return nil
+                    }
+                    let project = ckRecordToProject(record)
+                    if project == nil {
+                        print("   ⚠️ Project 변환 실패: \(recordID.recordName)")
+                        print("      name: \(record["name"] as? String ?? "없음")")
+                    }
+                    return project
+                }
+                print("   ✅ CKQuery로 \(cloudProjects.count)개 프로젝트 발견 (총 \(results.matchResults.count)개 레코드)")
+
+                // 가져온 레코드 ID를 UserDefaults에 저장
+                let fetchedRecordNames = cloudProjects.map { $0.id.uuidString }
+                UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudProjectRecordNames")
+                print("   💾 recordNames를 UserDefaults에 저장: \(fetchedRecordNames.count)개")
+            } catch {
+                print("   ❌ CKQuery 실패: \(error)")
+                throw error
+            }
         }
 
+        print("   📝 tasks 배열에 클라우드 데이터 할당 중... (\(cloudTasks.count)개)")
         tasks = cloudTasks
+        print("   ✅ tasks 배열 할당 완료 (현재: \(tasks.count)개)")
+
+        print("   📝 projects 배열에 클라우드 데이터 할당 중... (\(cloudProjects.count)개)")
         projects = cloudProjects
+        print("   ✅ projects 배열 할당 완료 (현재: \(projects.count)개)")
+
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
-        print("✅ Restored \(cloudTasks.count) tasks and \(cloudProjects.count) projects from cloud")
+        print("✅ [TaskViewModel.restoreFromCloud] Restored \(cloudTasks.count) tasks and \(cloudProjects.count) projects from cloud")
+        print("   최종 태스크 개수: \(tasks.count)")
+        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     /// 데이터 초기화 (로컬 + 클라우드)
     func resetAllData() async throws {
+        print("🗑️ [TaskViewModel.resetAllData] 시작")
+        print("   현재 태스크: \(tasks.count)개")
+        print("   호출 스택:")
+        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
+
+        // 1. tasks 배열 초기화 (이때 didSet이 호출되어 saveTasks() 실행됨)
+        print("   1️⃣ tasks 배열 초기화 중...")
         tasks = []
+        print("   ✅ tasks 배열 초기화 완료 (현재: \(tasks.count)개)")
+
+        // 2. UserDefaults 삭제
+        print("   2️⃣ UserDefaults 삭제 중...")
         UserDefaults.standard.removeObject(forKey: tasksKey)
+        UserDefaults.standard.removeObject(forKey: "\(tasksKey)_backup")
+        print("   ✅ UserDefaults 삭제 완료")
+
+        // 3. 프로젝트 초기화
+        print("   3️⃣ 프로젝트 초기화 중... (현재: \(projects.count)개)")
+        projects = []
+        UserDefaults.standard.removeObject(forKey: projectsKey)
+        print("   ✅ 프로젝트 초기화 완료")
+
+        // 4. 클라우드 레코드 삭제
+        print("   4️⃣ 클라우드 레코드 삭제 중...")
         try await deleteAllCloudRecords()
-        print("✅ All data has been reset")
+        print("   ✅ 클라우드 레코드 삭제 완료")
+
+        print("✅ [TaskViewModel.resetAllData] All data has been reset")
+        print("   최종 태스크 개수: \(tasks.count)")
+        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     /// 로컬 데이터만 초기화
     func resetLocalData() {
+        print("🗑️ [TaskViewModel.resetLocalData] 시작")
+        print("   현재 태스크: \(tasks.count)개")
+        print("   호출 스택:")
+        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
+
+        // 1. tasks 배열 초기화
+        print("   1️⃣ tasks 배열 초기화 중...")
         tasks = []
+        print("   ✅ tasks 배열 초기화 완료 (현재: \(tasks.count)개)")
+
+        // 2. UserDefaults 삭제
+        print("   2️⃣ UserDefaults 삭제 중...")
         UserDefaults.standard.removeObject(forKey: tasksKey)
-        print("✅ Local data has been reset")
+        UserDefaults.standard.removeObject(forKey: "\(tasksKey)_backup")
+        print("   ✅ UserDefaults 삭제 완료")
+
+        // 3. 프로젝트 초기화
+        print("   3️⃣ 프로젝트 초기화 중... (현재: \(projects.count)개)")
+        projects = []
+        UserDefaults.standard.removeObject(forKey: projectsKey)
+        print("   ✅ 프로젝트 초기화 완료")
+
+        print("✅ [TaskViewModel.resetLocalData] Local data has been reset")
+        print("   최종 태스크 개수: \(tasks.count)")
+        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     // MARK: - CloudKit Helper Methods

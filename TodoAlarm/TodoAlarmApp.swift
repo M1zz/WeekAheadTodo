@@ -17,8 +17,10 @@ struct TodoAlarmApp: App {
             ContentView()
                 .environmentObject(taskViewModel)
                 .task {
+                    print("🚀 [iOS TodoAlarmApp] 앱 시작 - 자동 동기화 시작")
                     // 앱 시작 시 자동 동기화
                     await taskViewModel.syncFromCloud()
+                    print("✅ [iOS TodoAlarmApp] 자동 동기화 완료")
                 }
         }
     }
