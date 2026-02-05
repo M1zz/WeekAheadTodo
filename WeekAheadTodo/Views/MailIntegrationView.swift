@@ -44,7 +44,7 @@ struct MailIntegrationView: View {
                 Toggle("일정만", isOn: $mailViewModel.showScheduleOnly)
                     .toggleStyle(.switch)
                     .controlSize(.small)
-                    .onChange(of: mailViewModel.showScheduleOnly) { _ in
+                    .onChange(of: mailViewModel.showScheduleOnly) { oldValue, newValue in
                         Task {
                             await mailViewModel.loadMails(limit: mailLimit)
                         }
