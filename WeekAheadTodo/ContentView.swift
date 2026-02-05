@@ -6,6 +6,7 @@ import SwiftData
 struct ContentView: View {
     @StateObject private var viewModel = TaskViewModel()
     @StateObject private var calendarViewModel = CalendarViewModel()
+    @StateObject private var mailViewModel = MailViewModel()
     @StateObject private var notificationService = NotificationService.shared
     @StateObject private var assistantService = ProactiveAssistantService.shared
     @AppStorage("selectedSection") private var selectedSectionRawValue: String = SidebarSection.today.rawValue
@@ -59,6 +60,7 @@ struct ContentView: View {
         case weekOverview = "주간 개요"
         case importTasks = "가져오기"
         case patterns = "패턴 관리"
+        case mail = "메일"
         case settings = "설정"
 
         var icon: String {
@@ -75,6 +77,7 @@ struct ContentView: View {
             case .weekOverview: return "chart.bar.fill"
             case .importTasks: return "square.and.arrow.down"
             case .patterns: return "arrow.triangle.2.circlepath"
+            case .mail: return "envelope.fill"
             case .settings: return "gear"
             }
         }
@@ -121,6 +124,7 @@ struct ContentView: View {
                     sidebarItem(.weekOverview)
                     sidebarItem(.importTasks)
                     sidebarItem(.patterns)
+                    sidebarItem(.mail)
                     sidebarItem(.settings)
                 }
             }
@@ -133,6 +137,7 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 600)
         .environmentObject(viewModel)
         .environmentObject(calendarViewModel)
+        .environmentObject(mailViewModel)
         .environmentObject(notificationService)
         .environmentObject(assistantService)
         .sheet(isPresented: $showingAddProject) {
@@ -314,6 +319,8 @@ struct ContentView: View {
                     ImportView()
                 case .patterns:
                     ApprovedPatternManagementView()
+                case .mail:
+                    MailIntegrationView()
                 case .settings:
                     SettingsView()
                 }
