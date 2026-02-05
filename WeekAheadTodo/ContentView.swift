@@ -140,6 +140,9 @@ struct ContentView: View {
         .environmentObject(mailViewModel)
         .environmentObject(notificationService)
         .environmentObject(assistantService)
+        .onOpenURL { url in
+            _ = URLHandler.handle(url: url, taskViewModel: viewModel)
+        }
         .sheet(isPresented: $showingAddProject) {
             AddProjectView(onProjectAdded: { projectId in
                 // 새로 추가된 프로젝트 자동 선택
