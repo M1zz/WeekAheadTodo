@@ -45,14 +45,14 @@ struct MailIntegrationView: View {
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .onChange(of: mailViewModel.showScheduleOnly) { oldValue, newValue in
-                        Task {
+                        _Concurrency.Task {
                             await mailViewModel.loadMails(limit: mailLimit)
                         }
                     }
 
                 // 새로고침 버튼
                 Button {
-                    Task {
+                    _Concurrency.Task {
                         await mailViewModel.loadMails(limit: mailLimit)
                     }
                 } label: {
@@ -202,7 +202,7 @@ struct MailIntegrationView: View {
                 .multilineTextAlignment(.center)
 
             Button {
-                Task {
+                _Concurrency.Task {
                     await mailViewModel.loadMails(limit: mailLimit)
                 }
             } label: {
