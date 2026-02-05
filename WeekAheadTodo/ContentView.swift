@@ -151,11 +151,15 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .showQuickAdd)) { _ in
             showingQuickAdd = true
         }
-        .onAppear {
+        .task {
+            // 앱 시작 시 iCloud와 자동 동기화 (로컬 데이터로 클라우드를 덮어쓰는 것을 방지)
+            await viewModel.performInitialSync()
+
+            // 서비스 설정
             setupServices()
-            _Concurrency.Task {
-                await generateTasksIfNeeded()
-            }
+
+            // 승인된 패턴에서 태스크 생성
+            await generateTasksIfNeeded()
         }
     }
 

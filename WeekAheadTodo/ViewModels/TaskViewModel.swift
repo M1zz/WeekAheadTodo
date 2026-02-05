@@ -104,6 +104,7 @@ class TaskViewModel: ObservableObject {
     private var autoBackupTimer: Timer?
     private var lastChangeDate: Date?
     private let autoBackupDelay: TimeInterval = 10.0 // 10초 후 자동 백업
+    private var initialSyncCompleted: Bool = false   // 초기 동기화 완료 플래그
 
     // Calendar reference for time block calculation
     weak var calendarViewModel: CalendarViewModel?
@@ -987,6 +988,90 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Initial Sync
+
+    /// 앱 시작 시 자동 동기화 (iCloud와 로컬 데이터 비교)
+    func performInitialSync() async {
+        print("\n╔════════════════════════════════════════════════════════╗")
+        print("║  앱 시작 - 초기 동기화 시작                            ║")
+        print("╚════════════════════════════════════════════════════════╝")
+
+        defer {
+            // 초기 동기화 완료 플래그 설정 (동기화 성공 여부와 관계없이)
+            initialSyncCompleted = true
+            print("✅ [TaskViewModel] 초기 동기화 완료 플래그 설정")
+        }
+
+        // CloudKit이 초기화되지 않았으면 로컬 데이터만 사용
+        guard let database = database else {
+            print("⚠️ [TaskViewModel] CloudKit 초기화 실패 - 로컬 데이터만 사용")
+            print("   로컬 태스크: \(tasks.count)개")
+            print("   로컬 프로젝트: \(projects.count)개")
+            return
+        }
+
+        do {
+            // 1. iCloud 데이터 개수 확인
+            let cloudPreview = try await getCloudDataPreview()
+            print("\n📊 데이터 비교:")
+            print("   로컬: 태스크 \(tasks.count)개, 프로젝트 \(projects.count)개")
+            print("   iCloud: 태스크 \(cloudPreview.taskCount)개, 프로젝트 \(cloudPreview.projectCount)개")
+
+            // 2. 로컬이 비어있고 iCloud에 데이터가 있으면 복원
+            if tasks.isEmpty && projects.isEmpty && !cloudPreview.isEmpty {
+                print("\n🔄 [TaskViewModel] 로컬 데이터 없음 → iCloud에서 복원")
+                try await restoreFromCloud()
+                print("✅ [TaskViewModel] iCloud에서 복원 완료")
+                print("   복원된 태스크: \(tasks.count)개")
+                print("   복원된 프로젝트: \(projects.count)개")
+                return
+            }
+
+            // 3. iCloud가 비어있고 로컬에 데이터가 있으면 백업
+            if cloudPreview.isEmpty && (!tasks.isEmpty || !projects.isEmpty) {
+                print("\n🔄 [TaskViewModel] iCloud 데이터 없음 → 로컬 데이터 백업")
+                try await saveToCloud()
+                print("✅ [TaskViewModel] 로컬 데이터 백업 완료")
+                return
+            }
+
+            // 4. 둘 다 데이터가 있으면 lastSyncDate 비교
+            if !tasks.isEmpty && !cloudPreview.isEmpty {
+                let localLastModified = lastSyncDate ?? Date.distantPast
+                let cloudLastModified = cloudPreview.lastSyncDate ?? Date.distantPast
+
+                print("\n⏰ 마지막 수정 시간 비교:")
+                print("   로컬: \(localLastModified == Date.distantPast ? "없음" : localLastModified.formatted(date: .abbreviated, time: .shortened))")
+                print("   iCloud: \(cloudLastModified == Date.distantPast ? "없음" : cloudLastModified.formatted(date: .abbreviated, time: .shortened))")
+
+                // iCloud가 더 최신이면 복원
+                if cloudLastModified > localLastModified {
+                    print("\n🔄 [TaskViewModel] iCloud가 더 최신 → 복원")
+                    try await restoreFromCloud()
+                    print("✅ [TaskViewModel] iCloud에서 복원 완료")
+                    print("   복원된 태스크: \(tasks.count)개")
+                    print("   복원된 프로젝트: \(projects.count)개")
+                } else if localLastModified > cloudLastModified {
+                    print("\n🔄 [TaskViewModel] 로컬이 더 최신 → 백업")
+                    try await saveToCloud()
+                    print("✅ [TaskViewModel] 로컬 데이터 백업 완료")
+                } else {
+                    print("\n✅ [TaskViewModel] 로컬과 iCloud 동기화됨 (동일 시간)")
+                }
+            } else {
+                print("\n✅ [TaskViewModel] 로컬과 iCloud 모두 비어있음")
+            }
+
+        } catch {
+            print("❌ [TaskViewModel] 초기 동기화 실패: \(error.localizedDescription)")
+            print("   로컬 데이터를 사용합니다.")
+            print("   로컬 태스크: \(tasks.count)개")
+            print("   로컬 프로젝트: \(projects.count)개")
+        }
+
+        print("════════════════════════════════════════════════════════\n")
+    }
+
     // MARK: - Cloud Sync
 
     /// 데이터 비교 결과
@@ -1140,6 +1225,12 @@ class TaskViewModel: ObservableObject {
 
     /// 자동 백업 트리거 (변경 감지 후 일정 시간 후 실행)
     private func triggerAutoBackup() {
+        // 초기 동기화가 완료되지 않았으면 스킵 (앱 시작 시 로컬 데이터로 클라우드를 덮어쓰는 것을 방지)
+        guard initialSyncCompleted else {
+            print("ℹ️ [TaskViewModel] 초기 동기화 미완료 - 자동 백업 스킵")
+            return
+        }
+
         guard isAutoBackupEnabled else {
             print("ℹ️ [TaskViewModel] 자동 백업 비활성화됨")
             return
@@ -1304,8 +1395,14 @@ class TaskViewModel: ObservableObject {
             query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
             do {
-                // 모든 필드를 가져오기 위해 desiredKeys를 지정하지 않음 (또는 nil)
-                let results = try await database.records(matching: query)
+                // 모든 필수 필드를 명시적으로 지정 (CloudKit은 desiredKeys 생략 시 일부 필드만 가져올 수 있음)
+                let results = try await database.records(matching: query, desiredKeys: [
+                    "title", "taskDescription", "dueDate", "scheduledStartTime", "estimatedMinutes", "leadTimeDays",
+                    "taskType", "taskRole", "status", "priority", "createdAt",
+                    "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
+                    "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
+                    "lastCheckinDate", "consecutiveMissedCheckins", "completedAt"
+                ])
                 print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
 
                 cloudTasks = results.matchResults.compactMap { (recordID, result) in
@@ -1364,8 +1461,8 @@ class TaskViewModel: ObservableObject {
             let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
 
             do {
-                // 모든 필드를 가져오기 위해 desiredKeys를 지정하지 않음
-                let results = try await database.records(matching: query)
+                // 모든 필수 필드를 명시적으로 지정
+                let results = try await database.records(matching: query, desiredKeys: ["name", "color", "icon"])
                 print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
 
                 cloudProjects = results.matchResults.compactMap { (recordID, result) in
@@ -1537,6 +1634,7 @@ class TaskViewModel: ObservableObject {
         let recordID = CKRecord.ID(recordName: task.id.uuidString)
         let record = CKRecord(recordType: "Task", recordID: recordID)
 
+        // 기본 정보
         record["title"] = task.title as CKRecordValue
         record["taskDescription"] = task.description as CKRecordValue
         record["dueDate"] = task.dueDate as CKRecordValue
@@ -1548,6 +1646,10 @@ class TaskViewModel: ObservableObject {
         record["priority"] = task.priority.rawValue as CKRecordValue
         record["createdAt"] = task.createdAt as CKRecordValue
 
+        // Optional 필드들
+        if let scheduledStartTime = task.scheduledStartTime {
+            record["scheduledStartTime"] = scheduledStartTime as CKRecordValue
+        }
         if let parentId = task.parentTaskId {
             record["parentTaskId"] = parentId.uuidString as CKRecordValue
         }
@@ -1564,22 +1666,64 @@ class TaskViewModel: ObservableObject {
             record["manualPriority"] = manualPriority as CKRecordValue
         }
 
+        // 캘린더 연동 정보
+        if let calendarEventId = task.calendarEventId {
+            record["calendarEventId"] = calendarEventId as CKRecordValue
+        }
+        record["isFromCalendarPattern"] = task.isFromCalendarPattern as CKRecordValue
+        if let patternId = task.patternId {
+            record["patternId"] = patternId.uuidString as CKRecordValue
+        }
+        record["autoRecurring"] = task.autoRecurring as CKRecordValue
+
+        // 체크인 정보
+        if let lastCheckinDate = task.lastCheckinDate {
+            record["lastCheckinDate"] = lastCheckinDate as CKRecordValue
+        }
+        record["consecutiveMissedCheckins"] = task.consecutiveMissedCheckins as CKRecordValue
+
+        // 완료 정보
+        if let completedAt = task.completedAt {
+            record["completedAt"] = completedAt as CKRecordValue
+        }
+
         return record
     }
 
     private func ckRecordToTask(_ record: CKRecord) -> Task? {
-        guard
-            let title = record["title"] as? String,
-            let dueDate = record["dueDate"] as? Date,
-            let estimatedMinutes = record["estimatedMinutes"] as? Int,
-            let leadTimeDays = record["leadTimeDays"] as? Int,
-            let taskTypeRaw = record["taskType"] as? String,
-            let taskType = TaskType(rawValue: taskTypeRaw),
-            let taskRoleRaw = record["taskRole"] as? String,
-            let statusRaw = record["status"] as? String,
-            let status = TaskStatus(rawValue: statusRaw),
-            let createdAt = record["createdAt"] as? Date
-        else {
+        // 필수 필드 체크 및 상세 로깅
+        guard let title = record["title"] as? String else {
+            print("❌ [ckRecordToTask] 'title' 필드 누락: \(record.recordID.recordName)")
+            return nil
+        }
+        guard let dueDate = record["dueDate"] as? Date else {
+            print("❌ [ckRecordToTask] 'dueDate' 필드 누락: \(title)")
+            return nil
+        }
+        guard let estimatedMinutes = record["estimatedMinutes"] as? Int else {
+            print("❌ [ckRecordToTask] 'estimatedMinutes' 필드 누락: \(title)")
+            return nil
+        }
+        guard let leadTimeDays = record["leadTimeDays"] as? Int else {
+            print("❌ [ckRecordToTask] 'leadTimeDays' 필드 누락: \(title)")
+            return nil
+        }
+        guard let taskTypeRaw = record["taskType"] as? String,
+              let taskType = TaskType(rawValue: taskTypeRaw) else {
+            print("❌ [ckRecordToTask] 'taskType' 필드 누락 또는 잘못된 값: \(title)")
+            return nil
+        }
+        guard let taskRoleRaw = record["taskRole"] as? String else {
+            print("❌ [ckRecordToTask] 'taskRole' 필드 누락: \(title)")
+            return nil
+        }
+        guard let statusRaw = record["status"] as? String,
+              let status = TaskStatus(rawValue: statusRaw) else {
+            print("❌ [ckRecordToTask] 'status' 필드 누락 또는 잘못된 값: \(title)")
+            return nil
+        }
+        guard let createdAt = record["createdAt"] as? Date else {
+            print("❌ [ckRecordToTask] 'createdAt' 필드 누락: \(title)")
             return nil
         }
 
@@ -1594,6 +1738,7 @@ class TaskViewModel: ObservableObject {
         }
 
         let taskDescription = record["taskDescription"] as? String ?? ""
+        let scheduledStartTime = record["scheduledStartTime"] as? Date
         let parentTaskId = (record["parentTaskId"] as? String).flatMap { UUID(uuidString: $0) }
         let mainTaskId = (record["mainTaskId"] as? String).flatMap { UUID(uuidString: $0) }
         let targetDate = record["targetDate"] as? Date
@@ -1603,6 +1748,19 @@ class TaskViewModel: ObservableObject {
         // priority는 optional로 처리 (기존 레코드 호환성)
         let priorityRaw = record["priority"] as? String
         let priority = priorityRaw.flatMap { TaskPriority(rawValue: $0) } ?? .normal
+
+        // 캘린더 연동 정보
+        let calendarEventId = record["calendarEventId"] as? String
+        let isFromCalendarPattern = record["isFromCalendarPattern"] as? Bool ?? false
+        let patternId = (record["patternId"] as? String).flatMap { UUID(uuidString: $0) }
+        let autoRecurring = record["autoRecurring"] as? Bool ?? false
+
+        // 체크인 정보
+        let lastCheckinDate = record["lastCheckinDate"] as? Date
+        let consecutiveMissedCheckins = record["consecutiveMissedCheckins"] as? Int ?? 0
+
+        // 완료 정보
+        let completedAt = record["completedAt"] as? Date
 
         var task = Task(
             id: UUID(uuidString: record.recordID.recordName) ?? UUID(),
@@ -1620,7 +1778,15 @@ class TaskViewModel: ObservableObject {
             mainTaskId: mainTaskId,
             targetDate: targetDate
         )
+        task.scheduledStartTime = scheduledStartTime
         task.manualPriority = manualPriority
+        task.calendarEventId = calendarEventId
+        task.isFromCalendarPattern = isFromCalendarPattern
+        task.patternId = patternId
+        task.autoRecurring = autoRecurring
+        task.lastCheckinDate = lastCheckinDate
+        task.consecutiveMissedCheckins = consecutiveMissedCheckins
+        task.completedAt = completedAt
         return task
     }
 
