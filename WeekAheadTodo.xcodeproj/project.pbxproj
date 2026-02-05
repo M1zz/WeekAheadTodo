@@ -27,6 +27,10 @@
 		8CF6E866F2714F108C425F91 /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */; };
 		9468934550894104B9A68228 /* TaskSelectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */; };
 		9A2E8D22B9864B26AB02122B /* ColorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */; };
+		9C1EAE202F34841900CB151B /* MailMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE1F2F34841900CB151B /* MailMessage.swift */; };
+		9C1EAE222F34842500CB151B /* MailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE212F34842500CB151B /* MailService.swift */; };
+		9C1EAE242F34843200CB151B /* MailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE232F34843200CB151B /* MailViewModel.swift */; };
+		9C1EAE262F34843D00CB151B /* MailIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE252F34843D00CB151B /* MailIntegrationView.swift */; };
 		9C3B2ECF2F22023800E535DB /* ProactiveAssistantService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */; };
 		9C3B2ED02F22023800E535DB /* UpcomingRemindersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */; };
 		9C40EC9585D24046A1CB958A /* CompletedTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00C2B6260404860B5B9EC18 /* CompletedTasksView.swift */; };
@@ -109,6 +113,10 @@
 		6492F14261394545B95A33BB /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
 		7625CEC7174C49BC84F85DF5 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		9C1EAE1F2F34841900CB151B /* MailMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailMessage.swift; sourceTree = "<group>"; };
+		9C1EAE212F34842500CB151B /* MailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailService.swift; sourceTree = "<group>"; };
+		9C1EAE232F34843200CB151B /* MailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailViewModel.swift; sourceTree = "<group>"; };
+		9C1EAE252F34843D00CB151B /* MailIntegrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailIntegrationView.swift; sourceTree = "<group>"; };
 		9C3D6D3A2F33248B00D67B5B /* TodoAlarm.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TodoAlarm.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CA0A3CE2F19D611004ABF40 /* WeekAheadTodoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeekAheadTodoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000002234567890000001 /* WeekAheadTodoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadTodoApp.swift; sourceTree = "<group>"; };
@@ -260,6 +268,7 @@
 		A1000005234567890000004 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				9C1EAE1F2F34841900CB151B /* MailMessage.swift */,
 				AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */,
 				A1000002234567890000003 /* Task.swift */,
 				A1000002234567890000004 /* TimeBlock.swift */,
@@ -273,6 +282,7 @@
 		A1000005234567890000005 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				9C1EAE232F34843200CB151B /* MailViewModel.swift */,
 				A1000002234567890000005 /* TaskViewModel.swift */,
 				A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */,
 			);
@@ -282,6 +292,7 @@
 		A16748511F016D66C6FA50EF /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				9C1EAE252F34843D00CB151B /* MailIntegrationView.swift */,
 				A1IV000000000000000VIEWW /* ImportView.swift */,
 				A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */,
 				A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */,
@@ -319,6 +330,7 @@
 		A1FB72B5092F65279D203C72 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				9C1EAE212F34842500CB151B /* MailService.swift */,
 				E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */,
 				A1TIP00000000000000PARSE /* TaskInputParser.swift */,
 				A1MD000000000000000PARSE /* MarkdownParser.swift */,
@@ -530,6 +542,7 @@
 				383DA3DCD1E94F078C61150A /* ProactiveAssistantService.swift in Sources */,
 				A1TIP11111111111111BUILD /* TaskInputParser.swift in Sources */,
 				A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */,
+				9C1EAE202F34841900CB151B /* MailMessage.swift in Sources */,
 				A1IV111111111111111BUILD /* ImportView.swift in Sources */,
 				A1000001234567890000001 /* WeekAheadTodoApp.swift in Sources */,
 				A1000001234567890000002 /* ContentView.swift in Sources */,
@@ -538,6 +551,7 @@
 				A1000001234567890000005 /* TaskViewModel.swift in Sources */,
 				A1629B2DA70C976EBBD04BB3 /* CalendarService.swift in Sources */,
 				A1C544133BCB00D56FD0DFFC /* PatternDetectionService.swift in Sources */,
+				9C1EAE242F34843200CB151B /* MailViewModel.swift in Sources */,
 				A1664A74F5515FFCE4F1EA33 /* CalendarEvent.swift in Sources */,
 				A1F1E7A4FDB964A04977DB8A /* RecurrencePattern.swift in Sources */,
 				A1EF5AE8B7997DF7B5BB7D8B /* CalendarViewModel.swift in Sources */,
@@ -563,7 +577,9 @@
 				6AB531D70BF14284B4C630AA /* EditTaskView.swift in Sources */,
 				273C935096424C9D8DB11BA9 /* ProjectViews.swift in Sources */,
 				BD2FEE0FD4C9451282D78E19 /* MonthCalendarView.swift in Sources */,
+				9C1EAE262F34843D00CB151B /* MailIntegrationView.swift in Sources */,
 				F6C42520668C4612BFE0DEC9 /* TimeBasedWeekCalendar.swift in Sources */,
+				9C1EAE222F34842500CB151B /* MailService.swift in Sources */,
 				9C40EC9585D24046A1CB958A /* CompletedTasksView.swift in Sources */,
 				4221730C4AC74093BA1A9CC8 /* AssistantHistoryView.swift in Sources */,
 				9468934550894104B9A68228 /* TaskSelectionSheet.swift in Sources */,
