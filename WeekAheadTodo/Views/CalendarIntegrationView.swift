@@ -9,6 +9,7 @@ struct CalendarIntegrationView: View {
     @State private var showingPatternReview = false
     @State private var showingPermissionGuide = false
     @State private var showingCalendarSelection = false
+    @State private var showingCalendarImport = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -42,10 +43,16 @@ struct CalendarIntegrationView: View {
                 compactMessage(icon: "exclamationmark.triangle.fill", text: errorMessage, color: .red)
             }
 
-            // 캘린더 선택
+            // 캘린더 선택 (패턴 감지용)
             if calendarViewModel.isEnabled && !calendarViewModel.availableCalendars.isEmpty {
                 Divider()
                 calendarSelectionSection
+            }
+
+            // 캘린더 전체 가져오기
+            if calendarViewModel.isEnabled && !calendarViewModel.availableCalendars.isEmpty {
+                Divider()
+                calendarImportSection
             }
         }
         .padding(12)
@@ -259,6 +266,113 @@ struct CalendarIntegrationView: View {
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(calendarViewModel.selectedCalendarIds.contains(calendar.calendarIdentifier) ? Color.blue.opacity(0.05) : Color.clear)
+        )
+    }
+
+    // MARK: - Calendar Import Section
+
+    private var calendarImportSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("캘린더 전체 가져오기", systemImage: "arrow.down.circle")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                Text("\(calendarViewModel.importCalendarIds.count)/\(calendarViewModel.availableCalendars.count)")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                Button(showingCalendarImport ? "접기" : "펼치기") {
+                    withAnimation {
+                        showingCalendarImport.toggle()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.callout)
+                .foregroundColor(.blue)
+            }
+
+            Text("선택한 캘린더의 모든 일정을 태스크로 가져옵니다 (패턴 감지가 아닌 전체 가져오기)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            if showingCalendarImport {
+                VStack(spacing: 4) {
+                    ForEach(calendarViewModel.availableCalendars, id: \.calendarIdentifier) { calendar in
+                        calendarImportRow(calendar: calendar)
+                    }
+                }
+
+                // 기간 설정
+                HStack {
+                    Text("가져올 기간:")
+                        .font(.callout)
+                    Picker("", selection: $calendarViewModel.importWeeksAhead) {
+                        Text("1주").tag(1)
+                        Text("2주").tag(2)
+                        Text("4주").tag(4)
+                        Text("8주").tag(8)
+                        Text("12주").tag(12)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 250)
+                }
+                .padding(.vertical, 4)
+
+                HStack(spacing: 8) {
+                    if !calendarViewModel.importCalendarIds.isEmpty {
+                        Button {
+                            _Concurrency.Task {
+                                await calendarViewModel.importAllEventsFromCalendars(to: taskViewModel)
+                            }
+                        } label: {
+                            Label("가져오기", systemImage: "arrow.down.circle.fill")
+                                .fontWeight(.semibold)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(calendarViewModel.isImporting)
+                    }
+
+                    Button(calendarViewModel.importCalendarIds.count == calendarViewModel.availableCalendars.count ? "전체 해제" : "전체 선택") {
+                        if calendarViewModel.importCalendarIds.count == calendarViewModel.availableCalendars.count {
+                            calendarViewModel.importCalendarIds = []
+                        } else {
+                            calendarViewModel.importCalendarIds = Set(calendarViewModel.availableCalendars.map { $0.calendarIdentifier })
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private func calendarImportRow(calendar: EKCalendar) -> some View {
+        Button {
+            calendarViewModel.toggleCalendarImport(calendar.calendarIdentifier)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: calendarViewModel.importCalendarIds.contains(calendar.calendarIdentifier) ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(calendarViewModel.importCalendarIds.contains(calendar.calendarIdentifier) ? .green : .gray)
+                    .font(.callout)
+
+                Circle()
+                    .fill(Color(calendar.color))
+                    .frame(width: 10, height: 10)
+
+                Text(calendar.title)
+                    .font(.callout)
+                    .lineLimit(1)
+
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 2)
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(calendarViewModel.importCalendarIds.contains(calendar.calendarIdentifier) ? Color.green.opacity(0.05) : Color.clear)
         )
     }
 

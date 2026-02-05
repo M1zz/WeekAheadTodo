@@ -21,6 +21,11 @@ class CalendarViewModel: ObservableObject {
     @Published var availableCalendars: [EKCalendar] = []
     @Published var selectedCalendarIds: Set<String> = []
 
+    // 캘린더 전체 가져오기
+    @Published var importCalendarIds: Set<String> = []  // 전체 가져오기할 캘린더 ID들
+    @Published var isImporting: Bool = false
+    @Published var importWeeksAhead: Int = 4  // 향후 몇 주간의 이벤트를 가져올지
+
     // MARK: - Services
 
     let calendarService: CalendarService  // public for time block calculation
@@ -385,6 +390,135 @@ class CalendarViewModel: ObservableObject {
         statusMessage = nil
 
         print("✅ 캘린더 연동 초기화 완료")
+    }
+
+    // MARK: - Calendar Import (전체 가져오기)
+
+    /// 선택한 캘린더의 모든 이벤트를 태스크로 가져오기
+    func importAllEventsFromCalendars(to taskViewModel: TaskViewModel) async {
+        print("\n╔════════════════════════════════════════════════════════╗")
+        print("║  캘린더 전체 가져오기 시작                              ║")
+        print("╚════════════════════════════════════════════════════════╝")
+
+        guard !importCalendarIds.isEmpty else {
+            errorMessage = "가져올 캘린더를 선택해주세요."
+            print("❌ 선택된 캘린더 없음")
+            return
+        }
+
+        guard calendarService.isAuthorized else {
+            errorMessage = "캘린더 접근 권한이 필요합니다."
+            print("❌ 캘린더 권한 없음")
+            return
+        }
+
+        isImporting = true
+        errorMessage = nil
+        statusMessage = "이벤트 가져오는 중..."
+
+        print("📊 가져오기 설정:")
+        print("   선택된 캘린더: \(importCalendarIds.count)개")
+        print("   기간: 향후 \(importWeeksAhead)주")
+
+        // 향후 N주간의 이벤트 가져오기
+        let calendar = Calendar.current
+        let startDate = Date()
+        guard let endDate = calendar.date(byAdding: .weekOfYear, value: importWeeksAhead, to: startDate) else {
+            errorMessage = "날짜 계산 오류"
+            isImporting = false
+            statusMessage = nil
+            return
+        }
+
+        print("   시작일: \(startDate.formatted(date: .abbreviated, time: .omitted))")
+        print("   종료일: \(endDate.formatted(date: .abbreviated, time: .omitted))")
+
+        // 이벤트 가져오기
+        print("\n🔍 EventKit에서 이벤트 가져오는 중...")
+        let ekEvents = calendarService.fetchEvents(
+            from: startDate,
+            to: endDate,
+            calendarIdentifiers: importCalendarIds
+        )
+        print("📥 가져온 이벤트: \(ekEvents.count)개")
+
+        if ekEvents.isEmpty {
+            await MainActor.run {
+                successMessage = "가져올 이벤트가 없습니다."
+                isImporting = false
+                statusMessage = nil
+            }
+            print("ℹ️ 이벤트 없음")
+            print("════════════════════════════════════════════════════════\n")
+            return
+        }
+
+        // 이벤트를 Task로 변환
+        print("\n🔄 이벤트를 태스크로 변환 중...")
+        var createdCount = 0
+        var skippedCount = 0
+
+        for event in ekEvents {
+            // 이미 가져온 이벤트인지 확인 (calendarEventId로 중복 체크)
+            let alreadyExists = taskViewModel.tasks.contains { task in
+                task.calendarEventId == event.eventIdentifier
+            }
+
+            if alreadyExists {
+                skippedCount += 1
+                continue
+            }
+
+            // 이벤트 시간 계산
+            let startTime = event.startDate ?? Date()
+            let endTime = event.endDate ?? startTime
+            let duration = Int(endTime.timeIntervalSince(startTime) / 60) // 분 단위
+
+            // Task 생성
+            let task = Task(
+                title: event.title ?? "제목 없음",
+                description: "📅 \(event.calendar.title)에서 가져옴",
+                dueDate: endTime,
+                estimatedMinutes: max(30, duration), // 최소 30분
+                leadTimeDays: 0,
+                taskType: .dateSpecific,  // 캘린더 이벤트는 당일만 가능
+                taskRole: .none,
+                status: .notStarted
+            )
+
+            var calendarTask = task
+            calendarTask.calendarEventId = event.eventIdentifier
+            calendarTask.isFromCalendarPattern = false  // 패턴이 아닌 직접 가져오기
+            calendarTask.scheduledStartTime = startTime
+            calendarTask.targetDate = startTime
+
+            taskViewModel.addTask(calendarTask)
+            createdCount += 1
+
+            print("   ✅ [\(event.calendar.title)] \(event.title ?? "제목 없음")")
+            print("      \(startTime.formatted(date: .abbreviated, time: .shortened)) ~ \(endTime.formatted(date: .omitted, time: .shortened))")
+        }
+
+        await MainActor.run {
+            successMessage = "✅ \(createdCount)개 이벤트를 가져왔습니다" + (skippedCount > 0 ? " (\(skippedCount)개 중복 제외)" : "")
+            isImporting = false
+            statusMessage = nil
+        }
+
+        print("\n📊 가져오기 완료:")
+        print("   생성됨: \(createdCount)개")
+        print("   중복 제외: \(skippedCount)개")
+        print("   전체 태스크: \(taskViewModel.tasks.count)개")
+        print("════════════════════════════════════════════════════════\n")
+    }
+
+    /// 캘린더 전체 가져오기 선택/해제
+    func toggleCalendarImport(_ calendarId: String) {
+        if importCalendarIds.contains(calendarId) {
+            importCalendarIds.remove(calendarId)
+        } else {
+            importCalendarIds.insert(calendarId)
+        }
     }
 
     // MARK: - Debugging
