@@ -8,6 +8,7 @@ class MailViewModel: ObservableObject {
 
     @Published var mails: [MailMessage] = []
     @Published var accounts: [MailAccount] = []
+    @Published var enabledAccountIds: Set<String> = []  // 연동 활성화된 계정 ID
     @Published var selectedAccountName: String?  // nil이면 전체 계정
     @Published var selectedMailId: UUID?
     @Published var isLoading: Bool = false
@@ -23,6 +24,17 @@ class MailViewModel: ObservableObject {
 
     init() {
         self.mailService = MailService()
+
+        // 저장된 연동 계정 목록 로드
+        if let savedIds = UserDefaults.standard.array(forKey: "enabledMailAccountIds") as? [String] {
+            self.enabledAccountIds = Set(savedIds)
+        }
+    }
+
+    /// 연동 계정 설정 저장
+    func saveEnabledAccounts() {
+        UserDefaults.standard.set(Array(enabledAccountIds), forKey: "enabledMailAccountIds")
+        print("✅ [MailViewModel] 연동 계정 저장: \(enabledAccountIds.count)개")
     }
 
     // MARK: - Account Loading
@@ -31,7 +43,30 @@ class MailViewModel: ObservableObject {
     func loadAccounts() {
         print("📧 [MailViewModel] 계정 목록 로드 시작")
         accounts = mailService.fetchAccounts()
-        print("✅ [MailViewModel] \(accounts.count)개 계정 로드 완료")
+
+        // 처음 로드 시 모든 계정을 기본으로 활성화
+        if enabledAccountIds.isEmpty && !accounts.isEmpty {
+            enabledAccountIds = Set(accounts.map { $0.id })
+            saveEnabledAccounts()
+            print("✅ [MailViewModel] 모든 계정 자동 활성화 (\(accounts.count)개)")
+        }
+
+        print("✅ [MailViewModel] \(accounts.count)개 계정 로드 완료 (활성: \(enabledAccountIds.count)개)")
+    }
+
+    /// 계정 활성화/비활성화 토글
+    func toggleAccount(_ accountId: String) {
+        if enabledAccountIds.contains(accountId) {
+            enabledAccountIds.remove(accountId)
+        } else {
+            enabledAccountIds.insert(accountId)
+        }
+        saveEnabledAccounts()
+    }
+
+    /// 연동 활성화된 계정 목록
+    var enabledAccounts: [MailAccount] {
+        accounts.filter { enabledAccountIds.contains($0.id) }
     }
 
     // MARK: - Mail Loading
