@@ -89,6 +89,7 @@ class MailService {
             // 전체 받은편지함 (모든 계정 통합)
             inboxSource = "inbox"
             print("   • Inbox: 전체 통합")
+        }
 
         // limit이 9999면 전체 메일 (제한 없음)
         let limitClause: String
@@ -293,4 +294,3 @@ extension NSAppleEventDescriptor {
         return formatter.date(from: dateStr) ?? Date()
     }
 }
-
