@@ -28,6 +28,8 @@
 	<string>반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다. 앱은 일정을 읽기만 하며 수정하지 않습니다.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>반복되는 일정 패턴을 분석하여 할 일을 자동으로 제안하기 위해 캘린더 접근이 필요합니다.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Mail.app에서 메일을 가져와 할 일로 변환하기 위해 Mail.app 접근 권한이 필요합니다. 메일을 읽기만 하며 수정하지 않습니다.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 </dict>

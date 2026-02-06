@@ -11,12 +11,15 @@ class MailService {
         let script = """
         -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
         if not (application "Mail" is running) then
-            tell application "Mail" to launch
-            delay 0.5
+            tell application "Mail"
+                launch
+                delay 2.0
+            end tell
         end if
 
         tell application "Mail"
             set visible to false
+            delay 0.5
             set accountList to {}
             repeat with acc in accounts
                 set accountInfo to {¬
@@ -106,12 +109,15 @@ class MailService {
         let script = """
         -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
         if not (application "Mail" is running) then
-            tell application "Mail" to launch
-            delay 0.5
+            tell application "Mail"
+                launch
+                delay 2.0
+            end tell
         end if
 
         tell application "Mail"
             set visible to false
+            delay 0.5
             set messageList to messages of \(inboxSource)
             set messageCount to count of messageList
             \(limitClause)
