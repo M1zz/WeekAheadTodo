@@ -41,17 +41,15 @@ class MailViewModel: ObservableObject {
 
     /// 메일 계정 목록 가져오기
     func loadAccounts() {
-        print("📧 [MailViewModel] 계정 목록 로드 시작")
         accounts = mailService.fetchAccounts()
 
         // 처음 로드 시 모든 계정을 기본으로 활성화
         if enabledAccountIds.isEmpty && !accounts.isEmpty {
             enabledAccountIds = Set(accounts.map { $0.id })
             saveEnabledAccounts()
-            print("✅ [MailViewModel] 모든 계정 자동 활성화 (\(accounts.count)개)")
         }
 
-        print("✅ [MailViewModel] \(accounts.count)개 계정 로드 완료 (활성: \(enabledAccountIds.count)개)")
+        print("📧 계정: \(accounts.count)개 (연동: \(enabledAccountIds.count)개)")
     }
 
     /// 계정 활성화/비활성화 토글
@@ -73,23 +71,20 @@ class MailViewModel: ObservableObject {
 
     /// 메일 가져오기
     func loadMails(limit: Int = 50) async {
-        print("\n╔════════════════════════════════════════════════════════╗")
-        print("║  메일 가져오기 시작                                     ║")
-        print("╚════════════════════════════════════════════════════════╝")
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🚀 메일 가져오기 시작")
+        print("   • 계정: \(selectedAccountName ?? "전체 연동 계정")")
+        print("   • 개수: \(limit)개")
+        print("   • 필터: \(showScheduleOnly ? "일정만" : "전체")")
+        print("   • 연동 계정 수: \(enabledAccountIds.count)개")
 
         isLoading = true
         errorMessage = nil
 
         do {
-            if let accountName = selectedAccountName {
-                print("   선택된 계정: \(accountName)")
-            } else {
-                print("   전체 계정")
-            }
-
             if showScheduleOnly {
-                print("   일정 포함 메일만 가져오기")
                 var fetchedMails = mailService.fetchMailsWithSchedule(limit: limit, accountName: selectedAccountName)
+                print("📊 일정 포함 메일: \(fetchedMails.count)개")
 
                 // 일정 정보 추가
                 for i in 0..<fetchedMails.count {
@@ -102,19 +97,31 @@ class MailViewModel: ObservableObject {
 
                 mails = fetchedMails
             } else {
-                print("   전체 메일 가져오기")
                 mails = mailService.fetchRecentMails(limit: limit, accountName: selectedAccountName)
+                print("📊 전체 메일: \(mails.count)개")
             }
 
             successMessage = "✅ \(mails.count)개 메일을 가져왔습니다."
-            print("✅ [MailViewModel] 메일 로드 완료: \(mails.count)개")
+
+            if mails.isEmpty {
+                print("⚠️ 메일이 0개입니다!")
+                if enabledAccountIds.isEmpty {
+                    print("   → 원인: 연동된 계정이 없음")
+                } else if selectedAccountName != nil {
+                    print("   → 원인: 선택된 계정에 메일이 없거나 Mail.app에 문제")
+                } else {
+                    print("   → 원인: Mail.app에 메일이 없거나 AppleScript 오류")
+                }
+            }
+
+            print("✅ 완료")
         } catch {
             errorMessage = "메일을 가져올 수 없습니다: \(error.localizedDescription)"
-            print("❌ [MailViewModel] 메일 로드 실패: \(error)")
+            print("❌ 에러: \(error)")
         }
 
         isLoading = false
-        print("════════════════════════════════════════════════════════\n")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
     }
 
     /// 선택한 메일들을 Task로 변환

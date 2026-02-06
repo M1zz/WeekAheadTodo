@@ -7,7 +7,6 @@ class MailService {
 
     /// 사용 가능한 메일 계정 목록 가져오기
     func fetchAccounts() -> [MailAccount] {
-        print("📧 [MailService] 메일 계정 목록 가져오기")
 
         let script = """
         -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
@@ -30,7 +29,7 @@ class MailService {
         """
 
         guard let appleScript = NSAppleScript(source: script) else {
-            print("❌ AppleScript 생성 실패")
+            print("❌ [계정] AppleScript 생성 실패")
             return []
         }
 
@@ -38,14 +37,15 @@ class MailService {
         let result = appleScript.executeAndReturnError(&error)
 
         if let error = error {
-            print("❌ AppleScript 실행 오류: \(error)")
+            print("❌ [계정] AppleScript 오류:")
+            print("   \(error["NSAppleScriptErrorMessage"] ?? error)")
             return []
         }
 
         // 결과 파싱
         var accounts: [MailAccount] = []
         guard let listDescriptor = result.coerce(toDescriptorType: typeAEList) else {
-            print("❌ 계정 목록 파싱 실패")
+            print("❌ [계정] 파싱 실패")
             return []
         }
 
@@ -61,14 +61,12 @@ class MailService {
             let account = MailAccount(
                 id: accountId,
                 name: name,
-                emailAddress: name // Mail.app에서 이메일 주소 추출은 복잡하므로 이름 사용
+                emailAddress: name
             )
 
             accounts.append(account)
-            print("   ✅ 계정 발견: \(name)")
         }
 
-        print("✅ [MailService] \(accounts.count)개 계정 발견")
         return accounts
     }
 
@@ -77,21 +75,20 @@ class MailService {
     ///   - limit: 가져올 메일 최대 개수
     ///   - accountName: 특정 계정 이름 (nil이면 전체 받은편지함)
     func fetchRecentMails(limit: Int = 50, accountName: String? = nil) -> [MailMessage] {
-        if let accountName = accountName {
-            print("📧 [MailService] 메일 가져오기 시작 (계정: \(accountName), 최대 \(limit)개)")
-        } else {
-            print("📧 [MailService] 메일 가져오기 시작 (전체 계정, 최대 \(limit)개)")
-        }
+        print("🔍 [메일 조회] 시작")
+        print("   • 계정: \(accountName ?? "전체")")
+        print("   • 제한: \(limit >= 9999 ? "무제한" : "\(limit)개")")
 
         // AppleScript 생성 - 계정별로 다르게
         let inboxSource: String
         if let accountName = accountName {
             // 특정 계정의 받은편지함
             inboxSource = "inbox of account \"\(accountName)\""
+            print("   • Inbox: 특정 계정")
         } else {
             // 전체 받은편지함 (모든 계정 통합)
             inboxSource = "inbox"
-        }
+            print("   • Inbox: 전체 통합")
 
         // limit이 9999면 전체 메일 (제한 없음)
         let limitClause: String
@@ -135,48 +132,44 @@ class MailService {
         """
 
         guard let appleScript = NSAppleScript(source: script) else {
-            print("❌ AppleScript 생성 실패")
+            print("❌ [메일] AppleScript 생성 실패")
             return []
         }
 
+        print("   ⏳ AppleScript 실행 중...")
         var error: NSDictionary?
         let result = appleScript.executeAndReturnError(&error)
 
         if let error = error {
-            print("❌ AppleScript 실행 오류:")
-            print("   Error Number: \(error["NSAppleScriptErrorNumber"] ?? "unknown")")
-            print("   Error Message: \(error["NSAppleScriptErrorMessage"] ?? "unknown")")
-            print("   Full Error: \(error)")
+            print("❌ [메일] AppleScript 실행 오류!")
+            print("   • 에러 번호: \(error["NSAppleScriptErrorNumber"] ?? "unknown")")
+            print("   • 에러 메시지: \(error["NSAppleScriptErrorMessage"] ?? "unknown")")
+            print("   • Mail.app이 실행 중인지 확인하세요")
+            print("   • 권한 설정을 확인하세요 (시스템 설정 → 개인정보 → 자동화)")
             return []
         }
-
-        print("✅ AppleScript 실행 완료")
-        print("   Result Type: \(result.descriptorType)")
-        print("   Result Description: \(result)")
 
         // AppleScript 결과 파싱
         var mails: [MailMessage] = []
         guard let listDescriptor = result.coerce(toDescriptorType: typeAEList) else {
-            print("❌ 결과 파싱 실패 - List로 변환 불가")
-            print("   Result Type: \(result.descriptorType)")
-            print("   Expected: \(typeAEList)")
+            print("❌ [메일] 결과 파싱 실패")
+            print("   • AppleScript 결과를 List로 변환할 수 없음")
+            print("   • Mail.app에 메일이 있는지 확인하세요")
             return []
         }
 
-        print("✅ List 변환 성공 - 아이템 개수: \(listDescriptor.numberOfItems)")
+        let itemCount = listDescriptor.numberOfItems
+        print("   ✅ AppleScript 성공: \(itemCount)개 메일 발견")
+
+        var successCount = 0
+        var failCount = 0
 
         for i in 1...listDescriptor.numberOfItems {
-            guard let itemDescriptor = listDescriptor.atIndex(i) else {
-                print("⚠️ 아이템 \(i) 가져오기 실패")
+            guard let itemDescriptor = listDescriptor.atIndex(i),
+                  let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
+                failCount += 1
                 continue
             }
-
-            guard let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
-                print("⚠️ 아이템 \(i) Record 변환 실패")
-                continue
-            }
-
-            print("   메일 \(i) 파싱 중... (필드 수: \(recordDescriptor.numberOfItems))")
 
             // 각 필드 추출
             let subject = recordDescriptor.atIndex(1)?.stringValue ?? "제목 없음"
@@ -187,9 +180,7 @@ class MailService {
             let body = recordDescriptor.atIndex(6)?.stringValue ?? ""
             let messageId = recordDescriptor.atIndex(7)?.int32Value ?? 0
 
-            print("      제목: \(subject.prefix(50))...")
-
-            // 발신자 이메일 추출 (간단하게 전체 문자열 사용)
+            // 발신자 이메일 추출
             let senderEmail = extractEmail(from: sender)
 
             // MailMessage 생성
@@ -205,9 +196,25 @@ class MailService {
             )
 
             mails.append(mail)
+            successCount += 1
         }
 
-        print("✅ [MailService] \(mails.count)개 메일 가져오기 완료")
+        print("📊 [메일 파싱] 성공: \(successCount)개 / 실패: \(failCount)개")
+
+        if mails.isEmpty {
+            print("⚠️ [메일] 결과가 0개입니다!")
+            print("   가능한 원인:")
+            print("   1. Mail.app에 메일이 없음")
+            print("   2. 선택한 계정에 메일이 없음")
+            print("   3. Mail.app이 제대로 실행되지 않음")
+            print("   4. 권한 문제 (시스템 설정 → 개인정보 → 자동화)")
+        } else {
+            print("✅ [메일] 완료: \(mails.count)개")
+            if mails.count > 0 {
+                print("   첫 메일: \(mails[0].subject.prefix(40))...")
+            }
+        }
+
         return mails
     }
 
