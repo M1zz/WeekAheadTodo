@@ -267,7 +267,7 @@ class MailService {
     }
 
     /// 이메일 주소 추출 (간단한 버전)
-    private func extractEmail(from sender: String) -> String {
+    func extractEmail(from sender: String) -> String {
         // "홍길동 <hong@example.com>" 형식에서 이메일 추출
         if let emailMatch = sender.range(of: #"<(.+?)>"#, options: .regularExpression) {
             let email = String(sender[emailMatch])
