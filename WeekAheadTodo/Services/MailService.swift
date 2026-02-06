@@ -293,3 +293,4 @@ extension NSAppleEventDescriptor {
         return formatter.date(from: dateStr) ?? Date()
     }
 }
+
