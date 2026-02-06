@@ -60,6 +60,21 @@ struct MailIntegrationView: View {
                     }
                 }
 
+                // 메일 개수 선택
+                Picker("개수", selection: $mailLimit) {
+                    Text("20개").tag(20)
+                    Text("50개").tag(50)
+                    Text("100개").tag(100)
+                    Text("200개").tag(200)
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 100)
+                .onChange(of: mailLimit) { oldValue, newValue in
+                    _Concurrency.Task {
+                        await mailViewModel.loadMails(limit: mailLimit)
+                    }
+                }
+
                 // 일정만 표시 토글
                 Toggle("일정만", isOn: $mailViewModel.showScheduleOnly)
                     .toggleStyle(.switch)
