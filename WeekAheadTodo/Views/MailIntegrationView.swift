@@ -6,7 +6,7 @@ struct MailIntegrationView: View {
     @EnvironmentObject var taskViewModel: TaskViewModel
     @State private var selectedMailIds: Set<UUID> = []
     @State private var mailLimit: Int = 50
-    @State private var showAccountSettings: Bool = false
+    @State private var showAccountSettingsSheet: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,12 +14,6 @@ struct MailIntegrationView: View {
             headerSection
 
             Divider()
-
-            // 연동 계정 설정 (확장 가능)
-            if showAccountSettings {
-                accountSettingsSection
-                Divider()
-            }
 
             // 메일 목록
             if mailViewModel.isLoading {
@@ -38,6 +32,10 @@ struct MailIntegrationView: View {
             // 메일 로드
             await mailViewModel.loadMails(limit: mailLimit)
         }
+        .sheet(isPresented: $showAccountSettingsSheet) {
+            AccountSettingsSheet()
+                .environmentObject(mailViewModel)
+        }
     }
 
     // MARK: - Header Section
@@ -52,10 +50,9 @@ struct MailIntegrationView: View {
 
                 // 계정 설정 버튼
                 Button {
-                    showAccountSettings.toggle()
+                    showAccountSettingsSheet = true
                 } label: {
-                    Label(showAccountSettings ? "설정 닫기" : "연동 계정 설정",
-                          systemImage: showAccountSettings ? "chevron.up" : "gearshape")
+                    Label("연동 계정 설정", systemImage: "gearshape")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -239,56 +236,6 @@ struct MailIntegrationView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Account Settings Section
-
-    private var accountSettingsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("연동할 메일 계정 선택")
-                .font(.headline)
-                .padding(.horizontal)
-                .padding(.top, 12)
-
-            if mailViewModel.accounts.isEmpty {
-                Text("사용 가능한 계정이 없습니다")
-                    .font(.callout)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(mailViewModel.accounts) { account in
-                        HStack {
-                            Toggle(isOn: Binding(
-                                get: { mailViewModel.enabledAccountIds.contains(account.id) },
-                                set: { _ in mailViewModel.toggleAccount(account.id) }
-                            )) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(account.name)
-                                        .font(.body)
-                                    Text(account.emailAddress)
-                                        .font(.callout)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .toggleStyle(.switch)
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-
-                // 설명
-                HStack(spacing: 4) {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.blue)
-                    Text("체크된 계정의 메일만 가져옵니다")
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-            }
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
 
     // MARK: - Empty State
 
@@ -317,5 +264,179 @@ struct MailIntegrationView: View {
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Account Settings Sheet
+
+/// 메일 계정 연동 설정 시트
+struct AccountSettingsSheet: View {
+    @EnvironmentObject var mailViewModel: MailViewModel
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 헤더
+            HStack {
+                Text("메일 계정 연동 설정")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+
+            Divider()
+
+            // 내용
+            if mailViewModel.accounts.isEmpty {
+                emptyAccountsView
+            } else {
+                accountListView
+            }
+        }
+        .frame(minWidth: 500, minHeight: 400)
+    }
+
+    // MARK: - Empty Accounts View
+
+    private var emptyAccountsView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            Image(systemName: "envelope.badge.shield.half.filled")
+                .font(.system(size: 64))
+                .foregroundColor(.secondary)
+
+            VStack(spacing: 8) {
+                Text("사용 가능한 메일 계정이 없습니다")
+                    .font(.headline)
+
+                Text("Mail.app에서 먼저 메일 계정을 추가해주세요")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(spacing: 12) {
+                Button {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.internetaccounts")!)
+                } label: {
+                    Label("시스템 설정 - 인터넷 계정", systemImage: "gear")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    NSWorkspace.shared.launchApplication("Mail")
+                } label: {
+                    Label("Mail.app 열기", systemImage: "envelope")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    mailViewModel.loadAccounts()
+                } label: {
+                    Label("다시 확인", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding()
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Account List View
+
+    private var accountListView: some View {
+        VStack(spacing: 0) {
+            // 안내
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(.blue)
+                Text("체크된 계정의 메일만 WeekAheadTodo에서 조회합니다")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding()
+            .background(Color.blue.opacity(0.1))
+
+            // 계정 목록
+            ScrollView {
+                VStack(spacing: 16) {
+                    ForEach(mailViewModel.accounts) { account in
+                        accountRow(account)
+                    }
+                }
+                .padding()
+            }
+
+            Divider()
+
+            // 하단 정보
+            HStack {
+                Text("총 \(mailViewModel.accounts.count)개 계정 중 \(mailViewModel.enabledAccountIds.count)개 연동 중")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Button("완료") {
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
+        }
+    }
+
+    // MARK: - Account Row
+
+    private func accountRow(_ account: MailAccount) -> some View {
+        HStack(spacing: 16) {
+            // 아이콘
+            Image(systemName: mailViewModel.enabledAccountIds.contains(account.id) ? "envelope.circle.fill" : "envelope.circle")
+                .font(.system(size: 32))
+                .foregroundColor(mailViewModel.enabledAccountIds.contains(account.id) ? .blue : .secondary)
+
+            // 계정 정보
+            VStack(alignment: .leading, spacing: 4) {
+                Text(account.name)
+                    .font(.headline)
+
+                Text(account.emailAddress)
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // 토글
+            Toggle("", isOn: Binding(
+                get: { mailViewModel.enabledAccountIds.contains(account.id) },
+                set: { _ in mailViewModel.toggleAccount(account.id) }
+            ))
+            .toggleStyle(.switch)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(mailViewModel.enabledAccountIds.contains(account.id) ? Color.blue : Color.clear, lineWidth: 2)
+        )
     }
 }
