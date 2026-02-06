@@ -26,6 +26,9 @@ struct MailIntegrationView: View {
         }
         .navigationTitle("📧 메일")
         .task {
+            // 계정 목록 먼저 로드
+            mailViewModel.loadAccounts()
+            // 메일 로드
             await mailViewModel.loadMails(limit: mailLimit)
         }
     }
@@ -39,6 +42,23 @@ struct MailIntegrationView: View {
                     .font(.headline)
 
                 Spacer()
+
+                // 계정 선택
+                if !mailViewModel.accounts.isEmpty {
+                    Picker("계정", selection: $mailViewModel.selectedAccountName) {
+                        Text("전체 계정").tag(String?.none)
+                        ForEach(mailViewModel.accounts) { account in
+                            Text(account.name).tag(String?.some(account.name))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 200)
+                    .onChange(of: mailViewModel.selectedAccountName) { oldValue, newValue in
+                        _Concurrency.Task {
+                            await mailViewModel.loadMails(limit: mailLimit)
+                        }
+                    }
+                }
 
                 // 일정만 표시 토글
                 Toggle("일정만", isOn: $mailViewModel.showScheduleOnly)

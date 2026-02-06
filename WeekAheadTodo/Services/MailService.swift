@@ -5,13 +5,90 @@ import AppKit
 @MainActor
 class MailService {
 
-    /// 받은 편지함에서 최근 메일 가져오기
-    func fetchRecentMails(limit: Int = 50) -> [MailMessage] {
-        print("📧 [MailService] 메일 가져오기 시작 (최대 \(limit)개)")
+    /// 사용 가능한 메일 계정 목록 가져오기
+    func fetchAccounts() -> [MailAccount] {
+        print("📧 [MailService] 메일 계정 목록 가져오기")
 
         let script = """
         tell application "Mail"
-            set messageList to messages of inbox
+            set accountList to {}
+            repeat with acc in accounts
+                set accountInfo to {¬
+                    name of acc, ¬
+                    id of acc}
+                set end of accountList to accountInfo
+            end repeat
+            return accountList
+        end tell
+        """
+
+        guard let appleScript = NSAppleScript(source: script) else {
+            print("❌ AppleScript 생성 실패")
+            return []
+        }
+
+        var error: NSDictionary?
+        let result = appleScript.executeAndReturnError(&error)
+
+        if let error = error {
+            print("❌ AppleScript 실행 오류: \(error)")
+            return []
+        }
+
+        // 결과 파싱
+        var accounts: [MailAccount] = []
+        guard let listDescriptor = result.coerce(toDescriptorType: typeAEList) else {
+            print("❌ 계정 목록 파싱 실패")
+            return []
+        }
+
+        for i in 1...listDescriptor.numberOfItems {
+            guard let itemDescriptor = listDescriptor.atIndex(i),
+                  let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
+                continue
+            }
+
+            let name = recordDescriptor.atIndex(1)?.stringValue ?? "알 수 없는 계정"
+            let accountId = recordDescriptor.atIndex(2)?.stringValue ?? UUID().uuidString
+
+            let account = MailAccount(
+                id: accountId,
+                name: name,
+                emailAddress: name // Mail.app에서 이메일 주소 추출은 복잡하므로 이름 사용
+            )
+
+            accounts.append(account)
+            print("   ✅ 계정 발견: \(name)")
+        }
+
+        print("✅ [MailService] \(accounts.count)개 계정 발견")
+        return accounts
+    }
+
+    /// 받은 편지함에서 최근 메일 가져오기
+    /// - Parameters:
+    ///   - limit: 가져올 메일 최대 개수
+    ///   - accountName: 특정 계정 이름 (nil이면 전체 받은편지함)
+    func fetchRecentMails(limit: Int = 50, accountName: String? = nil) -> [MailMessage] {
+        if let accountName = accountName {
+            print("📧 [MailService] 메일 가져오기 시작 (계정: \(accountName), 최대 \(limit)개)")
+        } else {
+            print("📧 [MailService] 메일 가져오기 시작 (전체 계정, 최대 \(limit)개)")
+        }
+
+        // AppleScript 생성 - 계정별로 다르게
+        let inboxSource: String
+        if let accountName = accountName {
+            // 특정 계정의 받은편지함
+            inboxSource = "inbox of account \"\(accountName)\""
+        } else {
+            // 전체 받은편지함 (모든 계정 통합)
+            inboxSource = "inbox"
+        }
+
+        let script = """
+        tell application "Mail"
+            set messageList to messages of \(inboxSource)
             set messageCount to count of messageList
             if messageCount > \(limit) then
                 set messageList to items 1 thru \(limit) of messageList
@@ -42,22 +119,40 @@ class MailService {
         let result = appleScript.executeAndReturnError(&error)
 
         if let error = error {
-            print("❌ AppleScript 실행 오류: \(error)")
+            print("❌ AppleScript 실행 오류:")
+            print("   Error Number: \(error["NSAppleScriptErrorNumber"] ?? "unknown")")
+            print("   Error Message: \(error["NSAppleScriptErrorMessage"] ?? "unknown")")
+            print("   Full Error: \(error)")
             return []
         }
+
+        print("✅ AppleScript 실행 완료")
+        print("   Result Type: \(result.descriptorType)")
+        print("   Result Description: \(result)")
 
         // AppleScript 결과 파싱
         var mails: [MailMessage] = []
         guard let listDescriptor = result.coerce(toDescriptorType: typeAEList) else {
-            print("❌ 결과 파싱 실패")
+            print("❌ 결과 파싱 실패 - List로 변환 불가")
+            print("   Result Type: \(result.descriptorType)")
+            print("   Expected: \(typeAEList)")
             return []
         }
 
+        print("✅ List 변환 성공 - 아이템 개수: \(listDescriptor.numberOfItems)")
+
         for i in 1...listDescriptor.numberOfItems {
-            guard let itemDescriptor = listDescriptor.atIndex(i),
-                  let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
+            guard let itemDescriptor = listDescriptor.atIndex(i) else {
+                print("⚠️ 아이템 \(i) 가져오기 실패")
                 continue
             }
+
+            guard let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
+                print("⚠️ 아이템 \(i) Record 변환 실패")
+                continue
+            }
+
+            print("   메일 \(i) 파싱 중... (필드 수: \(recordDescriptor.numberOfItems))")
 
             // 각 필드 추출
             let subject = recordDescriptor.atIndex(1)?.stringValue ?? "제목 없음"
@@ -67,6 +162,8 @@ class MailService {
             let isStarred = recordDescriptor.atIndex(5)?.booleanValue ?? false
             let body = recordDescriptor.atIndex(6)?.stringValue ?? ""
             let messageId = recordDescriptor.atIndex(7)?.int32Value ?? 0
+
+            print("      제목: \(subject.prefix(50))...")
 
             // 발신자 이메일 추출 (간단하게 전체 문자열 사용)
             let senderEmail = extractEmail(from: sender)
@@ -91,8 +188,8 @@ class MailService {
     }
 
     /// 일정이 포함된 메일만 필터링
-    func fetchMailsWithSchedule(limit: Int = 50) -> [MailMessage] {
-        let allMails = fetchRecentMails(limit: limit)
+    func fetchMailsWithSchedule(limit: Int = 50, accountName: String? = nil) -> [MailMessage] {
+        let allMails = fetchRecentMails(limit: limit, accountName: accountName)
         return allMails.filter { detectScheduleInMail($0) != nil }
     }
 

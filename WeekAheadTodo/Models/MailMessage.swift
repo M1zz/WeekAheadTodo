@@ -1,5 +1,12 @@
 import Foundation
 
+/// 메일 계정 정보
+struct MailAccount: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String
+    let emailAddress: String
+}
+
 /// 메일 메시지 모델
 struct MailMessage: Identifiable, Codable, Hashable {
     let id: UUID

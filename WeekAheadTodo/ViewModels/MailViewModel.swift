@@ -7,6 +7,8 @@ class MailViewModel: ObservableObject {
     // MARK: - Published Properties
 
     @Published var mails: [MailMessage] = []
+    @Published var accounts: [MailAccount] = []
+    @Published var selectedAccountName: String?  // nil이면 전체 계정
     @Published var selectedMailId: UUID?
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
@@ -23,6 +25,15 @@ class MailViewModel: ObservableObject {
         self.mailService = MailService()
     }
 
+    // MARK: - Account Loading
+
+    /// 메일 계정 목록 가져오기
+    func loadAccounts() {
+        print("📧 [MailViewModel] 계정 목록 로드 시작")
+        accounts = mailService.fetchAccounts()
+        print("✅ [MailViewModel] \(accounts.count)개 계정 로드 완료")
+    }
+
     // MARK: - Mail Loading
 
     /// 메일 가져오기
@@ -35,9 +46,15 @@ class MailViewModel: ObservableObject {
         errorMessage = nil
 
         do {
+            if let accountName = selectedAccountName {
+                print("   선택된 계정: \(accountName)")
+            } else {
+                print("   전체 계정")
+            }
+
             if showScheduleOnly {
                 print("   일정 포함 메일만 가져오기")
-                var fetchedMails = mailService.fetchMailsWithSchedule(limit: limit)
+                var fetchedMails = mailService.fetchMailsWithSchedule(limit: limit, accountName: selectedAccountName)
 
                 // 일정 정보 추가
                 for i in 0..<fetchedMails.count {
@@ -51,7 +68,7 @@ class MailViewModel: ObservableObject {
                 mails = fetchedMails
             } else {
                 print("   전체 메일 가져오기")
-                mails = mailService.fetchRecentMails(limit: limit)
+                mails = mailService.fetchRecentMails(limit: limit, accountName: selectedAccountName)
             }
 
             successMessage = "✅ \(mails.count)개 메일을 가져왔습니다."
