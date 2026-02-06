@@ -93,6 +93,18 @@ class MailService {
             inboxSource = "inbox"
         }
 
+        // limit이 9999면 전체 메일 (제한 없음)
+        let limitClause: String
+        if limit >= 9999 {
+            limitClause = ""
+        } else {
+            limitClause = """
+            if messageCount > \(limit) then
+                set messageList to items 1 thru \(limit) of messageList
+            end if
+            """
+        }
+
         let script = """
         -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
         if not (application "Mail" is running) then
@@ -104,9 +116,7 @@ class MailService {
             set visible to false
             set messageList to messages of \(inboxSource)
             set messageCount to count of messageList
-            if messageCount > \(limit) then
-                set messageList to items 1 thru \(limit) of messageList
-            end if
+            \(limitClause)
 
             set resultList to {}
             repeat with aMessage in messageList

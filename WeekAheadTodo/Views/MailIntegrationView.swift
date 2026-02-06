@@ -66,9 +66,12 @@ struct MailIntegrationView: View {
                     Text("50개").tag(50)
                     Text("100개").tag(100)
                     Text("200개").tag(200)
+                    Text("500개").tag(500)
+                    Text("1000개").tag(1000)
+                    Text("전체").tag(9999)
                 }
                 .pickerStyle(.menu)
-                .frame(maxWidth: 100)
+                .frame(maxWidth: 120)
                 .onChange(of: mailLimit) { oldValue, newValue in
                     _Concurrency.Task {
                         await mailViewModel.loadMails(limit: mailLimit)
