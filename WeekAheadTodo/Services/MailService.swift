@@ -10,7 +10,14 @@ class MailService {
         print("📧 [MailService] 메일 계정 목록 가져오기")
 
         let script = """
+        -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
+        if not (application "Mail" is running) then
+            tell application "Mail" to launch
+            delay 0.5
+        end if
+
         tell application "Mail"
+            set visible to false
             set accountList to {}
             repeat with acc in accounts
                 set accountInfo to {¬
@@ -87,7 +94,14 @@ class MailService {
         }
 
         let script = """
+        -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
+        if not (application "Mail" is running) then
+            tell application "Mail" to launch
+            delay 0.5
+        end if
+
         tell application "Mail"
+            set visible to false
             set messageList to messages of \(inboxSource)
             set messageCount to count of messageList
             if messageCount > \(limit) then
