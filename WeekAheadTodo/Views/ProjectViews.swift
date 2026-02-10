@@ -240,9 +240,7 @@ struct AddProjectView: View {
                         color: selectedColor,
                         icon: selectedIcon
                     )
-                    print("📝 [AddProjectView] 프로젝트 추가 중: \(project.name)")
                     viewModel.addProject(project)
-                    print("✅ [AddProjectView] 프로젝트 추가 완료. 총 프로젝트 수: \(viewModel.projects.count)")
                     onProjectAdded?(project.id)
                     dismiss()
                 }

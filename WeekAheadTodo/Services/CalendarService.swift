@@ -45,7 +45,6 @@ class CalendarService: ObservableObject {
             if #available(macOS 14.0, *) {
                 // macOS 14.0+ (iOS 17+): 최신 API 사용
                 granted = try await eventStore.requestFullAccessToEvents()
-                print("✓ Full Access to Events 요청 완료: \(granted ? "승인됨" : "거부됨")")
             } else {
                 // 이전 버전: deprecated API 사용 (호환성)
                 granted = try await withCheckedThrowingContinuation { continuation in
@@ -57,7 +56,6 @@ class CalendarService: ObservableObject {
                         }
                     }
                 }
-                print("✓ Calendar Access 요청 완료 (legacy): \(granted ? "승인됨" : "거부됨")")
             }
 
             // 권한 상태 업데이트
@@ -68,7 +66,6 @@ class CalendarService: ObservableObject {
             return granted
 
         } catch {
-            print("❌ 캘린더 권한 요청 실패: \(error.localizedDescription)")
             await MainActor.run {
                 updateAuthorizationStatus()
             }
@@ -80,16 +77,12 @@ class CalendarService: ObservableObject {
 
     /// 사용 가능한 캘린더 목록 가져오기
     func getAvailableCalendars() -> [EKCalendar] {
-        print("\n[CalendarService.getAvailableCalendars] 시작")
         guard isAuthorized else {
-            print("  ❌ 권한 없음")
             return []
         }
 
         let calendars = eventStore.calendars(for: .event)
-        print("  📋 발견된 캘린더: \(calendars.count)개")
         for (index, calendar) in calendars.enumerated() {
-            print("     \(index + 1). \(calendar.title) [\(calendar.source.title)]")
         }
         return calendars
     }
@@ -110,61 +103,40 @@ class CalendarService: ObservableObject {
     /// ## 안전성
     /// - 읽기 전용으로만 사용됨 (일정을 수정하거나 삭제하지 않음)
     func fetchEvents(from startDate: Date, to endDate: Date, calendarIdentifiers: Set<String>? = nil) -> [EKEvent] {
-        print("\n[CalendarService.fetchEvents] 시작")
-        print("  요청 기간: \(startDate.formatted(date: .abbreviated, time: .omitted)) ~ \(endDate.formatted(date: .abbreviated, time: .omitted))")
 
         // 1. 권한 확인
-        print("  권한 상태 확인: \(authorizationStatusString)")
         guard isAuthorized else {
-            print("  ❌ 권한 없음 - 빈 배열 반환")
             return []
         }
-        print("  ✅ 권한 확인됨")
 
         // 2. 캘린더 목록 가져오기
-        print("  캘린더 목록 가져오는 중...")
         var calendars = eventStore.calendars(for: .event)
-        print("  📋 전체 캘린더: \(calendars.count)개")
 
         // 선택된 캘린더만 필터링
         if let selectedIds = calendarIdentifiers, !selectedIds.isEmpty {
             calendars = calendars.filter { selectedIds.contains($0.calendarIdentifier) }
-            print("  🎯 선택된 캘린더로 필터링: \(calendars.count)개")
         } else {
-            print("  📋 모든 캘린더 사용")
         }
 
         guard !calendars.isEmpty else {
-            print("  ⚠️ 캘린더가 없음 - 빈 배열 반환")
             return []
         }
 
         for (index, calendar) in calendars.enumerated() {
-            print("     \(index + 1). \(calendar.title) (타입: \(calendar.type.rawValue))")
         }
 
         // 3. 이벤트 검색 (predicate 사용)
-        print("  🔍 Predicate 생성 중...")
         let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
-        print("  🔍 이벤트 검색 중...")
         let events = eventStore.events(matching: predicate)
-        print("  📥 검색 결과: \(events.count)개 이벤트")
 
         // 4. 결과 로깅
         if events.isEmpty {
-            print("  ⚠️ 이벤트가 없습니다!")
-            print("     가능한 원인:")
-            print("     - 캘린더에 해당 기간의 일정이 없음")
-            print("     - 권한이 제대로 부여되지 않음")
         } else {
-            print("  📊 이벤트 통계:")
             let calendarGroups = Dictionary(grouping: events) { $0.calendar.title }
             for (calendarName, calendarEvents) in calendarGroups.sorted(by: { $0.key < $1.key }) {
-                print("     - \(calendarName): \(calendarEvents.count)개")
             }
         }
 
-        print("[CalendarService.fetchEvents] 완료\n")
         return events
     }
 
@@ -179,13 +151,10 @@ class CalendarService: ObservableObject {
         let calendar = Calendar.current
         let endDate = Date()
         guard let startDate = calendar.date(byAdding: .month, value: -3, to: endDate) else {
-            print("❌ 시작 날짜 계산 실패")
             return []
         }
 
-        print("📆 최근 3개월 이벤트 분석 시작...")
         if let selectedIds = calendarIdentifiers, !selectedIds.isEmpty {
-            print("  🎯 선택된 캘린더: \(selectedIds.count)개")
         }
         return fetchEvents(from: startDate, to: endDate, calendarIdentifiers: calendarIdentifiers)
     }
@@ -229,12 +198,10 @@ class CalendarService: ObservableObject {
     /// - Returns: 해당 날짜의 이벤트 총 시간 (분)
     func calculateEventDuration(for date: Date, calendarIdentifiers: Set<String>) -> Int {
         guard isAuthorized else {
-            print("⚠️ [CalendarService] 권한 없음 - 이벤트 시간 계산 불가")
             return 0
         }
 
         guard !calendarIdentifiers.isEmpty else {
-            print("ℹ️ [CalendarService] 선택된 캘린더 없음")
             return 0
         }
 
@@ -250,7 +217,6 @@ class CalendarService: ObservableObject {
         }
 
         guard !selectedCalendars.isEmpty else {
-            print("⚠️ [CalendarService] 선택된 캘린더를 찾을 수 없음")
             return 0
         }
 
@@ -276,7 +242,6 @@ class CalendarService: ObservableObject {
             totalMinutes += Int(duration / 60)
         }
 
-        print("📊 [CalendarService] \(date.formatted(date: .abbreviated, time: .omitted)): \(totalMinutes)분 일정")
         return totalMinutes
     }
 
@@ -316,7 +281,6 @@ class CalendarService: ObservableObject {
         calendarIdentifier: String? = nil
     ) async -> Bool {
         guard isAuthorized else {
-            print("❌ [CalendarService] 권한 없음 - 이벤트 생성 불가")
             return false
         }
 
@@ -339,10 +303,8 @@ class CalendarService: ObservableObject {
 
         do {
             try eventStore.save(event, span: .thisEvent)
-            print("✅ [CalendarService] 이벤트 생성 성공: \(title)")
             return true
         } catch {
-            print("❌ [CalendarService] 이벤트 생성 실패: \(error.localizedDescription)")
             return false
         }
     }
@@ -375,7 +337,6 @@ class CalendarService: ObservableObject {
             }
         }
 
-        print("📊 [CalendarService] 이벤트 생성 완료: 성공 \(successCount)개, 실패 \(failureCount)개")
         return (successCount, failureCount)
     }
 }

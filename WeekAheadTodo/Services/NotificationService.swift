@@ -114,7 +114,6 @@ class NotificationService: NSObject, ObservableObject {
         )
 
         center.setNotificationCategories([checkinCategory, reminderCategory])
-        print("✅ [NotificationService] 알림 카테고리 등록 완료")
     }
 
     // MARK: - Notification Times Management
@@ -124,7 +123,6 @@ class NotificationService: NSObject, ObservableObject {
         if let data = UserDefaults.standard.data(forKey: notificationTimesKey),
            let times = try? JSONDecoder().decode([NotificationTime].self, from: data) {
             notificationTimes = times
-            print("✅ [NotificationService] 알림 시간 로드: \(times.count)개")
         } else {
             // 기본 알림 시간 (오전 9시, 오후 3시, 저녁 9시)
             notificationTimes = [
@@ -133,7 +131,6 @@ class NotificationService: NSObject, ObservableObject {
                 NotificationTime(hour: 21, minute: 0, label: "저녁 체크")
             ]
             saveNotificationTimes()
-            print("✅ [NotificationService] 기본 알림 시간 설정")
         }
     }
 
@@ -141,7 +138,6 @@ class NotificationService: NSObject, ObservableObject {
     func saveNotificationTimes() {
         if let data = try? JSONEncoder().encode(notificationTimes) {
             UserDefaults.standard.set(data, forKey: notificationTimesKey)
-            print("✅ [NotificationService] 알림 시간 저장: \(notificationTimes.count)개")
         }
     }
 
@@ -150,14 +146,12 @@ class NotificationService: NSObject, ObservableObject {
         let newTime = NotificationTime(hour: hour, minute: minute, label: label)
         notificationTimes.append(newTime)
         saveNotificationTimes()
-        print("✅ [NotificationService] 알림 시간 추가: \(hour):\(minute) - \(label)")
     }
 
     /// 알림 시간 삭제
     func removeNotificationTime(id: UUID) {
         notificationTimes.removeAll { $0.id == id }
         saveNotificationTimes()
-        print("✅ [NotificationService] 알림 시간 삭제: \(id)")
     }
 
     /// 알림 시간 업데이트
@@ -165,7 +159,6 @@ class NotificationService: NSObject, ObservableObject {
         if let index = notificationTimes.firstIndex(where: { $0.id == id }) {
             notificationTimes[index] = NotificationTime(id: id, hour: hour, minute: minute, isEnabled: isEnabled, label: label)
             saveNotificationTimes()
-            print("✅ [NotificationService] 알림 시간 업데이트: \(hour):\(minute)")
         }
     }
 
@@ -173,7 +166,6 @@ class NotificationService: NSObject, ObservableObject {
     func setNudgeNotificationEnabled(_ enabled: Bool) {
         nudgeNotificationEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: nudgeNotificationEnabledKey)
-        print("✅ [NotificationService] 재촉 알림: \(enabled ? "활성화" : "비활성화")")
     }
 
     // MARK: - 권한 관리
@@ -187,9 +179,7 @@ class NotificationService: NSObject, ObservableObject {
         await checkAuthorizationStatus()
 
         if granted {
-            print("✅ [NotificationService] 알림 권한 승인됨")
         } else {
-            print("⚠️ [NotificationService] 알림 권한 거부됨")
         }
     }
 
@@ -204,7 +194,6 @@ class NotificationService: NSObject, ObservableObject {
             isNotificationEnabled = false
         }
 
-        print("ℹ️ [NotificationService] 권한 상태: \(settings.authorizationStatus.rawValue)")
     }
 
     /// 알림 기능 활성화/비활성화
@@ -213,9 +202,7 @@ class NotificationService: NSObject, ObservableObject {
         UserDefaults.standard.set(enabled, forKey: notificationEnabledKey)
 
         if enabled {
-            print("✅ [NotificationService] 알림 기능 활성화")
         } else {
-            print("⚠️ [NotificationService] 알림 기능 비활성화")
             // 모든 예약된 알림 취소
             _Concurrency.Task {
                 await cancelAllScheduledNotifications()
@@ -228,14 +215,12 @@ class NotificationService: NSObject, ObservableObject {
     /// 모든 태스크에 대해 알림 스케줄 갱신
     func scheduleNotifications(for tasks: [WeekAheadTodo.Task]) async {
         guard isNotificationEnabled else {
-            print("ℹ️ [NotificationService] 알림이 비활성화되어 있음")
             return
         }
 
         // 기존 알림 모두 취소
         await cancelAllScheduledNotifications()
 
-        print("🔔 [NotificationService] 알림 스케줄링 시작...")
 
         // 활성화된 알림 시간에 대해 알림 설정
         let enabledTimes = notificationTimes.filter { $0.isEnabled }
@@ -243,7 +228,6 @@ class NotificationService: NSObject, ObservableObject {
             await scheduleDailyCheckNotification(hour: checkTime.hour, minute: checkTime.minute, tasks: tasks)
         }
 
-        print("✅ [NotificationService] 알림 스케줄링 완료 (\(enabledTimes.count)개 시간)")
 
         // 진행 중인 태스크에 대한 체크인 알림도 스케줄링
         await scheduleCheckinNotifications(for: tasks)
@@ -259,7 +243,6 @@ class NotificationService: NSObject, ObservableObject {
         let inProgressTasks = tasks.filter { $0.isInProgress }
 
         guard !inProgressTasks.isEmpty else {
-            print("ℹ️ [NotificationService] 진행 중인 태스크 없음 - 체크인 알림 스킵")
             return
         }
 
@@ -272,7 +255,6 @@ class NotificationService: NSObject, ObservableObject {
             }
         }
 
-        print("📊 [NotificationService] 체크인 알림 스케줄 완료: \(inProgressTasks.count)개 태스크")
     }
 
     /// 특정 시간에 진행 중 태스크의 체크인 알림 스케줄
@@ -298,9 +280,7 @@ class NotificationService: NSObject, ObservableObject {
 
         do {
             try await center.add(request)
-            print("  ✅ 체크인 알림 등록: \(task.title) at \(time.hour):\(String(format: "%02d", time.minute))")
         } catch {
-            print("  ❌ 체크인 알림 등록 실패: \(error)")
         }
     }
 
@@ -312,7 +292,6 @@ class NotificationService: NSObject, ObservableObject {
         let tasksNeedingAttention = filterTasksNeedingAttention(tasks)
 
         guard !tasksNeedingAttention.isEmpty else {
-            print("  ⏭️ [\(hour):\(minute)] 알림 필요 없음")
             return
         }
 
@@ -334,9 +313,7 @@ class NotificationService: NSObject, ObservableObject {
 
         do {
             try await center.add(request)
-            print("  ✅ [\(hour):\(minute)] 알림 스케줄 등록: \(tasksNeedingAttention.count)개 태스크")
         } catch {
-            print("  ❌ [\(hour):\(minute)] 알림 스케줄 실패: \(error)")
         }
     }
 
@@ -439,15 +416,12 @@ class NotificationService: NSObject, ObservableObject {
     /// 모든 예약된 알림 취소
     func cancelAllScheduledNotifications() async {
         center.removeAllPendingNotificationRequests()
-        print("🗑️ [NotificationService] 모든 알림 취소됨")
     }
 
     /// 예약된 알림 목록 확인 (디버깅용)
     func listScheduledNotifications() async {
         let requests = await center.pendingNotificationRequests()
-        print("📋 [NotificationService] 예약된 알림 \(requests.count)개:")
         for request in requests {
-            print("  - \(request.identifier): \(request.content.title)")
         }
     }
 
@@ -456,7 +430,6 @@ class NotificationService: NSObject, ObservableObject {
     /// 테스트용 즉시 알림 발송
     func sendTestNotification() async {
         guard isNotificationEnabled else {
-            print("⚠️ [NotificationService] 알림이 비활성화되어 있음")
             return
         }
 
@@ -473,9 +446,7 @@ class NotificationService: NSObject, ObservableObject {
 
         do {
             try await center.add(request)
-            print("✅ [NotificationService] 테스트 알림 발송됨")
         } catch {
-            print("❌ [NotificationService] 테스트 알림 실패: \(error)")
         }
     }
 }
@@ -500,7 +471,6 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         let userInfo = response.notification.request.content.userInfo
         let actionIdentifier = response.actionIdentifier
 
-        print("🔔 [NotificationService] 알림 응답: \(actionIdentifier)")
 
         // 체크인 알림 응답 처리
         if let taskIdString = userInfo["taskId"] as? String,
@@ -520,16 +490,12 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         switch actionIdentifier {
         case "CHECKIN_ON_TRACK":
             checkinResponse = .onTrack
-            print("✅ [NotificationService] 체크인 응답: 순조로움")
         case "CHECKIN_COMPLETED":
             checkinResponse = .completed
-            print("✅ [NotificationService] 체크인 응답: 완료")
         case "CHECKIN_NEED_HELP":
             checkinResponse = .needHelp
-            print("⚠️ [NotificationService] 체크인 응답: 문제 있음")
         case "CHECKIN_POSTPONE":
             checkinResponse = .postponed
-            print("📅 [NotificationService] 체크인 응답: 연기")
         case UNNotificationDefaultActionIdentifier:
             // 알림 탭 시 앱 열기 및 체크인 UI 표시
             checkinResponse = nil

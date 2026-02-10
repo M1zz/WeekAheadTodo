@@ -179,7 +179,6 @@ struct ApprovedPatternManagementView: View {
         do {
             try patternService.togglePatternActive(pattern)
         } catch {
-            print("Error toggling pattern: \(error)")
         }
     }
 
@@ -187,7 +186,6 @@ struct ApprovedPatternManagementView: View {
         do {
             try patternService.deletePattern(pattern)
         } catch {
-            print("Error deleting pattern: \(error)")
         }
     }
 }

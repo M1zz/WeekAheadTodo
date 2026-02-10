@@ -119,10 +119,8 @@ struct EditApprovedPatternView: View {
 
         do {
             try modelContext.save()
-            print("✅ Pattern updated successfully")
             dismiss()
         } catch {
-            print("❌ Error saving pattern: \(error)")
         }
     }
 }

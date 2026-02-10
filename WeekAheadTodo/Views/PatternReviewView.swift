@@ -355,7 +355,6 @@ struct PatternReviewView: View {
         calendarViewModel.approvePatterns(calendarViewModel.selectedPatterns)
 
         // 완료 메시지
-        print("✅ \(patternsToApprove.count)개 패턴 승인 완료")
 
         // 모든 패턴이 처리되었으면 닫기
         if calendarViewModel.detectedPatterns.isEmpty {

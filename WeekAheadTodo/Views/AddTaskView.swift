@@ -227,7 +227,6 @@ struct AddTaskView: View {
     private func parseQuickInput() {
         let parsed = TaskInputParser.parse(quickInput)
 
-        print("📝 입력 분석 시작: '\(quickInput)'")
 
         title = parsed.title
         if let date = parsed.dueDate { dueDate = date }

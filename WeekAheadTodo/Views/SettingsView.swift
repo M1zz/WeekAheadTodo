@@ -448,7 +448,6 @@ struct SettingsView: View {
                 await MainActor.run {
                     cloudOperationError = "클라우드 데이터 확인 실패: \(error.localizedDescription)"
                 }
-                print("❌ Failed to get cloud preview: \(error)")
             }
         }
     }
@@ -482,7 +481,6 @@ struct SettingsView: View {
                 await MainActor.run {
                     cloudOperationError = "데이터 비교 실패: \(error.localizedDescription)"
                 }
-                print("❌ Failed to compare data: \(error)")
             }
         }
     }
@@ -492,10 +490,8 @@ struct SettingsView: View {
         cloudOperationError = nil
         do {
             try await viewModel.saveToCloud()
-            print("✅ Successfully saved to cloud")
         } catch {
             cloudOperationError = "저장 실패: \(error.localizedDescription)"
-            print("❌ Failed to save to cloud: \(error)")
         }
         cloudOperationInProgress = false
     }
@@ -505,10 +501,8 @@ struct SettingsView: View {
         cloudOperationError = nil
         do {
             try await viewModel.restoreFromCloud()
-            print("✅ Successfully restored from cloud")
         } catch {
             cloudOperationError = "복원 실패: \(error.localizedDescription)"
-            print("❌ Failed to restore from cloud: \(error)")
         }
         cloudOperationInProgress = false
     }
@@ -518,10 +512,8 @@ struct SettingsView: View {
         cloudOperationError = nil
         do {
             try await viewModel.resetAllData()
-            print("✅ Successfully reset all data")
         } catch {
             cloudOperationError = "초기화 실패: \(error.localizedDescription)"
-            print("❌ Failed to reset data: \(error)")
         }
         cloudOperationInProgress = false
     }

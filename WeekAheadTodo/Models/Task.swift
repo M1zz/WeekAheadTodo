@@ -267,42 +267,21 @@ struct Task: Identifiable {
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm"
         dateFormatter.locale = Locale(identifier: "ko_KR")
 
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("📊 [Task.currentHorizon] \"\(title)\"")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("   🕐 현재 시각: \(dateFormatter.string(from: now))")
-        print("   📅 오늘: \(dateFormatter.string(from: today))")
-        print("")
-        print("   ⏰ 실제 시작 시간 (actualStartTime): \(dateFormatter.string(from: actualStartTime))")
-        print("   🎯 실제 마감 시간 (actualEndTime): \(dateFormatter.string(from: actualEndTime))")
-        print("   ⏱️ 예상 소요 시간: \(estimatedMinutes)분")
-        print("")
-        print("   📝 선행 소요 일수 (leadTimeDays): \(leadTimeDays)일")
-        print("   ▶️ 역산 시작일 (effectiveStartDate): \(dateFormatter.string(from: effectiveStartDate))")
-        print("   ⏱️ 시작까지 남은 일수 (daysUntilStart): \(daysUntilStart)일")
 
         // 이미 시작해야 했거나 오늘 시작해야 함
         if daysUntilStart <= 0 {
-            print("   ✅ 판정: .today (daysUntilStart <= 0)")
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .today
         }
         // 이번 주 내에 시작해야 함 (7일 이내)
         else if daysUntilStart <= 7 {
-            print("   ✅ 판정: .thisWeek (1 <= daysUntilStart <= 7)")
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .thisWeek
         }
         // 다음 주에 시작 (8-14일)
         else if daysUntilStart <= 14 {
-            print("   ✅ 판정: .nextWeek (8 <= daysUntilStart <= 14)")
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .nextWeek
         }
         // 그 이후
         else {
-            print("   ✅ 판정: .later (daysUntilStart > 14)")
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             return .later
         }
     }

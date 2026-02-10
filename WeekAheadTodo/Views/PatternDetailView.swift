@@ -281,7 +281,6 @@ struct PatternDetailView: View {
         calendarViewModel.approvePatterns([pattern.id])
 
         // 완료 메시지
-        print("✅ Task 생성 완료: \(title)")
 
         dismiss()
     }

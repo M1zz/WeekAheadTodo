@@ -149,7 +149,6 @@ struct ContentView: View {
                 // 새로 추가된 프로젝트 자동 선택
                 selectedProjectId = projectId
                 selectedSectionRawValue = "_project_\(projectId.uuidString)"
-                print("🎯 [ContentView] 새 프로젝트 선택됨: \(projectId)")
             })
             .environmentObject(viewModel)
         }
@@ -194,10 +193,8 @@ struct ContentView: View {
     }
 
     private func generateTasksIfNeeded() async {
-        print("🚀 [ContentView] generateTasksIfNeeded 호출됨")
         let patternService = PatternManagementService(modelContext: modelContext)
         await viewModel.generateTasksFromApprovedPatterns(patternService: patternService)
-        print("✅ [ContentView] Task 생성 완료 - 총 \(viewModel.tasks.count)개")
     }
 
     // MARK: - Sidebar Item

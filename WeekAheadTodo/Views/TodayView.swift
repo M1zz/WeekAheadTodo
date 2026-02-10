@@ -1053,10 +1053,8 @@ struct TodayView: View {
 
         await MainActor.run {
             if result.success > 0 {
-                print("✅ \(result.success)개 태스크를 캘린더에 추가했습니다")
             }
             if result.failure > 0 {
-                print("❌ \(result.failure)개 태스크 추가 실패")
             }
 
             selectedTasks.removeAll()

@@ -26,10 +26,6 @@ struct AddTaskIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        print("📱 [AddTaskIntent] 태스크 추가 시작")
-        print("   제목: \(title)")
-        print("   마감일: \(dueDate)")
-        print("   예상 시간: \(estimatedMinutes)분")
 
         // UserDefaults에서 기존 태스크 로드
         var tasks: [Task] = []
@@ -56,7 +52,6 @@ struct AddTaskIntent: AppIntent {
         // UserDefaults에 저장
         if let encoded = try? JSONEncoder().encode(tasks) {
             UserDefaults.standard.set(encoded, forKey: "SavedTasks")
-            print("✅ [AddTaskIntent] 태스크 저장 완료")
         }
 
         let dateFormatter = DateFormatter()

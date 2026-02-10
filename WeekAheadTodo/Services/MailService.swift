@@ -2,301 +2,274 @@ import Foundation
 import AppKit
 
 /// Mail.app에서 메일을 가져오는 서비스
+/// MailAppService를 래핑하여 기존 인터페이스 유지
 @MainActor
-class MailService {
-
-    /// 사용 가능한 메일 계정 목록 가져오기
-    func fetchAccounts() -> [MailAccount] {
-
-        let script = """
-        -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
-        if not (application "Mail" is running) then
-            tell application "Mail"
-                launch
-                delay 2.0
-            end tell
-        end if
-
-        tell application "Mail"
-            set visible to false
-            delay 0.5
-            set accountList to {}
-            repeat with acc in accounts
-                set accountInfo to {¬
-                    name of acc, ¬
-                    id of acc}
-                set end of accountList to accountInfo
-            end repeat
-            return accountList
-        end tell
-        """
-
-        guard let appleScript = NSAppleScript(source: script) else {
-            print("❌ [계정] AppleScript 생성 실패")
-            return []
+class MailService: ObservableObject {
+    
+    static let shared = MailService()
+    
+    private let mailAppService = MailAppService.shared
+    
+    @Published var isLoading = false
+    @Published var lastError: String?
+    @Published var accounts: [MailAccount] = []
+    @Published var recentMails: [MailMessage] = []
+    
+    // 캐시 파일 경로
+    private var cacheDirectory: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("WeekAheadTodo", isDirectory: true)
+    }
+    private var accountsCacheFile: URL { cacheDirectory.appendingPathComponent("mail_accounts.json") }
+    private var mailsCacheFile: URL { cacheDirectory.appendingPathComponent("mail_messages.json") }
+    
+    private init() {
+        // 캐시 디렉토리 생성
+        try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        // 캐시에서 로드 (메인 스레드에서 지연 실행)
+        DispatchQueue.main.async { [weak self] in
+            self?.loadFromCache()
         }
-
-        var error: NSDictionary?
-        let result = appleScript.executeAndReturnError(&error)
-
-        if let error = error {
-            print("❌ [계정] AppleScript 오류:")
-            print("   \(error["NSAppleScriptErrorMessage"] ?? error)")
-            return []
+    }
+    
+    // MARK: - 캐시
+    
+    /// 캐시에서 로드
+    private func loadFromCache() {
+        // 계정 로드
+        if let data = try? Data(contentsOf: accountsCacheFile),
+           let cached = try? JSONDecoder().decode([MailAccount].self, from: data) {
+            accounts = cached
+            print("📦 [MailService] 캐시에서 계정 \(cached.count)개 로드")
         }
-
-        // 결과 파싱
-        var accounts: [MailAccount] = []
-        guard let listDescriptor = result.coerce(toDescriptorType: typeAEList) else {
-            print("❌ [계정] 파싱 실패")
-            return []
+        
+        // 메일 로드
+        if let data = try? Data(contentsOf: mailsCacheFile),
+           let cached = try? JSONDecoder().decode([MailMessage].self, from: data) {
+            recentMails = cached
+            print("📦 [MailService] 캐시에서 메일 \(cached.count)개 로드")
         }
-
-        for i in 1...listDescriptor.numberOfItems {
-            guard let itemDescriptor = listDescriptor.atIndex(i),
-                  let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
-                continue
+    }
+    
+    /// 캐시에 저장
+    private func saveToCache() {
+        // 계정 저장
+        if let data = try? JSONEncoder().encode(accounts) {
+            try? data.write(to: accountsCacheFile)
+            print("💾 [MailService] 계정 \(accounts.count)개 캐시 저장")
+        }
+        
+        // 메일 저장
+        if let data = try? JSONEncoder().encode(recentMails) {
+            try? data.write(to: mailsCacheFile)
+            print("💾 [MailService] 메일 \(recentMails.count)개 캐시 저장")
+        }
+    }
+    
+    /// 캐시된 데이터가 있는지
+    var hasCachedData: Bool {
+        !accounts.isEmpty || !recentMails.isEmpty
+    }
+    
+    // MARK: - 계정
+    
+    /// 계정 목록 가져오기
+    func fetchAccounts() async -> [MailAccount] {
+        isLoading = true
+        lastError = nil
+        
+        do {
+            print("📧 [MailService] 계정 목록 가져오는 중...")
+            let mailAccounts = try await mailAppService.getAccounts()
+            let result = mailAccounts.map { account in
+                MailAccount(
+                    id: account.name,  // 이름으로 ID 사용 (중복 이메일 문제 해결)
+                    name: account.name,
+                    emailAddress: account.email
+                )
             }
-
-            let name = recordDescriptor.atIndex(1)?.stringValue ?? "알 수 없는 계정"
-            let accountId = recordDescriptor.atIndex(2)?.stringValue ?? UUID().uuidString
-
-            let account = MailAccount(
-                id: accountId,
-                name: name,
-                emailAddress: name
-            )
-
-            accounts.append(account)
+            accounts = result
+            saveToCache()
+            print("✅ [MailService] 계정 \(result.count)개 로드 완료")
+            isLoading = false
+            return result
+        } catch {
+            print("❌ [MailService] 계정 로드 실패: \(error.localizedDescription)")
+            lastError = error.localizedDescription
+            isLoading = false
+            return []
         }
-
+    }
+    
+    /// 캐시된 계정 반환 (API 호출 안 함)
+    func getCachedAccounts() -> [MailAccount] {
         return accounts
     }
-
-    /// 받은 편지함에서 최근 메일 가져오기
-    /// - Parameters:
-    ///   - limit: 가져올 메일 최대 개수
-    ///   - accountName: 특정 계정 이름 (nil이면 전체 받은편지함)
-    func fetchRecentMails(limit: Int = 50, accountName: String? = nil) -> [MailMessage] {
-        print("🔍 [메일 조회] 시작")
-        print("   • 계정: \(accountName ?? "전체")")
-        print("   • 제한: \(limit >= 9999 ? "무제한" : "\(limit)개")")
-
-        // AppleScript 생성 - 계정별로 다르게
-        let inboxSource: String
-        if let accountName = accountName {
-            // 특정 계정의 받은편지함
-            inboxSource = "inbox of account \"\(accountName)\""
-            print("   • Inbox: 특정 계정")
-        } else {
-            // 전체 받은편지함 (모든 계정 통합)
-            inboxSource = "inbox"
-            print("   • Inbox: 전체 통합")
-        }
-
-        // limit이 9999면 전체 메일 (제한 없음)
-        let limitClause: String
-        if limit >= 9999 {
-            limitClause = ""
-        } else {
-            limitClause = """
-            if messageCount > \(limit) then
-                set messageList to items 1 thru \(limit) of messageList
-            end if
-            """
-        }
-
-        let script = """
-        -- Mail.app이 실행되지 않았으면 숨김 상태로 실행
-        if not (application "Mail" is running) then
-            tell application "Mail"
-                launch
-                delay 2.0
-            end tell
-        end if
-
-        tell application "Mail"
-            set visible to false
-            delay 0.5
-            set messageList to messages of \(inboxSource)
-            set messageCount to count of messageList
-            \(limitClause)
-
-            set resultList to {}
-            repeat with aMessage in messageList
-                set messageInfo to {¬
-                    subject of aMessage, ¬
-                    sender of aMessage, ¬
-                    date received of aMessage, ¬
-                    read status of aMessage, ¬
-                    flagged status of aMessage, ¬
-                    content of aMessage, ¬
-                    id of aMessage}
-                set end of resultList to messageInfo
-            end repeat
-            return resultList
-        end tell
-        """
-
-        guard let appleScript = NSAppleScript(source: script) else {
-            print("❌ [메일] AppleScript 생성 실패")
-            return []
-        }
-
-        print("   ⏳ AppleScript 실행 중...")
-        var error: NSDictionary?
-        let result = appleScript.executeAndReturnError(&error)
-
-        if let error = error {
-            print("❌ [메일] AppleScript 실행 오류!")
-            print("   • 에러 번호: \(error["NSAppleScriptErrorNumber"] ?? "unknown")")
-            print("   • 에러 메시지: \(error["NSAppleScriptErrorMessage"] ?? "unknown")")
-            print("   • Mail.app이 실행 중인지 확인하세요")
-            print("   • 권한 설정을 확인하세요 (시스템 설정 → 개인정보 → 자동화)")
-            return []
-        }
-
-        // AppleScript 결과 파싱
-        var mails: [MailMessage] = []
-        guard let listDescriptor = result.coerce(toDescriptorType: typeAEList) else {
-            print("❌ [메일] 결과 파싱 실패")
-            print("   • AppleScript 결과를 List로 변환할 수 없음")
-            print("   • Mail.app에 메일이 있는지 확인하세요")
-            return []
-        }
-
-        let itemCount = listDescriptor.numberOfItems
-        print("   ✅ AppleScript 성공: \(itemCount)개 메일 발견")
-
-        var successCount = 0
-        var failCount = 0
-
-        for i in 1...listDescriptor.numberOfItems {
-            guard let itemDescriptor = listDescriptor.atIndex(i),
-                  let recordDescriptor = itemDescriptor.coerce(toDescriptorType: typeAEList) else {
-                failCount += 1
-                continue
+    
+    // MARK: - 메일 목록
+    
+    /// 최근 메일 가져오기
+    func fetchRecentMails(limit: Int = 50, accountName: String? = nil) async -> [MailMessage] {
+        isLoading = true
+        lastError = nil
+        
+        do {
+            print("📧 [MailService] 메일 \(limit)개 가져오는 중...")
+            let messages = try await mailAppService.getMessages(offset: 1, limit: limit)
+            print("📧 [MailService] MailAppService에서 \(messages.count)개 받음")
+            
+            let result = messages.compactMap { msg -> MailMessage? in
+                // accountName 필터 적용
+                if let accountName = accountName, msg.account != accountName {
+                    return nil
+                }
+                return MailMessage(
+                    id: UUID(),
+                    mailAppId: msg.id,
+                    sender: msg.sender,
+                    senderEmail: msg.senderEmail,
+                    subject: msg.subject,
+                    body: msg.content ?? "",
+                    date: msg.dateReceived,
+                    isRead: msg.isRead,
+                    isStarred: msg.isFlagged,
+                    hasAttachment: false,
+                    accountEmail: msg.account
+                )
             }
-
-            // 각 필드 추출
-            let subject = recordDescriptor.atIndex(1)?.stringValue ?? "제목 없음"
-            let sender = recordDescriptor.atIndex(2)?.stringValue ?? "발신자 없음"
-            let dateReceived = recordDescriptor.atIndex(3)?.dateValue ?? Date()
-            let isRead = recordDescriptor.atIndex(4)?.booleanValue ?? false
-            let isStarred = recordDescriptor.atIndex(5)?.booleanValue ?? false
-            let body = recordDescriptor.atIndex(6)?.stringValue ?? ""
-            let messageId = recordDescriptor.atIndex(7)?.int32Value ?? 0
-
-            // 발신자 이메일 추출
-            let senderEmail = extractEmail(from: sender)
-
-            // MailMessage 생성
-            let mail = MailMessage(
-                sender: sender,
-                senderEmail: senderEmail,
-                subject: subject,
-                body: body,
-                date: dateReceived,
-                isRead: isRead,
-                isStarred: isStarred,
-                hasAttachment: false
-            )
-
-            mails.append(mail)
-            successCount += 1
+            
+            recentMails = result
+            saveToCache()
+            print("✅ [MailService] 메일 \(result.count)개 로드 완료")
+            isLoading = false
+            return result
+        } catch {
+            print("❌ [MailService] 메일 로드 실패: \(error.localizedDescription)")
+            lastError = error.localizedDescription
+            isLoading = false
+            return []
         }
-
-        print("📊 [메일 파싱] 성공: \(successCount)개 / 실패: \(failCount)개")
-
-        if mails.isEmpty {
-            print("⚠️ [메일] 결과가 0개입니다!")
-            print("   가능한 원인:")
-            print("   1. Mail.app에 메일이 없음")
-            print("   2. 선택한 계정에 메일이 없음")
-            print("   3. Mail.app이 제대로 실행되지 않음")
-            print("   4. 권한 문제 (시스템 설정 → 개인정보 → 자동화)")
-        } else {
-            print("✅ [메일] 완료: \(mails.count)개")
-            if mails.count > 0 {
-                print("   첫 메일: \(mails[0].subject.prefix(40))...")
+    }
+    
+    /// 캐시된 메일 반환 (API 호출 안 함)
+    func getCachedMails() -> [MailMessage] {
+        return recentMails
+    }
+    
+    /// 메일 읽음 상태 변경
+    func markAsRead(mail: MailMessage) async {
+        guard let mailAppId = mail.mailAppId else {
+            print("❌ [MailService] mailAppId 없음")
+            return
+        }
+        
+        do {
+            try await mailAppService.markAsRead(messageId: mailAppId, isRead: true)
+            print("✅ [MailService] 메일 읽음 처리: \(mail.subject)")
+            
+            // 로컬 상태도 업데이트
+            if let index = recentMails.firstIndex(where: { $0.id == mail.id }) {
+                recentMails[index].isRead = true
+                saveToCache()
             }
+        } catch {
+            print("❌ [MailService] 읽음 처리 실패: \(error)")
         }
-
-        return mails
     }
-
-    /// 일정이 포함된 메일만 필터링
-    func fetchMailsWithSchedule(limit: Int = 50, accountName: String? = nil) -> [MailMessage] {
-        let allMails = fetchRecentMails(limit: limit, accountName: accountName)
-        return allMails.filter { detectScheduleInMail($0) != nil }
+    
+    /// 메일 본문 가져오기
+    func fetchMailBody(subject: String, date: Date) async -> String? {
+        do {
+            let messages = try await mailAppService.getMessages(offset: 1, limit: 100)
+            if let msg = messages.first(where: { 
+                $0.subject == subject && 
+                Calendar.current.isDate($0.dateReceived, inSameDayAs: date)
+            }) {
+                return msg.content
+            }
+        } catch {
+            print("❌ [MailService] 메일 본문 로드 실패: \(error)")
+        }
+        return nil
     }
-
+    
+    // MARK: - 권한
+    
+    /// Mail.app 권한 요청 및 실행 확인
+    func requestMailAccess() async -> Bool {
+        do {
+            print("📧 [MailService] Mail.app 권한 확인 중...")
+            try await mailAppService.ensureMailAppRunning()
+            print("✅ [MailService] Mail.app 권한 OK")
+            return true
+        } catch {
+            print("❌ [MailService] Mail.app 권한 실패: \(error.localizedDescription)")
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+    
+    /// 메일 접근 테스트
+    func testMailAccess() async -> (success: Bool, message: String) {
+        do {
+            // 1. Mail.app 실행 확인
+            try await mailAppService.ensureMailAppRunning()
+            
+            // 2. 계정 가져오기
+            let accounts = try await mailAppService.getAccounts()
+            guard !accounts.isEmpty else {
+                return (false, "Mail.app에 계정이 없습니다")
+            }
+            
+            // 3. 메일 개수 확인
+            let count = try await mailAppService.getInboxCount()
+            
+            return (true, "성공! \(accounts.count)개 계정, \(count)개 메일")
+        } catch {
+            return (false, "실패: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - 일정 감지
+    
+    /// 일정이 포함된 메일만 가져오기
+    func fetchMailsWithSchedule(limit: Int = 50, accountName: String? = nil) async -> [MailMessage] {
+        let allMails = await fetchRecentMails(limit: limit * 2, accountName: accountName)
+        
+        // 일정 관련 키워드가 포함된 메일만 필터링
+        let scheduleKeywords = ["회의", "미팅", "약속", "일정", "meeting", "schedule", "appointment",
+                                 "시", "분", "오전", "오후", "AM", "PM", "월", "일", "요일"]
+        
+        return Array(allMails.filter { mail in
+            let text = (mail.subject + " " + mail.body).lowercased()
+            return scheduleKeywords.contains { keyword in
+                text.contains(keyword.lowercased())
+            }
+        }.prefix(limit))
+    }
+    
     /// 메일에서 일정 정보 감지
     func detectScheduleInMail(_ mail: MailMessage) -> (date: Date, duration: Int)? {
         let text = mail.subject + " " + mail.body
-
+        
         // 날짜 패턴 감지
-        let datePatterns = [
-            // "내일", "모레"
-            ("내일", Calendar.current.date(byAdding: .day, value: 1, to: Date())),
-            ("모레", Calendar.current.date(byAdding: .day, value: 2, to: Date())),
-            // "다음주 월요일" 등
-        ]
-
-        var extractedDate: Date?
-        for (pattern, date) in datePatterns {
-            if text.contains(pattern), let date = date {
-                extractedDate = date
-                break
-            }
+        let dateDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue)
+        let range = NSRange(text.startIndex..., in: text)
+        
+        if let match = dateDetector?.firstMatch(in: text, options: [], range: range),
+           let detectedDate = match.date {
+            // 기본 소요 시간 60분
+            var duration = 60
+            
+            // 시간 패턴에서 소요 시간 추출 시도
+            if text.contains("30분") { duration = 30 }
+            else if text.contains("1시간") || text.contains("한시간") { duration = 60 }
+            else if text.contains("2시간") || text.contains("두시간") { duration = 120 }
+            else if text.contains("3시간") || text.contains("세시간") { duration = 180 }
+            
+            return (date: detectedDate, duration: duration)
         }
-
-        // 시간 패턴 감지 (예: "3시간", "30분")
-        var extractedDuration: Int = 60 // 기본 1시간
-        if let hoursMatch = text.range(of: #"(\d+)시간"#, options: .regularExpression) {
-            let hoursStr = String(text[hoursMatch]).replacingOccurrences(of: "시간", with: "")
-            if let hours = Int(hoursStr) {
-                extractedDuration = hours * 60
-            }
-        } else if let minutesMatch = text.range(of: #"(\d+)분"#, options: .regularExpression) {
-            let minutesStr = String(text[minutesMatch]).replacingOccurrences(of: "분", with: "")
-            if let minutes = Int(minutesStr) {
-                extractedDuration = minutes
-            }
-        }
-
-        if let date = extractedDate {
-            return (date, extractedDuration)
-        }
-
-        // 날짜 정보가 없으면 메일 받은 시간 기준
+        
         return nil
-    }
-
-    /// 이메일 주소 추출 (간단한 버전)
-    func extractEmail(from sender: String) -> String {
-        // "홍길동 <hong@example.com>" 형식에서 이메일 추출
-        if let emailMatch = sender.range(of: #"<(.+?)>"#, options: .regularExpression) {
-            let email = String(sender[emailMatch])
-                .replacingOccurrences(of: "<", with: "")
-                .replacingOccurrences(of: ">", with: "")
-            return email
-        }
-        return sender
-    }
-}
-
-// MARK: - NSAppleEventDescriptor Extensions
-
-extension NSAppleEventDescriptor {
-    var booleanValue: Bool {
-        return self.int32Value != 0
-    }
-
-    var dateValue: Date? {
-        guard let dateStr = self.stringValue else { return nil }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
-        return formatter.date(from: dateStr) ?? Date()
     }
 }

@@ -18,13 +18,11 @@ class MailViewModel: ObservableObject {
 
     // MARK: - Services
 
-    private let mailService: MailService
+    private let mailService = MailService.shared
 
     // MARK: - Initialization
 
     init() {
-        self.mailService = MailService()
-
         // 저장된 연동 계정 목록 로드
         if let savedIds = UserDefaults.standard.array(forKey: "enabledMailAccountIds") as? [String] {
             self.enabledAccountIds = Set(savedIds)
@@ -34,22 +32,43 @@ class MailViewModel: ObservableObject {
     /// 연동 계정 설정 저장
     func saveEnabledAccounts() {
         UserDefaults.standard.set(Array(enabledAccountIds), forKey: "enabledMailAccountIds")
-        print("✅ [MailViewModel] 연동 계정 저장: \(enabledAccountIds.count)개")
     }
 
     // MARK: - Account Loading
 
-    /// 메일 계정 목록 가져오기
-    func loadAccounts() {
-        accounts = mailService.fetchAccounts()
+    /// 메일 계정 목록 가져오기 (캐시 우선)
+    func loadAccounts() async {
+        // 캐시된 데이터가 있으면 사용
+        let cached = mailService.getCachedAccounts()
+        if !cached.isEmpty {
+            accounts = cached
+            print("📦 [MailViewModel] 캐시된 계정 \(cached.count)개 사용")
+            
+            // 처음 로드 시 모든 계정을 기본으로 활성화
+            if enabledAccountIds.isEmpty {
+                enabledAccountIds = Set(accounts.map { $0.id })
+                saveEnabledAccounts()
+            }
+            return
+        }
+        
+        // 캐시 없으면 API 호출
+        isLoading = true
+        accounts = await mailService.fetchAccounts()
+        isLoading = false
 
         // 처음 로드 시 모든 계정을 기본으로 활성화
         if enabledAccountIds.isEmpty && !accounts.isEmpty {
             enabledAccountIds = Set(accounts.map { $0.id })
             saveEnabledAccounts()
         }
-
-        print("📧 계정: \(accounts.count)개 (연동: \(enabledAccountIds.count)개)")
+    }
+    
+    /// 계정 강제 새로고침 (API 호출)
+    func refreshAccounts() async {
+        isLoading = true
+        accounts = await mailService.fetchAccounts()
+        isLoading = false
     }
 
     /// 계정 활성화/비활성화 토글
@@ -69,69 +88,70 @@ class MailViewModel: ObservableObject {
 
     // MARK: - Mail Loading
 
-    /// 메일 가져오기
+    /// 메일 가져오기 (캐시 우선)
     func loadMails(limit: Int = 50) async {
-        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("🚀 메일 가져오기 시작")
-        print("   • 계정: \(selectedAccountName ?? "전체 연동 계정")")
-        print("   • 개수: \(limit)개")
-        print("   • 필터: \(showScheduleOnly ? "일정만" : "전체")")
-        print("   • 연동 계정 수: \(enabledAccountIds.count)개")
-
+        // 캐시된 데이터가 있으면 사용
+        let cached = mailService.getCachedMails()
+        if !cached.isEmpty {
+            mails = cached
+            print("📦 [MailViewModel] 캐시된 메일 \(cached.count)개 사용")
+            successMessage = "📦 캐시에서 \(mails.count)개 메일 로드"
+            return
+        }
+        
+        // 캐시 없으면 API 호출
+        await refreshMails(limit: limit)
+    }
+    
+    /// 메일 강제 새로고침 (API 호출)
+    func refreshMails(limit: Int = 50) async {
         isLoading = true
         errorMessage = nil
 
-        do {
-            if showScheduleOnly {
-                var fetchedMails = mailService.fetchMailsWithSchedule(limit: limit, accountName: selectedAccountName)
-                print("📊 일정 포함 메일: \(fetchedMails.count)개")
+        if showScheduleOnly {
+            var fetchedMails = await mailService.fetchMailsWithSchedule(limit: limit, accountName: selectedAccountName)
 
-                // 일정 정보 추가
-                for i in 0..<fetchedMails.count {
-                    if let schedule = mailService.detectScheduleInMail(fetchedMails[i]) {
-                        fetchedMails[i].extractedDate = schedule.date
-                        fetchedMails[i].extractedDuration = schedule.duration
-                        fetchedMails[i].containsSchedule = true
-                    }
-                }
-
-                mails = fetchedMails
-            } else {
-                mails = mailService.fetchRecentMails(limit: limit, accountName: selectedAccountName)
-                print("📊 전체 메일: \(mails.count)개")
-            }
-
-            successMessage = "✅ \(mails.count)개 메일을 가져왔습니다."
-
-            if mails.isEmpty {
-                print("⚠️ 메일이 0개입니다!")
-                if enabledAccountIds.isEmpty {
-                    print("   → 원인: 연동된 계정이 없음")
-                } else if selectedAccountName != nil {
-                    print("   → 원인: 선택된 계정에 메일이 없거나 Mail.app에 문제")
-                } else {
-                    print("   → 원인: Mail.app에 메일이 없거나 AppleScript 오류")
+            // 일정 정보 추가
+            for i in 0..<fetchedMails.count {
+                if let schedule = mailService.detectScheduleInMail(fetchedMails[i]) {
+                    fetchedMails[i].extractedDate = schedule.date
+                    fetchedMails[i].extractedDuration = schedule.duration
+                    fetchedMails[i].containsSchedule = true
                 }
             }
 
-            print("✅ 완료")
-        } catch {
-            errorMessage = "메일을 가져올 수 없습니다: \(error.localizedDescription)"
-            print("❌ 에러: \(error)")
+            mails = fetchedMails
+        } else {
+            mails = await mailService.fetchRecentMails(limit: limit, accountName: selectedAccountName)
+        }
+
+        if let error = mailService.lastError {
+            errorMessage = error
+        } else {
+            successMessage = "✅ \(mails.count)개 메일을 새로 가져왔습니다."
         }
 
         isLoading = false
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+    }
+
+    /// Mail.app 연결 테스트
+    func testConnection() async -> (success: Bool, message: String) {
+        isLoading = true
+        let result = await mailService.testMailAccess()
+        isLoading = false
+        
+        if result.success {
+            successMessage = result.message
+        } else {
+            errorMessage = result.message
+        }
+        
+        return result
     }
 
     /// 선택한 메일들을 Task로 변환
     func convertMailsToTasks(mailIds: Set<UUID>, taskViewModel: TaskViewModel) {
-        print("\n╔════════════════════════════════════════════════════════╗")
-        print("║  메일 → 태스크 변환 시작                                ║")
-        print("╚════════════════════════════════════════════════════════╝")
-
         let selectedMails = mails.filter { mailIds.contains($0.id) }
-        print("   선택된 메일: \(selectedMails.count)개")
 
         var createdCount = 0
 
@@ -163,13 +183,9 @@ class MailViewModel: ObservableObject {
 
             taskViewModel.addTask(task)
             createdCount += 1
-
-            print("   ✅ [\(mail.sender)] \(mail.subject)")
         }
 
         successMessage = "✅ \(createdCount)개 메일을 태스크로 변환했습니다."
-        print("\n📊 변환 완료: \(createdCount)개")
-        print("════════════════════════════════════════════════════════\n")
     }
 
     // MARK: - Computed Properties
@@ -177,6 +193,18 @@ class MailViewModel: ObservableObject {
     var selectedMail: MailMessage? {
         guard let id = selectedMailId else { return nil }
         return mails.first { $0.id == id }
+    }
+    
+    /// 메일 읽음 처리
+    func markSelectedAsRead() async {
+        guard let mail = selectedMail, !mail.isRead else { return }
+        
+        await mailService.markAsRead(mail: mail)
+        
+        // 로컬 mails 배열도 업데이트
+        if let index = mails.firstIndex(where: { $0.id == mail.id }) {
+            mails[index].isRead = true
+        }
     }
 
     /// 일정 포함 메일 개수

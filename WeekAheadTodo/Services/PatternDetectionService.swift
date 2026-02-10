@@ -7,53 +7,37 @@ class PatternDetectionService {
 
     /// 전체 패턴 분석 (4가지 유형 모두)
     func analyzePatterns(events: [CalendarEvent]) -> [RecurrencePattern] {
-        print("\n[PatternDetectionService.analyzePatterns] 시작")
-        print("📊 입력 이벤트: \(events.count)개")
 
         if events.isEmpty {
-            print("  ⚠️ 이벤트가 없어서 패턴 분석 불가")
             return []
         }
 
         // 이벤트 날짜 범위 확인
         let sortedEvents = events.sorted { $0.startDate < $1.startDate }
         if let firstEvent = sortedEvents.first, let lastEvent = sortedEvents.last {
-            print("  📅 이벤트 기간: \(firstEvent.startDate.formatted(date: .abbreviated, time: .omitted)) ~ \(lastEvent.startDate.formatted(date: .abbreviated, time: .omitted))")
         }
 
         var allPatterns: [RecurrencePattern] = []
 
         // 1. 매주 고정 요일 패턴
-        print("\n  🔍 [1/4] 매주 고정 요일 패턴 감지 중...")
         let weeklyPatterns = detectWeeklyFixedDayPattern(events: events)
         allPatterns.append(contentsOf: weeklyPatterns)
-        print("      ✓ 감지됨: \(weeklyPatterns.count)개")
 
         // 2. 격주/월간 패턴
-        print("  🔍 [2/4] 격주/월간 패턴 감지 중...")
         let biweeklyMonthlyPatterns = detectBiweeklyMonthlyPattern(events: events)
         allPatterns.append(contentsOf: biweeklyMonthlyPatterns)
-        print("      ✓ 감지됨: \(biweeklyMonthlyPatterns.count)개")
 
         // 3. 매일 같은 시간 패턴
-        print("  🔍 [3/4] 매일 같은 시간 패턴 감지 중...")
         let dailyPatterns = detectDailySameTimePattern(events: events)
         allPatterns.append(contentsOf: dailyPatterns)
-        print("      ✓ 감지됨: \(dailyPatterns.count)개")
 
         // 4. 제목 유사도 패턴
-        print("  🔍 [4/4] 제목 유사도 패턴 감지 중...")
         let similarTitlePatterns = detectSimilarTitlePattern(events: events)
         allPatterns.append(contentsOf: similarTitlePatterns)
-        print("      ✓ 감지됨: \(similarTitlePatterns.count)개")
 
-        print("\n  🔄 중복 제거 및 순위 정렬 중...")
-        print("     중복 제거 전: \(allPatterns.count)개")
         let uniquePatterns = removeDuplicatePatterns(allPatterns)
-        print("     중복 제거 후: \(uniquePatterns.count)개")
         let rankedPatterns = rankPatterns(uniquePatterns)
 
-        print("\n✅ [PatternDetectionService] 완료: \(rankedPatterns.count)개 패턴 반환\n")
 
         return rankedPatterns
     }

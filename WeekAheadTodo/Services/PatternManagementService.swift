@@ -70,15 +70,11 @@ class PatternManagementService {
         let now = Date()
         let fiveWeeksFromNow = Calendar.current.date(byAdding: .day, value: 35, to: now)!
 
-        print("🔍 [PatternService] 현재 시각: \(now.formatted(date: .abbreviated, time: .shortened))")
-        print("🔍 [PatternService] 5주 후: \(fiveWeeksFromNow.formatted(date: .abbreviated, time: .shortened))")
 
         // 모든 패턴 조회
         let allDescriptor = FetchDescriptor<ApprovedPattern>()
         let allPatterns = try modelContext.fetch(allDescriptor)
-        print("📊 [PatternService] 전체 패턴 개수: \(allPatterns.count)")
         allPatterns.forEach { pattern in
-            print("  - '\(pattern.taskTitle)': isActive=\(pattern.isActive), nextOccurrenceDate=\(pattern.nextOccurrenceDate.formatted(date: .abbreviated, time: .shortened)), lastGenerated=\(pattern.lastGeneratedTaskDate?.formatted(date: .abbreviated, time: .shortened) ?? "없음")")
         }
 
         // 앞으로 5주 이내 발생하는 활성 패턴 (중복 체크는 TaskViewModel에서)
@@ -89,9 +85,7 @@ class PatternManagementService {
             }
         )
         let needingGeneration = try modelContext.fetch(descriptor)
-        print("✅ [PatternService] Task 생성 대상 패턴: \(needingGeneration.count)개 (중복 체크 전)")
         needingGeneration.forEach { pattern in
-            print("  ➡️ '\(pattern.taskTitle)' - \(pattern.nextOccurrenceDate.formatted(date: .abbreviated, time: .shortened))")
         }
         return needingGeneration
     }

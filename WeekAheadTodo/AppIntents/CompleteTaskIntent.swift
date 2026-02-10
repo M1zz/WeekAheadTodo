@@ -14,8 +14,6 @@ struct CompleteTaskIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        print("📱 [CompleteTaskIntent] 태스크 완료 처리 시작")
-        print("   태스크: \(task.title)")
 
         // UserDefaults에서 태스크 로드
         guard let data = UserDefaults.standard.data(forKey: "SavedTasks"),
@@ -34,7 +32,6 @@ struct CompleteTaskIntent: AppIntent {
         // UserDefaults에 저장
         if let encoded = try? JSONEncoder().encode(tasks) {
             UserDefaults.standard.set(encoded, forKey: "SavedTasks")
-            print("✅ [CompleteTaskIntent] 태스크 완료 처리 완료")
         }
 
         return .result(dialog: IntentDialog("'\(task.title)'을(를) 완료했습니다"))

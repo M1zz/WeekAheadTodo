@@ -16,7 +16,6 @@ struct ListTasksIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<[TaskEntity]> & ProvidesDialog {
-        print("📱 [ListTasksIntent] 태스크 조회 시작")
 
         // UserDefaults에서 태스크 로드
         guard let data = UserDefaults.standard.data(forKey: "SavedTasks"),
@@ -42,7 +41,6 @@ struct ListTasksIntent: AppIntent {
 
         let taskEntities = todayTasks.map { TaskEntity(from: $0) }
 
-        print("✅ [ListTasksIntent] \(taskEntities.count)개 태스크 조회 완료")
 
         let message: String
         if taskEntities.isEmpty {

@@ -338,7 +338,6 @@ class ProactiveAssistantService: ObservableObject {
     /// 모든 dismiss 기록 초기화 (디버깅용)
     func clearDismissedSuggestions() {
         UserDefaults.standard.removeObject(forKey: dismissedSuggestionsKey)
-        print("✅ [ProactiveAssistantService] Dismissed suggestions cleared")
     }
 
     // MARK: - History Persistence
@@ -347,18 +346,15 @@ class ProactiveAssistantService: ObservableObject {
     private func loadHistory() {
         guard let data = UserDefaults.standard.data(forKey: suggestionHistoryKey),
               let history = try? JSONDecoder().decode([AssistantSuggestion].self, from: data) else {
-            print("ℹ️ [ProactiveAssistantService] No suggestion history found")
             return
         }
         suggestionHistory = history
-        print("✅ [ProactiveAssistantService] Loaded \(history.count) suggestions from history")
     }
 
     /// UserDefaults에 제안 히스토리 저장
     private func saveHistory() {
         if let data = try? JSONEncoder().encode(suggestionHistory) {
             UserDefaults.standard.set(data, forKey: suggestionHistoryKey)
-            print("✅ [ProactiveAssistantService] Saved \(suggestionHistory.count) suggestions to history")
         }
     }
 
@@ -372,6 +368,5 @@ class ProactiveAssistantService: ObservableObject {
     func clearHistory() {
         suggestionHistory.removeAll()
         UserDefaults.standard.removeObject(forKey: suggestionHistoryKey)
-        print("✅ [ProactiveAssistantService] History cleared")
     }
 }

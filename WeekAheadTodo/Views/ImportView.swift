@@ -451,7 +451,6 @@ struct ImportView: View {
                     self.markdownText = content
                     self.parseResult = nil  // 기존 파싱 결과 초기화
                 } catch {
-                    print("파일 읽기 실패: \(error)")
                 }
             }
         }

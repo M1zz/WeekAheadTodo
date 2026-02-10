@@ -99,7 +99,6 @@ struct QuickAddView: View {
         )
 
         viewModel.addTask(task)
-        print("✅ [QuickAddView] 태스크 추가: \(title)")
         dismiss()
     }
 }

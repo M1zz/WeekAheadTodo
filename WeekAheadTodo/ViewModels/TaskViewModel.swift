@@ -128,15 +128,11 @@ class TaskViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        print("🚀 [TaskViewModel.init] 시작")
 
         // Initialize CloudKit (optional, may fail if not configured)
         // iOS와 같은 Container 사용 (명시적 지정)
         self.container = CKContainer(identifier: "iCloud.com.weekahead.todo")
         self.database = container?.privateCloudDatabase
-        print("✅ [macOS TaskViewModel.init] CloudKit initialized successfully")
-        print("   Container ID: \(container?.containerIdentifier ?? "nil")")
-        print("   Database: privateCloudDatabase")
 
         self.timeBlockManager = WeeklyTimeBlockManager(defaultDailyMinutes: 360)
 
@@ -160,19 +156,13 @@ class TaskViewModel: ObservableObject {
 
         // Auto backup 설정 로드 (기본값: true)
         self.isAutoBackupEnabled = UserDefaults.standard.object(forKey: autoBackupEnabledKey) as? Bool ?? true
-        print("   자동 백업: \(isAutoBackupEnabled ? "활성화" : "비활성화")")
 
-        print("   📂 loadTasks() 호출...")
         loadTasks()
-        print("   📂 loadProjects() 호출...")
         loadProjects()
 
         // 체크인 관련 옵저버 등록
         setupCheckinObservers()
 
-        print("✅ [TaskViewModel.init] TaskViewModel initialized")
-        print("   최종 태스크 개수: \(tasks.count)")
-        print("   최종 프로젝트 개수: \(projects.count)")
 
         // 태스크 시간 데이터 마이그레이션 (scheduledStartTime 기반으로 dueDate 동기화)
         migrateTaskTimes()
@@ -188,7 +178,6 @@ class TaskViewModel: ObservableObject {
     /// 특정 태스크의 모든 데이터 출력 (디버깅용)
     func debugTask(title: String) {
         guard let task = tasks.first(where: { $0.title.contains(title) }) else {
-            print("❌ 태스크를 찾을 수 없음: \(title)")
             return
         }
 
@@ -196,37 +185,11 @@ class TaskViewModel: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.locale = Locale(identifier: "ko_KR")
 
-        print("\n╔════════════════════════════════════════════════════════╗")
-        print("║  태스크 전체 데이터: \(task.title)")
-        print("╚════════════════════════════════════════════════════════╝")
-        print("   ID: \(task.id)")
-        print("   제목: \(task.title)")
-        print("   설명: \(task.description)")
-        print("   📅 dueDate: \(formatter.string(from: task.dueDate))")
-        print("   🎯 targetDate: \(task.targetDate.map { formatter.string(from: $0) } ?? "nil")")
-        print("   ⏰ scheduledStartTime: \(task.scheduledStartTime.map { formatter.string(from: $0) } ?? "nil")")
-        print("   ⏱️ estimatedMinutes: \(task.estimatedMinutes)분")
-        print("   📝 leadTimeDays: \(task.leadTimeDays)일")
-        print("   ▶️ actualStartTime: \(formatter.string(from: task.actualStartTime))")
-        print("   ▶️ actualEndTime: \(formatter.string(from: task.actualEndTime))")
-        print("   📊 effectiveStartDate: \(formatter.string(from: task.effectiveStartDate))")
-        print("   🏷️ status: \(task.status.rawValue)")
-        print("   ⭐️ priority: \(task.priority.rawValue)")
-        print("   🎯 taskType: \(task.taskType.rawValue)")
-        print("   🔖 taskRole: \(task.taskRole.rawValue)")
-        print("   📂 projectId: \(task.projectId?.uuidString ?? "nil")")
-        print("   🔗 calendarEventId: \(task.calendarEventId ?? "nil")")
-        print("   🔁 isFromCalendarPattern: \(task.isFromCalendarPattern)")
-        print("   📅 createdAt: \(formatter.string(from: task.createdAt))")
-        print("════════════════════════════════════════════════════════\n")
     }
 
     /// 캘린더 배치 정보를 기반으로 dueDate를 동기화
     /// scheduledStartTime이 설정된 경우, dueDate = scheduledStartTime + estimatedMinutes로 자동 계산
     private func migrateTaskTimes() {
-        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("🔄 [TaskViewModel] 태스크 시간 데이터 마이그레이션 시작")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         var migrationCount = 0
         let calendar = Calendar.current
@@ -239,11 +202,6 @@ class TaskViewModel: ObservableObject {
                 let calculatedDueDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: targetDate) ?? targetDate
 
                 if !calendar.isDate(task.dueDate, equalTo: calculatedDueDate, toGranularity: .minute) {
-                    print("   🔧 [\(task.title)]")
-                    print("      ✅ targetDate 발견: \(formatDate(targetDate))")
-                    print("      estimatedMinutes: \(task.estimatedMinutes)분")
-                    print("      기존 dueDate: \(formatDate(task.dueDate))")
-                    print("      새 dueDate: \(formatDate(calculatedDueDate))")
 
                     tasks[index].dueDate = calculatedDueDate
                     tasks[index].scheduledStartTime = targetDate
@@ -256,11 +214,6 @@ class TaskViewModel: ObservableObject {
 
                 // dueDate가 계산된 값과 다르면 동기화
                 if !calendar.isDate(task.dueDate, equalTo: calculatedDueDate, toGranularity: .minute) {
-                    print("   🔧 [\(task.title)]")
-                    print("      scheduledStartTime: \(formatDate(startTime))")
-                    print("      estimatedMinutes: \(task.estimatedMinutes)분")
-                    print("      기존 dueDate: \(formatDate(task.dueDate))")
-                    print("      새 dueDate: \(formatDate(calculatedDueDate))")
 
                     tasks[index].dueDate = calculatedDueDate
                     migrationCount += 1
@@ -278,11 +231,6 @@ class TaskViewModel: ObservableObject {
                 // scheduledStartTime = dueDate - estimatedMinutes
                 let calculatedStartTime = calendar.date(byAdding: .minute, value: -task.estimatedMinutes, to: newDueDate) ?? newDueDate
 
-                print("   🔧 [\(task.title)]")
-                print("      기존 dueDate (자정): \(formatDate(task.dueDate))")
-                print("      새 dueDate (23:59): \(formatDate(newDueDate))")
-                print("      estimatedMinutes: \(task.estimatedMinutes)분")
-                print("      계산된 scheduledStartTime: \(formatDate(calculatedStartTime))")
 
                 tasks[index].dueDate = newDueDate
                 tasks[index].scheduledStartTime = calculatedStartTime
@@ -291,14 +239,10 @@ class TaskViewModel: ObservableObject {
         }
 
         if migrationCount > 0 {
-            print("\n✅ [TaskViewModel] 마이그레이션 완료: \(migrationCount)개 태스크 수정됨")
             saveTasks()
-            print("   💾 변경사항 저장 완료")
         } else {
-            print("\n✅ [TaskViewModel] 마이그레이션 불필요 (모든 태스크가 올바른 상태)")
         }
 
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
     }
 
     /// dueDate가 자정(00:00)인지 확인
@@ -355,73 +299,51 @@ class TaskViewModel: ObservableObject {
 
     private func saveTasks() {
         do {
-            print("💾 [TaskViewModel.saveTasks] 시작 - 저장할 태스크: \(tasks.count)개")
-            print("   호출 스택:")
-            Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
 
             // 기존 데이터를 백업으로 저장 (마이그레이션 실패 시 복구용)
             if let existingData = UserDefaults.standard.data(forKey: tasksKey) {
                 UserDefaults.standard.set(existingData, forKey: "\(tasksKey)_backup")
-                print("   📦 백업 저장 완료")
             }
 
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted  // 디버깅 용이성
             let data = try encoder.encode(tasks)
             UserDefaults.standard.set(data, forKey: tasksKey)
-            print("✅ [TaskViewModel.saveTasks] Tasks saved: \(tasks.count)개")
 
             // 태스크가 변경되면 알림 스케줄 갱신
             _Concurrency.Task {
                 await updateNotificationSchedule()
             }
         } catch {
-            print("❌ [TaskViewModel.saveTasks] Failed to save tasks: \(error)")
-            print("   Error details: \(error.localizedDescription)")
         }
     }
 
     private func loadTasks() {
-        print("📂 [TaskViewModel.loadTasks] 시작")
-        print("   호출 스택:")
-        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
 
         guard let data = UserDefaults.standard.data(forKey: tasksKey) else {
-            print("ℹ️ [TaskViewModel.loadTasks] No saved tasks found in UserDefaults")
             return
         }
 
-        print("   📦 UserDefaults에서 데이터 발견: \(data.count) bytes")
 
         do {
             let decoder = JSONDecoder()
             tasks = try decoder.decode([Task].self, from: data)
-            print("✅ [TaskViewModel.loadTasks] Tasks loaded: \(tasks.count)개")
             if tasks.count > 0 {
-                print("   첫 번째 태스크: \(tasks[0].title)")
             }
         } catch {
-            print("❌ [TaskViewModel.loadTasks] Failed to load tasks: \(error)")
-            print("   Error details: \(error.localizedDescription)")
 
             // 백업에서 복구 시도
             if let backupData = UserDefaults.standard.data(forKey: "\(tasksKey)_backup") {
-                print("⚠️ [TaskViewModel.loadTasks] Attempting to restore from backup...")
-                print("   📦 백업 데이터 크기: \(backupData.count) bytes")
                 do {
                     let decoder = JSONDecoder()
                     tasks = try decoder.decode([Task].self, from: backupData)
-                    print("✅ [TaskViewModel.loadTasks] Tasks restored from backup: \(tasks.count)개")
 
                     // 복구 성공 시 백업을 현재 데이터로 저장
                     saveTasks()
                 } catch {
-                    print("❌ [TaskViewModel.loadTasks] Backup restore also failed: \(error)")
-                    print("   Starting with empty task list")
                     tasks = []
                 }
             } else {
-                print("   No backup found, starting with empty task list")
                 tasks = []
             }
         }
@@ -436,24 +358,19 @@ class TaskViewModel: ObservableObject {
             let encoder = JSONEncoder()
             let data = try encoder.encode(projects)
             UserDefaults.standard.set(data, forKey: projectsKey)
-            print("✅ Projects saved: \(projects.count)개")
         } catch {
-            print("❌ Failed to save projects: \(error)")
         }
     }
 
     private func loadProjects() {
         guard let data = UserDefaults.standard.data(forKey: projectsKey) else {
-            print("ℹ️ No saved projects found")
             return
         }
 
         do {
             let decoder = JSONDecoder()
             projects = try decoder.decode([Project].self, from: data)
-            print("✅ Projects loaded: \(projects.count)개")
         } catch {
-            print("❌ Failed to load projects: \(error)")
             projects = []
         }
     }
@@ -467,31 +384,20 @@ class TaskViewModel: ObservableObject {
     
     /// 오늘 할 일 (역산 결과 기준) - 완료된 것 포함
     var todayTasks: [Task] {
-        print("\n╔════════════════════════════════════════════════════════╗")
-        print("║  TaskViewModel.todayTasks 계산 시작                    ║")
-        print("╚════════════════════════════════════════════════════════╝")
-        print("   📊 전체 태스크 개수: \(tasks.count)개\n")
 
         let result = tasks
             .filter { task in
                 let horizon = task.currentHorizon
                 let isToday = horizon == .today
                 if !isToday {
-                    print("   ❌ 제외: \"\(task.title)\" → \(horizon.rawValue)")
                 }
                 return isToday
             }
             .sorted { $0.sortOrder < $1.sortOrder }
 
-        print("\n╔════════════════════════════════════════════════════════╗")
-        print("║  TaskViewModel.todayTasks 계산 완료                    ║")
-        print("╚════════════════════════════════════════════════════════╝")
-        print("   ✅ 오늘 할 일: \(result.count)개")
         for (index, task) in result.enumerated() {
             let statusIcon = task.isCompleted ? "✅" : "⏳"
-            print("   [\(index + 1)] \(statusIcon) \(task.title)")
         }
-        print("════════════════════════════════════════════════════════\n")
 
         return result
     }
@@ -852,7 +758,6 @@ class TaskViewModel: ObservableObject {
 
         addTask(calendarTask)
 
-        print("✅ 캘린더 패턴에서 Task 생성: \(calendarTask.title)")
     }
 
     /// 여러 패턴에서 Task 생성
@@ -876,14 +781,11 @@ class TaskViewModel: ObservableObject {
 
     /// Generate tasks from approved patterns (called on app launch or periodic check)
     func generateTasksFromApprovedPatterns(patternService: PatternManagementService) async {
-        print("🔄 [TaskViewModel] generateTasksFromApprovedPatterns 시작")
         do {
             let patternsNeedingTasks = try patternService.getPatternsNeedingTaskGeneration()
 
-            print("📋 [TaskViewModel] Found \(patternsNeedingTasks.count) patterns needing task generation")
 
             for pattern in patternsNeedingTasks {
-                print("🔍 [TaskViewModel] Pattern: '\(pattern.taskTitle)', frequency: \(pattern.frequency.rawValue)")
 
                 // 앞으로 5주간의 발생일을 계산
                 let calendar = Calendar.current
@@ -892,7 +794,6 @@ class TaskViewModel: ObservableObject {
 
                 var occurrenceCount = 0
                 while currentOccurrence <= fiveWeeksFromNow && occurrenceCount < 10 {
-                    print("  📅 Checking occurrence: \(currentOccurrence.formatted(date: .abbreviated, time: .omitted))")
 
                     // 해당 패턴과 날짜에 대한 Task가 이미 존재하는지 확인
                     let alreadyExists = tasks.contains { task in
@@ -921,9 +822,7 @@ class TaskViewModel: ObservableObject {
                         addTask(calendarTask)
                         let dueDateStr = task.dueDate.formatted(date: .abbreviated, time: .omitted)
                         let startDateStr = task.effectiveStartDate.formatted(date: .abbreviated, time: .omitted)
-                        print("  ✅ Created task - dueDate: \(dueDateStr), effectiveStartDate: \(startDateStr)")
                     } else {
-                        print("  ⏭️ Task already exists, skipping")
                     }
 
                     // 다음 발생일 계산
@@ -942,9 +841,7 @@ class TaskViewModel: ObservableObject {
                 }
             }
 
-            print("📊 [TaskViewModel] 최종 Task 개수: \(tasks.count)")
         } catch {
-            print("❌ [TaskViewModel] Error generating tasks from patterns: \(error)")
         }
     }
 
@@ -992,46 +889,30 @@ class TaskViewModel: ObservableObject {
 
     /// 앱 시작 시 자동 동기화 (iCloud와 로컬 데이터 비교)
     func performInitialSync() async {
-        print("\n╔════════════════════════════════════════════════════════╗")
-        print("║  앱 시작 - 초기 동기화 시작                            ║")
-        print("╚════════════════════════════════════════════════════════╝")
 
         defer {
             // 초기 동기화 완료 플래그 설정 (동기화 성공 여부와 관계없이)
             initialSyncCompleted = true
-            print("✅ [TaskViewModel] 초기 동기화 완료 플래그 설정")
         }
 
         // CloudKit이 초기화되지 않았으면 로컬 데이터만 사용
         guard let database = database else {
-            print("⚠️ [TaskViewModel] CloudKit 초기화 실패 - 로컬 데이터만 사용")
-            print("   로컬 태스크: \(tasks.count)개")
-            print("   로컬 프로젝트: \(projects.count)개")
             return
         }
 
         do {
             // 1. iCloud 데이터 개수 확인
             let cloudPreview = try await getCloudDataPreview()
-            print("\n📊 데이터 비교:")
-            print("   로컬: 태스크 \(tasks.count)개, 프로젝트 \(projects.count)개")
-            print("   iCloud: 태스크 \(cloudPreview.taskCount)개, 프로젝트 \(cloudPreview.projectCount)개")
 
             // 2. 로컬이 비어있고 iCloud에 데이터가 있으면 복원
             if tasks.isEmpty && projects.isEmpty && !cloudPreview.isEmpty {
-                print("\n🔄 [TaskViewModel] 로컬 데이터 없음 → iCloud에서 복원")
                 try await restoreFromCloud()
-                print("✅ [TaskViewModel] iCloud에서 복원 완료")
-                print("   복원된 태스크: \(tasks.count)개")
-                print("   복원된 프로젝트: \(projects.count)개")
                 return
             }
 
             // 3. iCloud가 비어있고 로컬에 데이터가 있으면 백업
             if cloudPreview.isEmpty && (!tasks.isEmpty || !projects.isEmpty) {
-                print("\n🔄 [TaskViewModel] iCloud 데이터 없음 → 로컬 데이터 백업")
                 try await saveToCloud()
-                print("✅ [TaskViewModel] 로컬 데이터 백업 완료")
                 return
             }
 
@@ -1040,36 +921,20 @@ class TaskViewModel: ObservableObject {
                 let localLastModified = lastSyncDate ?? Date.distantPast
                 let cloudLastModified = cloudPreview.lastSyncDate ?? Date.distantPast
 
-                print("\n⏰ 마지막 수정 시간 비교:")
-                print("   로컬: \(localLastModified == Date.distantPast ? "없음" : localLastModified.formatted(date: .abbreviated, time: .shortened))")
-                print("   iCloud: \(cloudLastModified == Date.distantPast ? "없음" : cloudLastModified.formatted(date: .abbreviated, time: .shortened))")
 
                 // iCloud가 더 최신이면 복원
                 if cloudLastModified > localLastModified {
-                    print("\n🔄 [TaskViewModel] iCloud가 더 최신 → 복원")
                     try await restoreFromCloud()
-                    print("✅ [TaskViewModel] iCloud에서 복원 완료")
-                    print("   복원된 태스크: \(tasks.count)개")
-                    print("   복원된 프로젝트: \(projects.count)개")
                 } else if localLastModified > cloudLastModified {
-                    print("\n🔄 [TaskViewModel] 로컬이 더 최신 → 백업")
                     try await saveToCloud()
-                    print("✅ [TaskViewModel] 로컬 데이터 백업 완료")
                 } else {
-                    print("\n✅ [TaskViewModel] 로컬과 iCloud 동기화됨 (동일 시간)")
                 }
             } else {
-                print("\n✅ [TaskViewModel] 로컬과 iCloud 모두 비어있음")
             }
 
         } catch {
-            print("❌ [TaskViewModel] 초기 동기화 실패: \(error.localizedDescription)")
-            print("   로컬 데이터를 사용합니다.")
-            print("   로컬 태스크: \(tasks.count)개")
-            print("   로컬 프로젝트: \(projects.count)개")
         }
 
-        print("════════════════════════════════════════════════════════\n")
     }
 
     // MARK: - Cloud Sync
@@ -1126,18 +991,15 @@ class TaskViewModel: ObservableObject {
             ])
         }
 
-        print("🔍 [TaskViewModel.getCloudDataPreview] 클라우드 데이터 미리보기 가져오기...")
 
         // Get saved recordNames from UserDefaults
         var taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
         var projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
         let lastSync = UserDefaults.standard.object(forKey: syncDateKey) as? Date
 
-        print("   📦 UserDefaults에 저장된 개수: 태스크 \(taskRecordNames.count)개, 프로젝트 \(projectRecordNames.count)개")
 
         // recordNames가 없으면 실제로 CloudKit에서 확인
         if taskRecordNames.isEmpty {
-            print("   ⚠️ recordNames가 비어있음. CKQuery로 실제 개수 확인 중...")
             let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
             do {
                 let results = try await database.records(matching: query, desiredKeys: ["title"])
@@ -1145,15 +1007,12 @@ class TaskViewModel: ObservableObject {
                     guard (try? result.get()) != nil else { return nil }
                     return recordID.recordName
                 }
-                print("   ✅ 실제 CloudKit에서 \(taskRecordNames.count)개 태스크 발견")
             } catch {
-                print("   ⚠️ CKQuery 실패: \(error)")
                 // 에러가 나도 계속 진행 (빈 배열로)
             }
         }
 
         if projectRecordNames.isEmpty {
-            print("   ⚠️ recordNames가 비어있음. CKQuery로 실제 개수 확인 중...")
             let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
             do {
                 let results = try await database.records(matching: query, desiredKeys: ["name"])
@@ -1161,9 +1020,7 @@ class TaskViewModel: ObservableObject {
                     guard (try? result.get()) != nil else { return nil }
                     return recordID.recordName
                 }
-                print("   ✅ 실제 CloudKit에서 \(projectRecordNames.count)개 프로젝트 발견")
             } catch {
-                print("   ⚠️ CKQuery 실패: \(error)")
                 // 에러가 나도 계속 진행 (빈 배열로)
             }
         }
@@ -1174,13 +1031,8 @@ class TaskViewModel: ObservableObject {
             lastSyncDate: lastSync
         )
 
-        print("📊 [TaskViewModel.getCloudDataPreview] 클라우드 데이터:")
-        print("   태스크: \(preview.taskCount)개")
-        print("   프로젝트: \(preview.projectCount)개")
         if let lastSync = preview.lastSyncDate {
-            print("   마지막 동기화: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
         } else {
-            print("   마지막 동기화: 없음")
         }
 
         return preview
@@ -1194,7 +1046,6 @@ class TaskViewModel: ObservableObject {
             ])
         }
 
-        print("🔍 로컬과 클라우드 데이터 비교 시작...")
 
         // Get saved recordNames from UserDefaults
         let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
@@ -1212,11 +1063,6 @@ class TaskViewModel: ObservableObject {
             cloudProjectCount: cloudProjectCount
         )
 
-        print("📊 비교 결과:")
-        print("   로컬: 태스크 \(localTaskCount)개, 프로젝트 \(localProjectCount)개")
-        print("   클라우드: 태스크 \(cloudTaskCount)개, 프로젝트 \(cloudProjectCount)개")
-        print("   차이: 태스크 \(result.taskCountDifference)개 (\(String(format: "%.1f", result.taskDifferencePercentage))%)")
-        print("   유의미한 차이: \(result.hasSignificantDifference ? "예" : "아니오")")
 
         return result
     }
@@ -1227,18 +1073,15 @@ class TaskViewModel: ObservableObject {
     private func triggerAutoBackup() {
         // 초기 동기화가 완료되지 않았으면 스킵 (앱 시작 시 로컬 데이터로 클라우드를 덮어쓰는 것을 방지)
         guard initialSyncCompleted else {
-            print("ℹ️ [TaskViewModel] 초기 동기화 미완료 - 자동 백업 스킵")
             return
         }
 
         guard isAutoBackupEnabled else {
-            print("ℹ️ [TaskViewModel] 자동 백업 비활성화됨")
             return
         }
 
         // 현재 동기화 중이면 스킵
         guard !isSyncing else {
-            print("ℹ️ [TaskViewModel] 이미 동기화 중 - 자동 백업 스킵")
             return
         }
 
@@ -1257,34 +1100,25 @@ class TaskViewModel: ObservableObject {
             }
         }
 
-        print("⏱️ [TaskViewModel] 자동 백업 예약: \(Int(autoBackupDelay))초 후")
     }
 
     /// 자동 백업 실행
     private func performAutoBackup() async {
         // 마지막 변경 후 충분한 시간이 지났는지 확인
         guard let lastChange = lastChangeDate else {
-            print("ℹ️ [TaskViewModel] 마지막 변경 없음 - 자동 백업 스킵")
             return
         }
 
         let timeSinceChange = Date().timeIntervalSince(lastChange)
         guard timeSinceChange >= autoBackupDelay else {
-            print("ℹ️ [TaskViewModel] 변경 후 시간 부족 (\(Int(timeSinceChange))초) - 자동 백업 스킵")
             return
         }
 
-        print("🔄 [TaskViewModel] 자동 백업 시작...")
-        print("   마지막 변경: \(Int(timeSinceChange))초 전")
-        print("   태스크: \(tasks.count)개")
-        print("   프로젝트: \(projects.count)개")
 
         do {
             try await saveToCloud()
             lastAutoBackupDate = Date()
-            print("✅ [TaskViewModel] 자동 백업 완료")
         } catch {
-            print("❌ [TaskViewModel] 자동 백업 실패: \(error.localizedDescription)")
             // 자동 백업 실패는 사용자에게 알리지 않음 (조용히 실패)
         }
     }
@@ -1297,11 +1131,6 @@ class TaskViewModel: ObservableObject {
             ])
         }
 
-        print("☁️ [macOS TaskViewModel.saveToCloud] Starting cloud save...")
-        print("   Container ID: \(container?.containerIdentifier ?? "nil")")
-        print("   Database: privateCloudDatabase")
-        print("   저장할 태스크: \(tasks.count)개")
-        print("   저장할 프로젝트: \(projects.count)개")
 
         isSyncing = true
         syncError = nil
@@ -1333,16 +1162,10 @@ class TaskViewModel: ObservableObject {
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
-        print("☁️ Successfully saved \(tasks.count) tasks and \(projects.count) projects to cloud")
     }
 
     /// 클라우드에서 복원
     func restoreFromCloud() async throws {
-        print("☁️ [TaskViewModel.restoreFromCloud] 시작")
-        print("   호출 스택:")
-        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
-        print("   현재 로컬 태스크: \(tasks.count)개")
-        print("   현재 로컬 프로젝트: \(projects.count)개")
 
         guard let database = database else {
             throw NSError(domain: "CloudKit", code: -1, userInfo: [
@@ -1350,7 +1173,6 @@ class TaskViewModel: ObservableObject {
             ])
         }
 
-        print("☁️ Starting cloud restore...")
         isSyncing = true
         syncError = nil
 
@@ -1360,13 +1182,11 @@ class TaskViewModel: ObservableObject {
         let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
         let projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
 
-        print("📋 [TaskViewModel.restoreFromCloud] Found \(taskRecordNames.count) task records and \(projectRecordNames.count) project records in UserDefaults")
 
         // Restore tasks
         var cloudTasks: [Task] = []
 
         if !taskRecordNames.isEmpty {
-            print("   📥 recordNames로 태스크 복원 시도...")
             // recordNames가 있으면 직접 fetch
             let taskRecordIDs = taskRecordNames.map { CKRecord.ID(recordName: $0) }
 
@@ -1378,18 +1198,15 @@ class TaskViewModel: ObservableObject {
                         try? result.get()
                     }.compactMap { ckRecordToTask($0) }
                     cloudTasks.append(contentsOf: batchTasks)
-                    print("   ✅ 배치에서 \(batchTasks.count)개 태스크 복원")
                 } catch let error as CKError {
                     // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
                     if error.code == .unknownItem {
-                        print("⚠️ Some task records not found (may have been deleted)")
                     } else {
                         throw error
                     }
                 }
             }
         } else {
-            print("   ⚠️ recordNames가 비어있음. CKQuery로 모든 태스크 검색...")
             // recordNames가 없으면 CKQuery로 모든 레코드 가져오기
             let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
             query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
@@ -1403,28 +1220,21 @@ class TaskViewModel: ObservableObject {
                     "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
                     "lastCheckinDate", "consecutiveMissedCheckins", "completedAt"
                 ])
-                print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
 
                 cloudTasks = results.matchResults.compactMap { (recordID, result) in
                     guard let record = try? result.get() else {
-                        print("   ⚠️ 레코드 가져오기 실패: \(recordID.recordName)")
                         return nil
                     }
                     let task = ckRecordToTask(record)
                     if task == nil {
-                        print("   ⚠️ Task 변환 실패: \(recordID.recordName)")
-                        print("      title: \(record["title"] as? String ?? "없음")")
                     }
                     return task
                 }
-                print("   ✅ CKQuery로 \(cloudTasks.count)개 태스크 발견 (총 \(results.matchResults.count)개 레코드)")
 
                 // 가져온 레코드 ID를 UserDefaults에 저장
                 let fetchedRecordNames = cloudTasks.map { $0.id.uuidString }
                 UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudTaskRecordNames")
-                print("   💾 recordNames를 UserDefaults에 저장: \(fetchedRecordNames.count)개")
             } catch {
-                print("   ❌ CKQuery 실패: \(error)")
                 throw error
             }
         }
@@ -1433,7 +1243,6 @@ class TaskViewModel: ObservableObject {
         var cloudProjects: [Project] = []
 
         if !projectRecordNames.isEmpty {
-            print("   📥 recordNames로 프로젝트 복원 시도...")
             // recordNames가 있으면 직접 fetch
             let projectRecordIDs = projectRecordNames.map { CKRecord.ID(recordName: $0) }
 
@@ -1445,127 +1254,82 @@ class TaskViewModel: ObservableObject {
                         try? result.get()
                     }.compactMap { ckRecordToProject($0) }
                     cloudProjects.append(contentsOf: batchProjects)
-                    print("   ✅ 배치에서 \(batchProjects.count)개 프로젝트 복원")
                 } catch let error as CKError {
                     // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
                     if error.code == .unknownItem {
-                        print("⚠️ Some project records not found (may have been deleted)")
                     } else {
                         throw error
                     }
                 }
             }
         } else {
-            print("   ⚠️ recordNames가 비어있음. CKQuery로 모든 프로젝트 검색...")
             // recordNames가 없으면 CKQuery로 모든 레코드 가져오기
             let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
 
             do {
                 // 모든 필수 필드를 명시적으로 지정
                 let results = try await database.records(matching: query, desiredKeys: ["name", "color", "icon"])
-                print("   📦 CKQuery 결과: \(results.matchResults.count)개 레코드")
 
                 cloudProjects = results.matchResults.compactMap { (recordID, result) in
                     guard let record = try? result.get() else {
-                        print("   ⚠️ 레코드 가져오기 실패: \(recordID.recordName)")
                         return nil
                     }
                     let project = ckRecordToProject(record)
                     if project == nil {
-                        print("   ⚠️ Project 변환 실패: \(recordID.recordName)")
-                        print("      name: \(record["name"] as? String ?? "없음")")
                     }
                     return project
                 }
-                print("   ✅ CKQuery로 \(cloudProjects.count)개 프로젝트 발견 (총 \(results.matchResults.count)개 레코드)")
 
                 // 가져온 레코드 ID를 UserDefaults에 저장
                 let fetchedRecordNames = cloudProjects.map { $0.id.uuidString }
                 UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudProjectRecordNames")
-                print("   💾 recordNames를 UserDefaults에 저장: \(fetchedRecordNames.count)개")
             } catch {
-                print("   ❌ CKQuery 실패: \(error)")
                 throw error
             }
         }
 
-        print("   📝 tasks 배열에 클라우드 데이터 할당 중... (\(cloudTasks.count)개)")
         tasks = cloudTasks
-        print("   ✅ tasks 배열 할당 완료 (현재: \(tasks.count)개)")
 
-        print("   📝 projects 배열에 클라우드 데이터 할당 중... (\(cloudProjects.count)개)")
         projects = cloudProjects
-        print("   ✅ projects 배열 할당 완료 (현재: \(projects.count)개)")
 
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
-        print("✅ [TaskViewModel.restoreFromCloud] Restored \(cloudTasks.count) tasks and \(cloudProjects.count) projects from cloud")
-        print("   최종 태스크 개수: \(tasks.count)")
-        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     /// 데이터 초기화 (로컬 + 클라우드)
     func resetAllData() async throws {
-        print("🗑️ [TaskViewModel.resetAllData] 시작")
-        print("   현재 태스크: \(tasks.count)개")
-        print("   호출 스택:")
-        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
 
         // 1. tasks 배열 초기화 (이때 didSet이 호출되어 saveTasks() 실행됨)
-        print("   1️⃣ tasks 배열 초기화 중...")
         tasks = []
-        print("   ✅ tasks 배열 초기화 완료 (현재: \(tasks.count)개)")
 
         // 2. UserDefaults 삭제
-        print("   2️⃣ UserDefaults 삭제 중...")
         UserDefaults.standard.removeObject(forKey: tasksKey)
         UserDefaults.standard.removeObject(forKey: "\(tasksKey)_backup")
-        print("   ✅ UserDefaults 삭제 완료")
 
         // 3. 프로젝트 초기화
-        print("   3️⃣ 프로젝트 초기화 중... (현재: \(projects.count)개)")
         projects = []
         UserDefaults.standard.removeObject(forKey: projectsKey)
-        print("   ✅ 프로젝트 초기화 완료")
 
         // 4. 클라우드 레코드 삭제
-        print("   4️⃣ 클라우드 레코드 삭제 중...")
         try await deleteAllCloudRecords()
-        print("   ✅ 클라우드 레코드 삭제 완료")
 
-        print("✅ [TaskViewModel.resetAllData] All data has been reset")
-        print("   최종 태스크 개수: \(tasks.count)")
-        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     /// 로컬 데이터만 초기화
     func resetLocalData() {
-        print("🗑️ [TaskViewModel.resetLocalData] 시작")
-        print("   현재 태스크: \(tasks.count)개")
-        print("   호출 스택:")
-        Thread.callStackSymbols.prefix(5).forEach { print("   \($0)") }
 
         // 1. tasks 배열 초기화
-        print("   1️⃣ tasks 배열 초기화 중...")
         tasks = []
-        print("   ✅ tasks 배열 초기화 완료 (현재: \(tasks.count)개)")
 
         // 2. UserDefaults 삭제
-        print("   2️⃣ UserDefaults 삭제 중...")
         UserDefaults.standard.removeObject(forKey: tasksKey)
         UserDefaults.standard.removeObject(forKey: "\(tasksKey)_backup")
-        print("   ✅ UserDefaults 삭제 완료")
 
         // 3. 프로젝트 초기화
-        print("   3️⃣ 프로젝트 초기화 중... (현재: \(projects.count)개)")
         projects = []
         UserDefaults.standard.removeObject(forKey: projectsKey)
-        print("   ✅ 프로젝트 초기화 완료")
 
-        print("✅ [TaskViewModel.resetLocalData] Local data has been reset")
-        print("   최종 태스크 개수: \(tasks.count)")
-        print("   최종 프로젝트 개수: \(projects.count)")
     }
 
     // MARK: - CloudKit Helper Methods
@@ -1579,13 +1343,9 @@ class TaskViewModel: ObservableObject {
 
         do {
             let (savedRecords, _) = try await database.modifyRecords(saving: records, deleting: [])
-            print("✅ Saved batch of \(savedRecords.count) records")
         } catch let error as CKError {
-            print("❌ CloudKit save error: \(error.localizedDescription)")
-            print("   Error code: \(error.code.rawValue)")
             if let partialErrors = error.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] {
                 for (recordID, partialError) in partialErrors {
-                    print("   Failed record: \(recordID.recordName) - \(partialError.localizedDescription)")
                 }
             }
             throw error
@@ -1605,9 +1365,7 @@ class TaskViewModel: ObservableObject {
                 let taskRecordIDs = taskRecordNames.map { CKRecord.ID(recordName: $0) }
                 for batch in taskRecordIDs.chunked(into: 200) {
                     let (_, deletedRecordIDs) = try await database.modifyRecords(saving: [], deleting: batch)
-                    print("🗑️ Deleted batch of \(deletedRecordIDs.count) task records")
                 }
-                print("🗑️ Deleted \(taskRecordIDs.count) task records in total")
             }
 
             // Delete all Project records
@@ -1615,14 +1373,11 @@ class TaskViewModel: ObservableObject {
                 let projectRecordIDs = projectRecordNames.map { CKRecord.ID(recordName: $0) }
                 for batch in projectRecordIDs.chunked(into: 200) {
                     let (_, deletedRecordIDs) = try await database.modifyRecords(saving: [], deleting: batch)
-                    print("🗑️ Deleted batch of \(deletedRecordIDs.count) project records")
                 }
-                print("🗑️ Deleted \(projectRecordIDs.count) project records in total")
             }
         } catch let error as CKError {
             // "Unknown Item" 에러는 레코드가 없다는 의미이므로 무시
             if error.code == .unknownItem {
-                print("⚠️ No records found in CloudKit (this is normal if you haven't saved to cloud yet)")
                 return
             }
             throw error
@@ -1693,37 +1448,29 @@ class TaskViewModel: ObservableObject {
     private func ckRecordToTask(_ record: CKRecord) -> Task? {
         // 필수 필드 체크 및 상세 로깅
         guard let title = record["title"] as? String else {
-            print("❌ [ckRecordToTask] 'title' 필드 누락: \(record.recordID.recordName)")
             return nil
         }
         guard let dueDate = record["dueDate"] as? Date else {
-            print("❌ [ckRecordToTask] 'dueDate' 필드 누락: \(title)")
             return nil
         }
         guard let estimatedMinutes = record["estimatedMinutes"] as? Int else {
-            print("❌ [ckRecordToTask] 'estimatedMinutes' 필드 누락: \(title)")
             return nil
         }
         guard let leadTimeDays = record["leadTimeDays"] as? Int else {
-            print("❌ [ckRecordToTask] 'leadTimeDays' 필드 누락: \(title)")
             return nil
         }
         guard let taskTypeRaw = record["taskType"] as? String,
               let taskType = TaskType(rawValue: taskTypeRaw) else {
-            print("❌ [ckRecordToTask] 'taskType' 필드 누락 또는 잘못된 값: \(title)")
             return nil
         }
         guard let taskRoleRaw = record["taskRole"] as? String else {
-            print("❌ [ckRecordToTask] 'taskRole' 필드 누락: \(title)")
             return nil
         }
         guard let statusRaw = record["status"] as? String,
               let status = TaskStatus(rawValue: statusRaw) else {
-            print("❌ [ckRecordToTask] 'status' 필드 누락 또는 잘못된 값: \(title)")
             return nil
         }
         guard let createdAt = record["createdAt"] as? Date else {
-            print("❌ [ckRecordToTask] 'createdAt' 필드 누락: \(title)")
             return nil
         }
 
@@ -1836,25 +1583,21 @@ class TaskViewModel: ObservableObject {
     /// - 근무 시간 - 캘린더 이벤트 시간 - 점심시간 = 실제 가용 시간
     func updateTimeBlocksWithCalendar() {
         guard useCalendarForTimeBlocks else {
-            print("ℹ️ [TaskViewModel] 캘린더 기반 타임 블록이 비활성화됨")
             // 캘린더를 사용하지 않으면 기본 설정 사용
             updateTimeBlocksWithFixedHours()
             return
         }
 
         guard !timeBlockCalendarIds.isEmpty else {
-            print("⚠️ [TaskViewModel] 타임 블록용 캘린더가 선택되지 않음")
             updateTimeBlocksWithFixedHours()
             return
         }
 
         guard let calendarVM = calendarViewModel else {
-            print("⚠️ [TaskViewModel] CalendarViewModel 참조 없음")
             updateTimeBlocksWithFixedHours()
             return
         }
 
-        print("📊 [TaskViewModel] 캘린더 기반 타임 블록 업데이트 시작")
 
         let workMinutes = Int(workHoursPerDay * 60)
 
@@ -1872,10 +1615,8 @@ class TaskViewModel: ObservableObject {
 
             timeBlockManager.blocks[i].availableMinutes = availableMinutes
 
-            print("  \(date.formatted(date: .abbreviated, time: .omitted)): 근무 \(workMinutes)분 - 일정 \(eventMinutes)분 - 점심 \(lunchBreakMinutes)분 = 가용 \(availableMinutes)분")
         }
 
-        print("✅ [TaskViewModel] 타임 블록 업데이트 완료")
     }
 
     /// 고정된 시간으로 타임 블록 업데이트 (캘린더 미사용)
@@ -1886,13 +1627,11 @@ class TaskViewModel: ObservableObject {
             timeBlockManager.blocks[i].availableMinutes = fixedMinutes
         }
 
-        print("✅ [TaskViewModel] 고정 시간으로 타임 블록 업데이트: \(fixedMinutes)분/일")
     }
 
     /// 캘린더 ViewModel 연결
     func setCalendarViewModel(_ calendarVM: CalendarViewModel) {
         self.calendarViewModel = calendarVM
-        print("✅ [TaskViewModel] CalendarViewModel 연결됨")
 
         // 연결 후 즉시 타임 블록 업데이트
         if useCalendarForTimeBlocks {
@@ -1905,7 +1644,6 @@ class TaskViewModel: ObservableObject {
     /// NotificationService 연결
     func setNotificationService(_ service: NotificationService) {
         self.notificationService = service
-        print("✅ [TaskViewModel] NotificationService 연결됨")
 
         // 연결 후 즉시 알림 스케줄 업데이트
         _Concurrency.Task {
@@ -1916,7 +1654,6 @@ class TaskViewModel: ObservableObject {
     /// 알림 스케줄 갱신
     func updateNotificationSchedule() async {
         guard let service = notificationService else {
-            print("ℹ️ [TaskViewModel] NotificationService가 연결되지 않음")
             return
         }
 
@@ -1944,7 +1681,6 @@ class TaskViewModel: ObservableObject {
     /// 체크인 응답 처리
     func handleCheckinResponse(taskId: UUID, response: CheckinResponse) {
         guard let index = tasks.firstIndex(where: { $0.id == taskId }) else {
-            print("⚠️ [TaskViewModel] 체크인 대상 태스크를 찾을 수 없음: \(taskId)")
             return
         }
 
@@ -1955,26 +1691,23 @@ class TaskViewModel: ObservableObject {
         switch response {
         case .onTrack:
             // 순조롭게 진행 중 - 상태 유지
-            print("✅ [TaskViewModel] 체크인: \(tasks[index].title) - 순조로움")
+            break
 
         case .completed:
             // 완료 처리
             tasks[index].status = .completed
-            print("✅ [TaskViewModel] 체크인: \(tasks[index].title) - 완료")
 
         case .needHelp:
             // 문제 있음 - 우선순위 상향
             if tasks[index].priority != .urgent {
                 tasks[index].priority = .high
             }
-            print("⚠️ [TaskViewModel] 체크인: \(tasks[index].title) - 문제 있음")
 
         case .postponed:
             // 연기 - 마감일 하루 연장
             if let newDueDate = Calendar.current.date(byAdding: .day, value: 1, to: tasks[index].dueDate) {
                 tasks[index].dueDate = newDueDate
             }
-            print("📅 [TaskViewModel] 체크인: \(tasks[index].title) - 연기됨")
         }
     }
 
@@ -1990,12 +1723,10 @@ class TaskViewModel: ObservableObject {
             if let lastCheckin = tasks[index].lastCheckinDate {
                 if lastCheckin < calendar.startOfDay(for: yesterday) {
                     tasks[index].consecutiveMissedCheckins += 1
-                    print("⚠️ [TaskViewModel] 미체크인 감지: \(tasks[index].title) - \(tasks[index].consecutiveMissedCheckins)일 연속")
                 }
             } else if tasks[index].status == .inProgress {
                 // 진행 중인데 한 번도 체크인한 적 없음
                 tasks[index].consecutiveMissedCheckins += 1
-                print("⚠️ [TaskViewModel] 미체크인 감지 (첫 체크인 없음): \(tasks[index].title)")
             }
         }
     }
