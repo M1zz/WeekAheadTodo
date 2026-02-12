@@ -984,6 +984,7 @@ class TaskViewModel: ObservableObject {
     }
 
     /// 클라우드 데이터 미리보기 가져오기
+    /// CloudKit에서 SyncMetadata 레코드를 직접 fetch하여 실제 클라우드의 lastSyncDate를 반환
     func getCloudDataPreview() async throws -> CloudDataPreview {
         guard let database = database else {
             throw NSError(domain: "CloudKit", code: -1, userInfo: [
@@ -991,49 +992,63 @@ class TaskViewModel: ObservableObject {
             ])
         }
 
+        print("🔍 [getCloudDataPreview] CloudKit에서 SyncMetadata 조회 시작")
 
-        // Get saved recordNames from UserDefaults
-        var taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
-        var projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
-        let lastSync = UserDefaults.standard.object(forKey: syncDateKey) as? Date
+        // 1. CloudKit에서 SyncMetadata 레코드 직접 fetch
+        let metadataRecordID = CKRecord.ID(recordName: "SyncMetadata")
+        do {
+            let metadataRecord = try await database.record(for: metadataRecordID)
+            let cloudLastSync = metadataRecord["lastSyncDate"] as? Date
+            let cloudTaskCount = metadataRecord["taskCount"] as? Int ?? 0
+            let cloudProjectCount = metadataRecord["projectCount"] as? Int ?? 0
 
+            print("✅ [getCloudDataPreview] SyncMetadata 조회 성공 - lastSyncDate: \(String(describing: cloudLastSync)), tasks: \(cloudTaskCount), projects: \(cloudProjectCount)")
 
-        // recordNames가 없으면 실제로 CloudKit에서 확인
-        if taskRecordNames.isEmpty {
-            let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
-            do {
-                let results = try await database.records(matching: query, desiredKeys: ["title"])
-                taskRecordNames = results.matchResults.compactMap { (recordID, result) in
-                    guard (try? result.get()) != nil else { return nil }
-                    return recordID.recordName
-                }
-            } catch {
-                // 에러가 나도 계속 진행 (빈 배열로)
-            }
+            return CloudDataPreview(
+                taskCount: cloudTaskCount,
+                projectCount: cloudProjectCount,
+                lastSyncDate: cloudLastSync
+            )
+        } catch let error as CKError where error.code == .unknownItem {
+            // SyncMetadata 레코드가 없는 경우 (아직 한 번도 새 방식으로 저장하지 않은 경우)
+            print("ℹ️ [getCloudDataPreview] SyncMetadata 레코드 없음, CKQuery fallback 사용")
+        } catch {
+            print("⚠️ [getCloudDataPreview] SyncMetadata 조회 실패, CKQuery fallback 사용: \(error)")
         }
 
-        if projectRecordNames.isEmpty {
-            let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
-            do {
-                let results = try await database.records(matching: query, desiredKeys: ["name"])
-                projectRecordNames = results.matchResults.compactMap { (recordID, result) in
-                    guard (try? result.get()) != nil else { return nil }
-                    return recordID.recordName
-                }
-            } catch {
-                // 에러가 나도 계속 진행 (빈 배열로)
-            }
+        // 2. SyncMetadata가 없으면 기존 fallback: CKQuery로 태스크/프로젝트 개수 확인
+        var taskCount = 0
+        var projectCount = 0
+
+        do {
+            let taskQuery = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
+            let taskResults = try await database.records(matching: taskQuery, desiredKeys: ["title"])
+            taskCount = taskResults.matchResults.compactMap { (recordID, result) -> CKRecord.ID? in
+                guard (try? result.get()) != nil else { return nil }
+                return recordID
+            }.count
+        } catch {
+            print("⚠️ [getCloudDataPreview] Task 쿼리 실패: \(error)")
+        }
+
+        do {
+            let projectQuery = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
+            let projectResults = try await database.records(matching: projectQuery, desiredKeys: ["name"])
+            projectCount = projectResults.matchResults.compactMap { (recordID, result) -> CKRecord.ID? in
+                guard (try? result.get()) != nil else { return nil }
+                return recordID
+            }.count
+        } catch {
+            print("⚠️ [getCloudDataPreview] Project 쿼리 실패: \(error)")
         }
 
         let preview = CloudDataPreview(
-            taskCount: taskRecordNames.count,
-            projectCount: projectRecordNames.count,
-            lastSyncDate: lastSync
+            taskCount: taskCount,
+            projectCount: projectCount,
+            lastSyncDate: nil  // SyncMetadata가 없으면 클라우드 동기화 날짜 알 수 없음
         )
 
-        if let lastSync = preview.lastSyncDate {
-        } else {
-        }
+        print("📊 [getCloudDataPreview] fallback 결과 - tasks: \(taskCount), projects: \(projectCount)")
 
         return preview
     }
@@ -1161,6 +1176,19 @@ class TaskViewModel: ObservableObject {
         // Update last sync date
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
+
+        // SyncMetadata 레코드를 CloudKit에 저장 (다른 기기에서 클라우드 최신 여부 판단용)
+        let metadataRecordID = CKRecord.ID(recordName: "SyncMetadata")
+        let metadataRecord = CKRecord(recordType: "SyncMetadata", recordID: metadataRecordID)
+        metadataRecord["lastSyncDate"] = lastSyncDate! as CKRecordValue
+        metadataRecord["taskCount"] = tasks.count as CKRecordValue
+        metadataRecord["projectCount"] = projects.count as CKRecordValue
+        do {
+            try await database.save(metadataRecord)
+            print("✅ [saveToCloud] SyncMetadata 저장 완료 - lastSyncDate: \(lastSyncDate!), tasks: \(tasks.count), projects: \(projects.count)")
+        } catch {
+            print("⚠️ [saveToCloud] SyncMetadata 저장 실패 (동기화 자체에는 영향 없음): \(error)")
+        }
 
     }
 
@@ -1374,6 +1402,16 @@ class TaskViewModel: ObservableObject {
                 for batch in projectRecordIDs.chunked(into: 200) {
                     let (_, deletedRecordIDs) = try await database.modifyRecords(saving: [], deleting: batch)
                 }
+            }
+
+            // Delete SyncMetadata record
+            let metadataRecordID = CKRecord.ID(recordName: "SyncMetadata")
+            do {
+                let (_, _) = try await database.modifyRecords(saving: [], deleting: [metadataRecordID])
+                print("✅ [deleteAllCloudRecords] SyncMetadata 레코드 삭제 완료")
+            } catch let metaError as CKError where metaError.code == .unknownItem {
+                // SyncMetadata 레코드가 없으면 무시
+                print("ℹ️ [deleteAllCloudRecords] SyncMetadata 레코드 없음 (이미 삭제됨)")
             }
         } catch let error as CKError {
             // "Unknown Item" 에러는 레코드가 없다는 의미이므로 무시
