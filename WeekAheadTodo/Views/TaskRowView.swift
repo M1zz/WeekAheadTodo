@@ -191,6 +191,26 @@ struct TaskRowView: View {
             Text("\"\(task.title)\"을(를) 삭제합니다. 이 작업은 되돌릴 수 없습니다.")
         }
 
+        // 세부 항목 장려 메시지 (미시작 + 세부항목 없음)
+        if task.isNotStarted && task.subtasks.isEmpty {
+            Button(action: { showingEditSheet = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.dashed")
+                        .font(.callout)
+                    Text("세부 항목을 추가하면 시작하기 쉬워져요")
+                        .font(.callout)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundColor(.blue.opacity(0.7))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.blue.opacity(0.05))
+            }
+            .buttonStyle(.plain)
+        }
+
         // 하위 할 일 목록 (펼침)
         if isSubtasksExpanded && !task.subtasks.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
