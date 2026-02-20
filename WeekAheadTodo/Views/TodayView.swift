@@ -88,7 +88,7 @@ struct TodayView: View {
                         selectedCheckinTask: $selectedCheckinTask
                     )
 
-                    if !viewModel.todayTasks.isEmpty {
+                    if !displayedTasks.isEmpty {
                         taskSection(
                             title: "오늘 해야 할 일",
                             subtitle: "역산 결과 기준",

@@ -612,7 +612,12 @@ class TaskViewModel: ObservableObject {
     
     func updateTask(_ task: Task) {
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-            tasks[index] = task
+            var updatedTask = task
+            // 오늘 이외의 horizon으로 이동하면 수동 순서 초기화
+            if updatedTask.currentHorizon != .today {
+                updatedTask.manualPriority = nil
+            }
+            tasks[index] = updatedTask
         }
     }
 
