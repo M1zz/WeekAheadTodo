@@ -1,4 +1,28 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - Today Task Drop Delegate
+
+private struct TodayTaskDropDelegate: DropDelegate {
+    let targetId: UUID
+    let orderedIds: [UUID]
+    @Binding var draggingId: UUID?
+    let onMove: (UUID, UUID, [UUID]) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let dragId = draggingId, dragId != targetId else { return }
+        onMove(dragId, targetId, orderedIds)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingId = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
 
 // MARK: - Today View
 
@@ -18,6 +42,7 @@ struct TodayView: View {
     @State private var movedTasksCount = 0
     @State private var showingTaskSelectionSheet = false
     @State private var taskIdsToSelect: [UUID] = []
+    @State private var draggingTaskId: UUID? = nil
     @AppStorage("recommendationSectionExpanded") private var isRecommendationExpanded = true
 
     // 체크인 관련
@@ -679,17 +704,28 @@ struct TodayView: View {
                         TaskRowView(task: task)
                     }
                 } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundColor(.gray)
-                            .font(.body)
-
-                        TaskRowView(task: task)
+                    TaskRowView(task: task)
+                    .opacity(draggingTaskId == task.id ? 0.4 : 1.0)
+                    .onDrag {
+                        draggingTaskId = task.id
+                        return NSItemProvider(object: task.id.uuidString as NSString)
                     }
+                    .onDrop(
+                        of: [UTType.plainText],
+                        delegate: TodayTaskDropDelegate(
+                            targetId: task.id,
+                            orderedIds: tasks.map { $0.id },
+                            draggingId: $draggingTaskId,
+                            onMove: { draggedId, targetId, orderedIds in
+                                viewModel.moveTodayTask(
+                                    draggedId: draggedId,
+                                    targetId: targetId,
+                                    orderedIds: orderedIds
+                                )
+                            }
+                        )
+                    )
                 }
-            }
-            .onMove { source, destination in
-                viewModel.reorderTodayTasks(from: source, to: destination)
             }
         }
         .confirmationDialog(

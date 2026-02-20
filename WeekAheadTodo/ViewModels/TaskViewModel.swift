@@ -629,6 +629,24 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    /// 드래그 앤 드롭으로 오늘 태스크 순서 재조정 (표시된 목록 기준, UUID 배열 사용)
+    func moveTodayTask(draggedId: UUID, targetId: UUID, orderedIds: [UUID]) {
+        guard draggedId != targetId else { return }
+        var ordered = orderedIds
+        guard let fromIndex = ordered.firstIndex(of: draggedId),
+              let toIndex = ordered.firstIndex(of: targetId) else { return }
+
+        ordered.move(fromOffsets: IndexSet(integer: fromIndex),
+                     toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+
+        // 새 순서에 따라 manualPriority 재할당
+        for (index, taskId) in ordered.enumerated() {
+            if let taskIndex = tasks.firstIndex(where: { $0.id == taskId }) {
+                tasks[taskIndex].manualPriority = index
+            }
+        }
+    }
+
     /// 모든 태스크의 수동 우선순위 초기화 (자동 정렬로 복귀)
     func resetManualPriorities() {
         for index in 0..<tasks.count {
