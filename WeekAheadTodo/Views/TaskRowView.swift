@@ -10,8 +10,10 @@ struct TaskRowView: View {
     @State private var showingDeleteAlert = false
     @State private var isHovered = false
     @State private var isPulsing = false
+    @State private var isSubtasksExpanded = false
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 12) {
             // 진행 중 표시 바 (왼쪽)
             if task.isInProgress {
@@ -88,6 +90,28 @@ struct TaskRowView: View {
                         .fontWeight(task.isInProgress ? .semibold : .regular)
                         .strikethrough(task.isCompleted)
                         .foregroundColor(task.isCompleted ? .secondary : .primary)
+
+                    if let progressText = task.subtaskProgressText {
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isSubtasksExpanded.toggle()
+                            }
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: isSubtasksExpanded ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 9, weight: .semibold))
+                                Text(progressText)
+                                    .font(.callout)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(task.allSubtasksCompleted ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12))
+                            .foregroundColor(task.allSubtasksCompleted ? .green : .secondary)
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     if task.priority == .urgent || task.priority == .high {
                         Image(systemName: task.priority.icon)
@@ -166,6 +190,36 @@ struct TaskRowView: View {
         } message: {
             Text("\"\(task.title)\"을(를) 삭제합니다. 이 작업은 되돌릴 수 없습니다.")
         }
+
+        // 하위 할 일 목록 (펼침)
+        if isSubtasksExpanded && !task.subtasks.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(task.subtasks) { subtask in
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            viewModel.toggleSubtaskCompletion(taskId: task.id, subtaskId: subtask.id)
+                        }) {
+                            Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.callout)
+                                .foregroundColor(subtask.isCompleted ? .green : .gray)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text(subtask.title)
+                            .font(.callout)
+                            .strikethrough(subtask.isCompleted)
+                            .foregroundColor(subtask.isCompleted ? .secondary : .primary)
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+            .padding(.leading, 40)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+        } // VStack 닫기
     }
 
     private var statusColor: Color {

@@ -19,6 +19,8 @@ struct EditTaskView: View {
     @State private var priority: TaskPriority
     @State private var taskType: TaskType
     @State private var selectedProjectId: UUID?
+    @State private var subtasks: [Subtask]
+    @State private var newSubtaskTitle: String = ""
 
     init(task: Task) {
         self.task = task
@@ -33,6 +35,7 @@ struct EditTaskView: View {
         _priority = State(initialValue: task.priority)
         _taskType = State(initialValue: task.taskType)
         _selectedProjectId = State(initialValue: task.projectId)
+        _subtasks = State(initialValue: task.subtasks)
     }
 
     var body: some View {
@@ -132,6 +135,54 @@ struct EditTaskView: View {
                     }
                 }
 
+                Section("하위 할 일") {
+                    ForEach($subtasks) { $subtask in
+                        HStack(spacing: 8) {
+                            Button(action: { subtask.isCompleted.toggle() }) {
+                                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(subtask.isCompleted ? .green : .gray)
+                            }
+                            .buttonStyle(.plain)
+
+                            TextField("하위 할 일", text: $subtask.title)
+                                .font(.callout)
+
+                            Button(action: {
+                                subtasks.removeAll { $0.id == subtask.id }
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(.red.opacity(0.7))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle")
+                            .foregroundColor(.blue)
+                        TextField("새 하위 할 일 추가...", text: $newSubtaskTitle)
+                            .font(.callout)
+                            .onSubmit { addSubtask() }
+
+                        if !newSubtaskTitle.isEmpty {
+                            Button("추가") { addSubtask() }
+                                .buttonStyle(.plain)
+                                .foregroundColor(.blue)
+                                .font(.callout)
+                        }
+                    }
+
+                    if !subtasks.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(.secondary)
+                            Text("완료 \(subtasks.filter { $0.isCompleted }.count) / 전체 \(subtasks.count)")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
                 Section("정보") {
                     if task.taskRole != .none {
                         LabeledContent("역할", value: task.taskRole.rawValue)
@@ -164,7 +215,16 @@ struct EditTaskView: View {
             updatedTask.targetDate = nil
         }
 
+        updatedTask.subtasks = subtasks
         viewModel.updateTask(updatedTask)
         dismiss()
+    }
+
+    private func addSubtask() {
+        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        subtasks.append(Subtask(title: trimmed))
+        newSubtaskTitle = ""
+        print("✅ [EditTaskView] 하위 할 일 추가: \(trimmed)")
     }
 }

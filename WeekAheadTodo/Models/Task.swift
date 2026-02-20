@@ -160,6 +160,23 @@ enum CheckinResponse: String, CaseIterable, Codable {
     }
 }
 
+// MARK: - Subtask
+
+/// 태스크의 하위 할 일
+struct Subtask: Identifiable, Codable, Hashable {
+    let id: UUID
+    var title: String
+    var isCompleted: Bool
+    var createdAt: Date
+
+    init(id: UUID = UUID(), title: String, isCompleted: Bool = false) {
+        self.id = id
+        self.title = title
+        self.isCompleted = isCompleted
+        self.createdAt = Date()
+    }
+}
+
 /// 메인 태스크 모델
 struct Task: Identifiable {
     let id: UUID
@@ -192,7 +209,10 @@ struct Task: Identifiable {
 
     // 완료 관련
     var completedAt: Date?               // 완료된 시간
-    
+
+    // 하위 할 일
+    var subtasks: [Subtask] = []
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -412,6 +432,24 @@ struct Task: Identifiable {
         }
     }
 
+    // MARK: - 하위 할 일 관련
+
+    /// 완료된 하위 할 일 수
+    var completedSubtaskCount: Int {
+        subtasks.filter { $0.isCompleted }.count
+    }
+
+    /// 하위 할 일 진행률 텍스트 (예: "2/5")
+    var subtaskProgressText: String? {
+        guard !subtasks.isEmpty else { return nil }
+        return "\(completedSubtaskCount)/\(subtasks.count)"
+    }
+
+    /// 하위 할 일이 모두 완료되었는지
+    var allSubtasksCompleted: Bool {
+        !subtasks.isEmpty && subtasks.allSatisfy { $0.isCompleted }
+    }
+
     // MARK: - 상태 관련
 
     /// 완료 여부 (backward compatibility)
@@ -447,6 +485,7 @@ extension Task: Codable {
         case calendarEventId, isFromCalendarPattern, patternId, autoRecurring
         case lastCheckinDate, consecutiveMissedCheckins
         case completedAt
+        case subtasks
     }
 
     init(from decoder: Decoder) throws {
@@ -484,6 +523,9 @@ extension Task: Codable {
 
         // 완료 필드
         completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+
+        // 하위 할 일 (기존 데이터 호환: 없으면 빈 배열)
+        subtasks = try container.decodeIfPresent([Subtask].self, forKey: .subtasks) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -516,6 +558,9 @@ extension Task: Codable {
 
         // 완료 필드
         try container.encodeIfPresent(completedAt, forKey: .completedAt)
+
+        // 하위 할 일
+        try container.encode(subtasks, forKey: .subtasks)
     }
 }
 

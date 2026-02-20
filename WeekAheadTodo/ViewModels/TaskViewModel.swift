@@ -629,6 +629,19 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    // MARK: - 하위 할 일 관련
+
+    /// 특정 태스크의 하위 할 일 완료 상태 토글
+    func toggleSubtaskCompletion(taskId: UUID, subtaskId: UUID) {
+        guard let taskIndex = tasks.firstIndex(where: { $0.id == taskId }),
+              let subtaskIndex = tasks[taskIndex].subtasks.firstIndex(where: { $0.id == subtaskId }) else {
+            print("⚠️ [TaskViewModel] 하위 할 일 찾기 실패: taskId=\(taskId), subtaskId=\(subtaskId)")
+            return
+        }
+        tasks[taskIndex].subtasks[subtaskIndex].isCompleted.toggle()
+        print("✅ [TaskViewModel] 하위 할 일 완료 토글: \(tasks[taskIndex].subtasks[subtaskIndex].title)")
+    }
+
     /// 드래그 앤 드롭으로 오늘 태스크 순서 재조정 (표시된 목록 기준, UUID 배열 사용)
     func moveTodayTask(draggedId: UUID, targetId: UUID, orderedIds: [UUID]) {
         guard draggedId != targetId else { return }
