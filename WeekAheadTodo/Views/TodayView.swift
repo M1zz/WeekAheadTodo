@@ -319,10 +319,10 @@ struct TodayView: View {
                     if notificationService.isNotificationEnabled && tasksNeedingAttentionCount > 0 {
                         Circle()
                             .fill(Color.red)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 16, height: 16)
                             .overlay(
                                 Text("\(min(tasksNeedingAttentionCount, 9))")
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
                             )
                             .offset(x: 8, y: -8)
