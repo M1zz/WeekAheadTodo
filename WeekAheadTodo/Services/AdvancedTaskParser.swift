@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 고급 자연어 파싱 (시간대, 복잡한 날짜 표현)

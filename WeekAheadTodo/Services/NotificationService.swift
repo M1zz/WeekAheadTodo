@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 import UserNotifications
 
@@ -213,7 +214,7 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - 태스크 알림 스케줄링
 
     /// 모든 태스크에 대해 알림 스케줄 갱신
-    func scheduleNotifications(for tasks: [WeekAheadTodo.Task]) async {
+    func scheduleNotifications(for tasks: [WeekAheadShared.Task]) async {
         guard isNotificationEnabled else {
             return
         }
@@ -236,7 +237,7 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - 진행 확인 알림
 
     /// 진행 중인 태스크에 대한 체크인 알림 스케줄링
-    func scheduleCheckinNotifications(for tasks: [WeekAheadTodo.Task]) async {
+    func scheduleCheckinNotifications(for tasks: [WeekAheadShared.Task]) async {
         guard isNotificationEnabled else { return }
 
         // 진행 중인 태스크만 필터링
@@ -258,7 +259,7 @@ class NotificationService: NSObject, ObservableObject {
     }
 
     /// 특정 시간에 진행 중 태스크의 체크인 알림 스케줄
-    private func scheduleCheckinNotification(for task: WeekAheadTodo.Task, at time: NotificationTime) async {
+    private func scheduleCheckinNotification(for task: WeekAheadShared.Task, at time: NotificationTime) async {
         let notificationId = "checkin-\(task.id.uuidString)-\(time.hour)-\(time.minute)"
 
         let content = UNMutableNotificationContent()
@@ -285,7 +286,7 @@ class NotificationService: NSObject, ObservableObject {
     }
 
     /// 특정 시간에 태스크 체크 알림 스케줄
-    private func scheduleDailyCheckNotification(hour: Int, minute: Int, tasks: [WeekAheadTodo.Task]) async {
+    private func scheduleDailyCheckNotification(hour: Int, minute: Int, tasks: [WeekAheadShared.Task]) async {
         let notificationId = "daily-check-\(hour)-\(minute)"
 
         // 알림이 필요한 태스크들 필터링
@@ -320,12 +321,12 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - 태스크 필터링 로직
 
     /// 알림이 필요한 태스크들 필터링
-    private func filterTasksNeedingAttention(_ tasks: [WeekAheadTodo.Task]) -> [WeekAheadTodo.Task] {
+    private func filterTasksNeedingAttention(_ tasks: [WeekAheadShared.Task]) -> [WeekAheadShared.Task] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
 
-        var tasksNeedingAttention: [WeekAheadTodo.Task] = []
+        var tasksNeedingAttention: [WeekAheadShared.Task] = []
 
         for task in tasks where !task.isCompleted {
             // 1. 시작일이 지났는데 아직 시작 안한 일
@@ -372,7 +373,7 @@ class NotificationService: NSObject, ObservableObject {
     }
 
     /// 알림 본문 생성
-    private func generateNotificationBody(for tasks: [WeekAheadTodo.Task]) -> String {
+    private func generateNotificationBody(for tasks: [WeekAheadShared.Task]) -> String {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 

@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 캘린더 이벤트의 반복 패턴 감지 서비스

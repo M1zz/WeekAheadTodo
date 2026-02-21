@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 import SwiftData
 
@@ -158,6 +159,11 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .showQuickAdd)) { _ in
             showingQuickAdd = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            _Concurrency.Task { @MainActor in
+                await viewModel.syncOnForeground()
+            }
         }
         .task {
             // 앱 시작 시 iCloud와 자동 동기화 (로컬 데이터로 클라우드를 덮어쓰는 것을 방지)

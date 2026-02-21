@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/.build/arm64-apple-macosx/debug/WeekAheadShared.build/master.swiftdeps"
+  },
+  "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/Sources/WeekAheadShared/Task.swift": {
+    "dependencies": "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/.build/arm64-apple-macosx/debug/WeekAheadShared.build/Task.d",
+    "object": "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/.build/arm64-apple-macosx/debug/WeekAheadShared.build/Task.swift.o",
+    "swiftmodule": "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/.build/arm64-apple-macosx/debug/WeekAheadShared.build/Task~partial.swiftmodule",
+    "swift-dependencies": "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/.build/arm64-apple-macosx/debug/WeekAheadShared.build/Task.swiftdeps",
+    "diagnostics": "/Users/leeo/Documents/code/WeekAheadTodo/Packages/WeekAheadShared/.build/arm64-apple-macosx/debug/WeekAheadShared.build/Task.dia"
+  }
+}

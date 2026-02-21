@@ -5,6 +5,7 @@
 //  CloudKit 뷰어 앱
 //
 
+import WeekAheadShared
 import SwiftUI
 import Combine
 

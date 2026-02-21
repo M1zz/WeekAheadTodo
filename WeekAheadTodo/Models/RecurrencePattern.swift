@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 반복 패턴 유형

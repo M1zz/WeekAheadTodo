@@ -6,6 +6,7 @@
 //
 
 #if os(iOS)
+import WeekAheadShared
 import ActivityKit
 import SwiftUI
 import Combine

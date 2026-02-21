@@ -5,6 +5,7 @@
 //  로컬 푸시 알림 관리
 //
 
+import WeekAheadShared
 import Foundation
 import UserNotifications
 import SwiftUI

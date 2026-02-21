@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 /// 다가올 알림을 미리 볼 수 있는 뷰

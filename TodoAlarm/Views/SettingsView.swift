@@ -5,6 +5,7 @@
 //  설정 및 통계 탭
 //
 
+import WeekAheadShared
 import SwiftUI
 
 struct SettingsView: View {

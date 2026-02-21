@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 // MARK: - Time Based Week Calendar (Google Calendar Style)

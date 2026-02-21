@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 import AppKit
 import EventKit

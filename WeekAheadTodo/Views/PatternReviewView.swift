@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 /// 감지된 패턴 검토 뷰

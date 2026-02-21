@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 선제적 제안 유형

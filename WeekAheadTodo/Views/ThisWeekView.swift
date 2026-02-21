@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 // MARK: - This Week View

@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 자연어 입력을 파싱하여 태스크 정보 추출

@@ -5,6 +5,7 @@
 //  Task 행 컴포넌트
 //
 
+import WeekAheadShared
 import SwiftUI
 
 struct TaskRowView: View {

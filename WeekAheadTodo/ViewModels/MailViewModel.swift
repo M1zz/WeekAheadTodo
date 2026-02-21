@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 메일 통합 ViewModel

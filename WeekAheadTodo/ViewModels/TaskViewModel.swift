@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 import SwiftUI
 import CloudKit
@@ -125,6 +126,10 @@ class TaskViewModel: ObservableObject {
     private let calendarEndHourKey = "CalendarEndHour"
     private let autoBackupEnabledKey = "AutoBackupEnabled"
 
+    // Time Migration 버전 관리 (일회성 마이그레이션 가드)
+    private let timeMigrationVersionKey = "TaskTimeMigrationVersion"
+    private let currentMigrationVersion = 1
+
     // MARK: - Initialization
 
     init() {
@@ -190,6 +195,12 @@ class TaskViewModel: ObservableObject {
     /// 캘린더 배치 정보를 기반으로 dueDate를 동기화
     /// scheduledStartTime이 설정된 경우, dueDate = scheduledStartTime + estimatedMinutes로 자동 계산
     private func migrateTaskTimes() {
+        // 이미 완료된 버전이면 건너뜀 (매 앱 시작마다 덮어쓰는 버그 방지)
+        let completedVersion = UserDefaults.standard.integer(forKey: timeMigrationVersionKey)
+        guard completedVersion < currentMigrationVersion else {
+            print("ℹ️ [migrateTaskTimes] 이미 완료 (v\(completedVersion)), 건너뜀")
+            return
+        }
 
         var migrationCount = 0
         let calendar = Calendar.current
@@ -243,6 +254,9 @@ class TaskViewModel: ObservableObject {
         } else {
         }
 
+        // 마이그레이션 완료 버전 기록 (이후 앱 시작 시 건너뜀)
+        UserDefaults.standard.set(currentMigrationVersion, forKey: timeMigrationVersionKey)
+        print("✅ [migrateTaskTimes] v\(currentMigrationVersion) 완료, \(migrationCount)개 수정")
     }
 
     /// dueDate가 자정(00:00)인지 확인
@@ -610,6 +624,22 @@ class TaskViewModel: ObservableObject {
         }
     }
     
+    // MARK: - MIT (Most Important Task)
+
+    /// 오늘의 핵심 태스크 (MIT, 미완료)
+    var mitTasks: [Task] {
+        todayTasks.filter { $0.isMIT && !$0.isCompleted }
+    }
+
+    /// MIT 토글 (최대 3개 제한)
+    func toggleMIT(_ task: Task) {
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        let currentCount = tasks.filter { $0.isMIT && !$0.isCompleted }.count
+        if !tasks[index].isMIT && currentCount >= 3 { return }
+        tasks[index].isMIT.toggle()
+        print("⭐ [toggleMIT] \(tasks[index].title) isMIT=\(tasks[index].isMIT)")
+    }
+
     func updateTask(_ task: Task) {
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             var updatedTask = task
@@ -1116,6 +1146,34 @@ class TaskViewModel: ObservableObject {
 
 
         return result
+    }
+
+    // MARK: - Foreground Sync
+
+    /// 앱이 포그라운드로 복귀할 때 클라우드와 동기화
+    /// 클라우드가 더 최신이면 복원, 로컬이 더 최신이면 백업
+    func syncOnForeground() async {
+        guard let _ = database else { return }
+        guard !isSyncing else { return }
+        guard initialSyncCompleted else { return }
+
+        do {
+            let cloudPreview = try await getCloudDataPreview()
+            let localLastModified = lastSyncDate ?? Date.distantPast
+            let cloudLastModified = cloudPreview.lastSyncDate ?? Date.distantPast
+
+            if cloudLastModified > localLastModified {
+                print("☁️ [syncOnForeground] 클라우드가 더 최신 → 자동 복원")
+                try await restoreFromCloud()
+            } else if localLastModified > cloudLastModified, (!tasks.isEmpty || !projects.isEmpty) {
+                print("💾 [syncOnForeground] 로컬이 더 최신 → 자동 백업")
+                try await saveToCloud()
+            } else {
+                print("✅ [syncOnForeground] 동기화 상태 최신")
+            }
+        } catch {
+            print("⚠️ [syncOnForeground] 동기화 실패: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Auto Backup

@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 /// 메일 통합 뷰

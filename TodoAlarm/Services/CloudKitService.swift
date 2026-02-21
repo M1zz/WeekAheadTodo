@@ -5,6 +5,7 @@
 //  CloudKit 읽기 전용 서비스
 //
 
+import WeekAheadShared
 import CloudKit
 import Foundation
 

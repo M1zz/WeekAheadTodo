@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 /// 패턴 상세 및 Task 설정 뷰

@@ -5,6 +5,7 @@
 //  TabView 기반 메인 UI
 //
 
+import WeekAheadShared
 import SwiftUI
 
 struct ContentView: View {

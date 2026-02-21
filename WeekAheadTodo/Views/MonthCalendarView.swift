@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 // MARK: - Month Calendar View (Apple Calendar Style)

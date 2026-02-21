@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -44,6 +45,7 @@ struct TodayView: View {
     @State private var taskIdsToSelect: [UUID] = []
     @State private var draggingTaskId: UUID? = nil
     @AppStorage("recommendationSectionExpanded") private var isRecommendationExpanded = true
+    @AppStorage("focusModeEnabled") private var isFocusMode = false
 
     // 체크인 관련
     @State private var showingCheckinSheet = false
@@ -56,62 +58,80 @@ struct TodayView: View {
         }
     }
 
+    /// 포커스 모드에서 보여줄 최대 3개 태스크 (MIT 우선, 이후 sortOrder 순)
+    private var focusTasks: [Task] {
+        let mit = displayedTasks.filter { $0.isMIT }
+        let nonMit = displayedTasks.filter { !$0.isMIT }
+        return Array((mit + nonMit).prefix(3))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    ForEach(assistantService.activeSuggestions) { suggestion in
-                        AssistantSuggestionBannerView(
-                            suggestion: suggestion,
-                            onDismiss: {
-                                assistantService.dismissSuggestion(suggestion)
-                            },
-                            onAction: { action in
-                                handleSuggestionAction(action, suggestion: suggestion)
-                            }
-                        )
-                    }
-
-                    // 미체크인 경고 배너
-                    MissedCheckinBanner(
-                        showingCheckinSheet: $showingCheckinSheet,
-                        selectedCheckinTask: $selectedCheckinTask
-                    )
-
-                    // 체크인 필요 태스크 목록
-                    CheckinNeededListView(
-                        showingCheckinSheet: $showingCheckinSheet,
-                        selectedCheckinTask: $selectedCheckinTask
-                    )
-
-                    if !displayedTasks.isEmpty {
-                        taskSection(
-                            title: "오늘 해야 할 일",
-                            subtitle: "역산 결과 기준",
-                            tasks: displayedTasks
-                        )
-                    } else {
-                        emptyStateView
-                    }
-
-                    if !viewModel.recommendPreparableTasks().isEmpty {
-                        recommendationSection
-                    }
-
-                    if viewModel.isTodayOverCapacity {
-                        reallocationSuggestionView
-                    }
-
-                    let futurePreps = viewModel.futureTasksPreparedToday()
-                    if !futurePreps.isEmpty {
-                        futureFeedbackSection(futurePreps: futurePreps)
-                    }
+            if isFocusMode {
+                ScrollView {
+                    focusModeSection
+                        .padding(24)
                 }
-                .padding(24)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        ForEach(assistantService.activeSuggestions) { suggestion in
+                            AssistantSuggestionBannerView(
+                                suggestion: suggestion,
+                                onDismiss: {
+                                    assistantService.dismissSuggestion(suggestion)
+                                },
+                                onAction: { action in
+                                    handleSuggestionAction(action, suggestion: suggestion)
+                                }
+                            )
+                        }
+
+                        // 미체크인 경고 배너
+                        MissedCheckinBanner(
+                            showingCheckinSheet: $showingCheckinSheet,
+                            selectedCheckinTask: $selectedCheckinTask
+                        )
+
+                        // 체크인 필요 태스크 목록
+                        CheckinNeededListView(
+                            showingCheckinSheet: $showingCheckinSheet,
+                            selectedCheckinTask: $selectedCheckinTask
+                        )
+
+                        if !viewModel.mitTasks.isEmpty {
+                            mitPinnedSection
+                        }
+
+                        if !displayedTasks.isEmpty {
+                            taskSection(
+                                title: "오늘 해야 할 일",
+                                subtitle: "역산 결과 기준",
+                                tasks: displayedTasks
+                            )
+                        } else {
+                            emptyStateView
+                        }
+
+                        if !viewModel.recommendPreparableTasks().isEmpty {
+                            recommendationSection
+                        }
+
+                        if viewModel.isTodayOverCapacity {
+                            reallocationSuggestionView
+                        }
+
+                        let futurePreps = viewModel.futureTasksPreparedToday()
+                        if !futurePreps.isEmpty {
+                            futureFeedbackSection(futurePreps: futurePreps)
+                        }
+                    }
+                    .padding(24)
+                }
             }
         }
         .toolbar {
@@ -211,6 +231,19 @@ struct TodayView: View {
                     Text("오늘 \(todayDateString)")
                         .font(.largeTitle)
                         .fontWeight(.bold)
+
+                    Button(action: { isFocusMode.toggle() }) {
+                        Image(systemName: "scope")
+                            .font(.title2)
+                            .foregroundColor(isFocusMode ? .blue : .gray.opacity(0.5))
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(isFocusMode ? Color.blue.opacity(0.12) : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(isFocusMode ? "포커스 모드 끄기" : "포커스 모드 켜기 (오늘 핵심 3개)")
 
                     if let furthestDays = furthestFutureDays, furthestDays > 0 {
                         Text("\(furthestDays)일 뒤를 살고 있어요! ✨")
@@ -776,6 +809,52 @@ struct TodayView: View {
         }
     }
 
+    // MARK: - MIT 핀 섹션
+
+    private var mitPinnedSection: some View {
+        let allMIT = viewModel.tasks.filter { $0.isMIT }
+        let completedCount = allMIT.filter { $0.isCompleted }.count
+        let totalCount = allMIT.count
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill")
+                    .foregroundColor(.yellow)
+                Text("오늘의 핵심")
+                    .font(.headline)
+                Spacer()
+                Text("\(completedCount)/\(totalCount) 완료")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(allMIT) { task in
+                HStack(spacing: 10) {
+                    Button(action: { viewModel.toggleTaskCompletion(task) }) {
+                        Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.body)
+                            .foregroundColor(task.isCompleted ? .green : .gray)
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(task.title)
+                        .font(.body)
+                        .strikethrough(task.isCompleted)
+                        .foregroundColor(task.isCompleted ? .secondary : .primary)
+
+                    Spacer()
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.yellow.opacity(0.08))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+        )
+    }
+
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle")
@@ -1051,6 +1130,173 @@ struct TodayView: View {
         .padding(16)
         .background(Color.green.opacity(0.05))
         .cornerRadius(12)
+    }
+
+    // MARK: - 포커스 모드 섹션
+
+    private var focusModeSection: some View {
+        let completedCount = focusTasks.filter { $0.isCompleted }.count
+        let totalCount = focusTasks.count
+        let remainingCount = totalCount - completedCount
+        let progress = totalCount > 0 ? Double(completedCount) / Double(totalCount) : 0.0
+        let allCompleted = totalCount > 0 && remainingCount == 0
+
+        return VStack(alignment: .leading, spacing: 20) {
+
+            // 헤더: 타이틀 + 원형 진행 링
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "scope")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                        Text("오늘의 포커스")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                    }
+                    Text(allCompleted ? "모두 완료했어요! 🎉" : "이 \(remainingCount)개만 끝내면 됩니다")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                // 원형 진행 링
+                ZStack {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 5)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(progress))
+                        .stroke(
+                            allCompleted ? Color.green : Color.blue,
+                            style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeInOut(duration: 0.4), value: progress)
+                    VStack(spacing: 0) {
+                        Text("\(completedCount)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(allCompleted ? .green : .blue)
+                        Text("/\(totalCount)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(width: 54, height: 54)
+            }
+
+            Divider()
+
+            if focusTasks.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundColor(.green)
+                    Text("오늘 할 일이 없습니다!")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(24)
+            } else {
+                // 번호 배지 + 태스크 목록
+                VStack(spacing: 10) {
+                    ForEach(Array(focusTasks.enumerated()), id: \.element.id) { index, task in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text("\(index + 1)")
+                                .font(.callout)
+                                .fontWeight(.bold)
+                                .foregroundColor(task.isCompleted ? .secondary : .white)
+                                .frame(width: 24, height: 24)
+                                .background(
+                                    Circle()
+                                        .fill(task.isCompleted ? Color.secondary.opacity(0.2) : Color.blue)
+                                )
+                                .padding(.top, 10)
+                            TaskRowView(task: task)
+                        }
+                    }
+                }
+
+                // 진행률 바
+                VStack(alignment: .leading, spacing: 6) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.gray.opacity(0.15))
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(
+                                    allCompleted
+                                        ? LinearGradient(colors: [.green, .green.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
+                                        : LinearGradient(colors: [.blue, .blue.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
+                                )
+                                .frame(width: geometry.size.width * CGFloat(progress))
+                                .animation(.easeInOut(duration: 0.4), value: progress)
+                        }
+                    }
+                    .frame(height: 12)
+
+                    HStack {
+                        Text("\(Int(progress * 100))% 완료")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                            .foregroundColor(allCompleted ? .green : .blue)
+                        Spacer()
+                        if !allCompleted {
+                            Text("\(remainingCount)개 남음")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // 동기부여 메시지 / 완료 버튼
+                if allCompleted {
+                    HStack {
+                        Spacer()
+                        Button(action: { isFocusMode = false }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("포커스 모드 끄기")
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.green)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bolt.fill")
+                            .font(.callout)
+                            .foregroundColor(.blue)
+                        Text(remainingCount == 1 ? "마지막 1개! 거의 다 왔어요!" : "집중해서 \(remainingCount)개 끝내봐요!")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.blue.opacity(0.08))
+                    .cornerRadius(8)
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Color.blue.opacity(0.07), Color.blue.opacity(0.03)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.blue.opacity(0.4), lineWidth: 1.5)
+        )
     }
 
     private func addSelectedTasksToCalendar() async {

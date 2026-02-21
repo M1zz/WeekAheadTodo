@@ -5,6 +5,7 @@
 //  다음 주 할 일 탭
 //
 
+import WeekAheadShared
 import SwiftUI
 
 struct NextWeekTasksView: View {

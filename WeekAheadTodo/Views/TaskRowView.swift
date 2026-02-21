@@ -1,3 +1,4 @@
+import WeekAheadShared
 import SwiftUI
 
 // MARK: - Task Row View
@@ -11,6 +12,8 @@ struct TaskRowView: View {
     @State private var isHovered = false
     @State private var isPulsing = false
     @State private var isSubtasksExpanded = false
+    @State private var pomodoroSeconds: Int = 25 * 60
+    @State private var isPomodoroActive: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -19,6 +22,12 @@ struct TaskRowView: View {
             if task.isInProgress {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.blue)
+                    .frame(width: 4)
+                    .padding(.vertical, -12)
+                    .padding(.leading, -12)
+            } else if task.isMIT {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.yellow.opacity(0.8))
                     .frame(width: 4)
                     .padding(.vertical, -12)
                     .padding(.leading, -12)
@@ -122,6 +131,12 @@ struct TaskRowView: View {
 
                 HStack(spacing: 8) {
                     Label(task.estimatedTimeFormatted, systemImage: "clock")
+
+                    if let targetDate = task.targetDate, !task.isPreparation {
+                        Label(targetDate.formatted(.dateTime.hour().minute()), systemImage: "clock.fill")
+                            .foregroundColor(.blue.opacity(0.8))
+                    }
+
                     Label(task.dueDateWithWeekday, systemImage: "calendar")
 
                     if task.leadTimeDays > 0 {
@@ -143,10 +158,56 @@ struct TaskRowView: View {
                         }
                     }
 
+                    if let staleDays = task.staleDays {
+                        HStack(spacing: 3) {
+                            Image(systemName: "clock.badge.exclamationmark")
+                            Text("\(staleDays)일 방치")
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.red.opacity(0.12))
+                        .foregroundColor(.red)
+                        .cornerRadius(4)
+                    }
+
                     urgencyIndicator
                 }
                 .font(.callout)
                 .foregroundColor(.secondary)
+
+                // 뽀모도로 타이머 (진행 중 태스크에만 표시)
+                if task.isInProgress {
+                    HStack(spacing: 8) {
+                        Button(action: { isPomodoroActive.toggle() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: isPomodoroActive ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 10))
+                                Text(pomodoroFormatted)
+                                    .font(.callout)
+                                    .fontWeight(.medium)
+                                    .monospacedDigit()
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(isPomodoroActive ? Color.orange : Color.orange.opacity(0.15))
+                            .foregroundColor(isPomodoroActive ? .white : .orange)
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(.plain)
+
+                        if pomodoroSeconds < 25 * 60 {
+                            Button(action: {
+                                pomodoroSeconds = 25 * 60
+                                isPomodoroActive = false
+                            }) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.callout)
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
             }
 
             Spacer()
@@ -168,6 +229,20 @@ struct TaskRowView: View {
                     .help("삭제")
                 }
             }
+
+            // MIT 별 버튼 (항상 맨 오른쪽 고정)
+            Button(action: { viewModel.toggleMIT(task) }) {
+                Image(systemName: task.isMIT ? "star.fill" : "star")
+                    .font(.title3)
+                    .foregroundColor(task.isMIT ? .yellow : .gray.opacity(0.35))
+                    .padding(6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(task.isMIT ? Color.yellow.opacity(0.18) : Color.clear)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help(task.isMIT ? "핵심 해제 (포커스 모드에서 제외)" : "포커스 모드 핵심 태스크로 설정 (최대 3개)")
         }
         .padding(12)
         .background(taskBackground)
@@ -240,6 +315,29 @@ struct TaskRowView: View {
             .transition(.opacity.combined(with: .move(edge: .top)))
         }
         } // VStack 닫기
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            guard isPomodoroActive else {
+                if pomodoroSeconds == 0 { isPomodoroActive = false }
+                return
+            }
+            if pomodoroSeconds > 0 {
+                pomodoroSeconds -= 1
+            } else {
+                isPomodoroActive = false
+            }
+        }
+        .onChange(of: task.isInProgress) { _, isInProgress in
+            if !isInProgress {
+                isPomodoroActive = false
+                pomodoroSeconds = 25 * 60
+            }
+        }
+    }
+
+    private var pomodoroFormatted: String {
+        let m = pomodoroSeconds / 60
+        let s = pomodoroSeconds % 60
+        return String(format: "%02d:%02d", m, s)
     }
 
     private var statusColor: Color {
@@ -255,6 +353,8 @@ struct TaskRowView: View {
             return Color.green.opacity(0.05)
         } else if task.isInProgress {
             return Color.blue.opacity(0.08)
+        } else if task.isMIT {
+            return Color.yellow.opacity(0.06)
         } else {
             return Color(NSColor.controlBackgroundColor)
         }

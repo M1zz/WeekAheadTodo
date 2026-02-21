@@ -5,6 +5,7 @@
 //  iOS 전용 간소화 ViewModel
 //
 
+import WeekAheadShared
 import SwiftUI
 import CloudKit
 import Foundation

@@ -1,3 +1,4 @@
+import WeekAheadShared
 import Foundation
 
 /// 선제적 제안 서비스 - "비서처럼" 먼저 알려주는 기능

@@ -98,6 +98,19 @@ AdvancedTaskParser.swift가 프로젝트에 추가된 후:
   - "다다음주 보고서 작성" → 2주 후, 120분
   - "이번달말까지 프로젝트 #긴급" → 이번 달 마지막 날
 
+## ✅ iOS/macOS 코드 공유 구조 리팩토링 (2026-02-21)
+- [x] `Packages/WeekAheadShared/` 로컬 Swift Package 생성 (swift-tools-version: 6.0)
+- [x] `Task`, `Subtask`, `Project`, `TaskTemplate`, 6개 enum을 패키지로 이전 (public 선언)
+- [x] `project.pbxproj` 수정: XCLocalSwiftPackageReference, XCSwiftPackageProductDependency 추가
+- [x] WeekAheadTodo(macOS) 타깃에 WeekAheadShared 패키지 연결
+- [x] TodoAlarm(iOS) 타깃에 WeekAheadShared 패키지 연결
+- [x] `WeekAheadTodo/Models/Task.swift` 삭제 (패키지로 이전)
+- [x] `TodoAlarm/Models/Task.swift` 삭제 (패키지로 이전)
+- [x] 57개 파일에 `import WeekAheadShared` 추가
+- [x] macOS 빌드 성공 확인
+- [x] iOS(TodoAlarm) 파일 컴파일 에러 없음 확인
+  - ⚠️ widgetExtension 타깃의 Recovered References 에러는 기존 문제 (CalendarService.swift 등이 프로젝트 루트에 없음)
+
 ## 📋 향후 개선 사항
 
 - [ ] 자동 iCloud 동기화 (현재는 앱 시작 시에만)
