@@ -99,7 +99,7 @@ class CloudKitService {
               let taskRoleRaw = record["taskRole"] as? String,
               let statusRaw = record["status"] as? String,
               let priorityRaw = record["priority"] as? String,
-              let createdAt = record["createdAt"] as? Date,
+              let _ = record["createdAt"] as? Date,
               let taskType = TaskType(rawValue: taskTypeRaw),
               let status = TaskStatus(rawValue: statusRaw),
               let priority = TaskPriority(rawValue: priorityRaw)

@@ -5,6 +5,7 @@ import SwiftUI
 
 struct EditTaskView: View {
     @EnvironmentObject var viewModel: TaskViewModel
+    @EnvironmentObject var wikiViewModel: WikiViewModel
     @Environment(\.dismiss) var dismiss
 
     let task: Task
@@ -22,6 +23,8 @@ struct EditTaskView: View {
     @State private var selectedProjectId: UUID?
     @State private var subtasks: [Subtask]
     @State private var newSubtaskTitle: String = ""
+    @State private var linkedWikiPageIds: [UUID]
+    @State private var showingWikiLinkPicker: Bool = false
 
     init(task: Task) {
         self.task = task
@@ -37,6 +40,7 @@ struct EditTaskView: View {
         _taskType = State(initialValue: task.taskType)
         _selectedProjectId = State(initialValue: task.projectId)
         _subtasks = State(initialValue: task.subtasks)
+        _linkedWikiPageIds = State(initialValue: task.linkedWikiPageIds)
     }
 
     var body: some View {
@@ -184,6 +188,43 @@ struct EditTaskView: View {
                     }
                 }
 
+                Section("연결된 위키") {
+                    ForEach(linkedWikiPageIds, id: \.self) { pageId in
+                        if let page = wikiViewModel.page(for: pageId) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.text")
+                                    .foregroundColor(.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(page.title)
+                                        .font(.callout)
+                                    if let folder = wikiViewModel.folder(for: page.folderId) {
+                                        Text(folder.name)
+                                            .font(.callout)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Button {
+                                    linkedWikiPageIds.removeAll { $0 == pageId }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    Button {
+                        showingWikiLinkPicker = true
+                    } label: {
+                        Label("위키 페이지 연결...", systemImage: "link.badge.plus")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.blue)
+                }
+
                 Section("정보") {
                     if task.taskRole != .none {
                         LabeledContent("역할", value: task.taskRole.rawValue)
@@ -197,6 +238,10 @@ struct EditTaskView: View {
             .formStyle(.grouped)
         }
         .frame(width: 500, height: 600)
+        .sheet(isPresented: $showingWikiLinkPicker) {
+            WikiLinkPickerView(linkedPageIds: $linkedWikiPageIds)
+                .environmentObject(wikiViewModel)
+        }
     }
 
     private func saveTask() {
@@ -217,6 +262,7 @@ struct EditTaskView: View {
         }
 
         updatedTask.subtasks = subtasks
+        updatedTask.linkedWikiPageIds = linkedWikiPageIds
         viewModel.updateTask(updatedTask)
         dismiss()
     }

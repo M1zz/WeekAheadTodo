@@ -29,7 +29,7 @@ struct TaskRowView: View {
                 if task.priority != .normal {
                     Image(systemName: priorityIcon)
                         .foregroundStyle(priorityColor)
-                        .font(.caption)
+                        .font(.callout)
                 }
             }
 
@@ -37,28 +37,28 @@ struct TaskRowView: View {
             HStack(spacing: 4) {
                 Image(systemName: isPastDue ? "exclamationmark.triangle.fill" : "clock.fill")
                     .foregroundStyle(isPastDue ? .red : .orange)
-                    .font(.caption)
+                    .font(.callout)
 
                 Text(timeRangeText)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(isPastDue ? .red : .primary)
                     .fontWeight(.medium)
 
                 if isPastDue {
                     Text("⚠️")
-                        .font(.caption)
+                        .font(.callout)
                 }
             }
 
             // 예상 시간 + 프로젝트
             HStack(spacing: 12) {
                 Label("\(task.estimatedMinutes)분", systemImage: "timer")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
 
                 if let projectName = viewModel.projectName(for: task.projectId) {
                     Label(projectName, systemImage: "folder")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundStyle(.blue)
                 }
             }
@@ -66,7 +66,7 @@ struct TaskRowView: View {
             // 설명 (있으면 표시)
             if !task.description.isEmpty {
                 Text(task.description)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .padding(.top, 2)

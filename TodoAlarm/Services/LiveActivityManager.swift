@@ -155,7 +155,8 @@ class LiveActivityManager: ObservableObject {
             print("   Code: \(error.code)")
             print("   Description: \(error.localizedDescription)")
 
-            if let userInfo = error.userInfo as? [String: Any], !userInfo.isEmpty {
+            if !error.userInfo.isEmpty {
+                let userInfo = error.userInfo
                 print("\n   UserInfo:")
                 for (key, value) in userInfo {
                     print("      \(key): \(value)")

@@ -47,7 +47,7 @@ struct SettingsView: View {
                             Text("자동 동기화")
                                 .font(.callout)
                             Text("1시간마다 자동으로 클라우드에서 데이터 가져오기")
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -78,7 +78,7 @@ struct SettingsView: View {
 
                     if let error = viewModel.syncError {
                         Text("오류: \(error)")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.red)
                     }
                 }
@@ -108,7 +108,7 @@ struct SettingsView: View {
                         Text("1.0.0")
                     }
                     Text("macOS WeekAheadTodo 데이터를 읽기 전용으로 표시합니다.")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                 }
             }

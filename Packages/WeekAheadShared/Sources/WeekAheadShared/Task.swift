@@ -216,6 +216,9 @@ public struct Task: Identifiable {
     // MIT (Most Important Task)
     public var isMIT: Bool = false
 
+    // 위키 연결
+    public var linkedWikiPageIds: [UUID] = []
+
     public init(
         id: UUID = UUID(),
         title: String,
@@ -494,6 +497,7 @@ extension Task: Codable {
         case completedAt
         case subtasks
         case isMIT
+        case linkedWikiPageIds
     }
 
     public init(from decoder: Decoder) throws {
@@ -537,6 +541,9 @@ extension Task: Codable {
 
         // MIT (없으면 기본값 false)
         isMIT = try container.decodeIfPresent(Bool.self, forKey: .isMIT) ?? false
+
+        // 위키 연결 (없으면 빈 배열)
+        linkedWikiPageIds = try container.decodeIfPresent([UUID].self, forKey: .linkedWikiPageIds) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -575,6 +582,9 @@ extension Task: Codable {
 
         // MIT
         try container.encode(isMIT, forKey: .isMIT)
+
+        // 위키 연결
+        try container.encode(linkedWikiPageIds, forKey: .linkedWikiPageIds)
     }
 }
 

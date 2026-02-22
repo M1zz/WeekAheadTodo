@@ -146,7 +146,6 @@ struct UpcomingRemindersView: View {
                 emptyState
             }
         }
-        .frame(minWidth: 500)
         .sheet(item: $showingEditTask) { task in
             EditTaskView(task: task)
                 .environmentObject(viewModel)
@@ -168,7 +167,6 @@ struct UpcomingRemindersView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            .frame(minWidth: 350)
 
             Spacer()
 
@@ -241,7 +239,6 @@ struct UpcomingRemindersView: View {
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
-                .frame(minWidth: 250)
 
                 Spacer()
 
@@ -346,7 +343,6 @@ struct ReminderTaskRow: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(minWidth: 200)
 
             Spacer()
 
@@ -364,7 +360,6 @@ struct ReminderTaskRow: View {
             .buttonStyle(.plain)
         }
         .padding(12)
-        .frame(minWidth: 400)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
     }

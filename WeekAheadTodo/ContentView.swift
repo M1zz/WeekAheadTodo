@@ -8,6 +8,7 @@ struct ContentView: View {
     @StateObject private var viewModel = TaskViewModel()
     @StateObject private var calendarViewModel = CalendarViewModel()
     @StateObject private var mailViewModel = MailViewModel()
+    @StateObject private var wikiViewModel = WikiViewModel()
     @StateObject private var notificationService = NotificationService.shared
     @StateObject private var assistantService = ProactiveAssistantService.shared
     @AppStorage("selectedSection") private var selectedSectionRawValue: String = SidebarSection.today.rawValue
@@ -61,6 +62,7 @@ struct ContentView: View {
         case weekOverview = "주간 개요"
         case importTasks = "가져오기"
         case patterns = "패턴 관리"
+        case wiki = "위키"
         case mail = "메일"
         case settings = "설정"
 
@@ -78,6 +80,7 @@ struct ContentView: View {
             case .weekOverview: return "chart.bar.fill"
             case .importTasks: return "square.and.arrow.down"
             case .patterns: return "arrow.triangle.2.circlepath"
+            case .wiki: return "book.closed.fill"
             case .mail: return "envelope.fill"
             case .settings: return "gear"
             }
@@ -120,12 +123,15 @@ struct ContentView: View {
                     }
                 }
 
+                Section("문서") {
+                    sidebarItem(.wiki)
+                }
+
                 Section("관리") {
                     sidebarItem(.todayInsights)
                     sidebarItem(.weekOverview)
                     sidebarItem(.importTasks)
                     sidebarItem(.patterns)
-                    sidebarItem(.mail)
                     sidebarItem(.settings)
                 }
             }
@@ -134,11 +140,13 @@ struct ContentView: View {
         } detail: {
             // 메인 콘텐츠
             mainContent
+                .id(selectedSectionRawValue)
         }
         .frame(minWidth: 900, minHeight: 600)
         .environmentObject(viewModel)
         .environmentObject(calendarViewModel)
         .environmentObject(mailViewModel)
+        .environmentObject(wikiViewModel)
         .environmentObject(notificationService)
         .environmentObject(assistantService)
         // TODO: URLHandler.swift를 Xcode 프로젝트에 추가한 후 주석 해제
@@ -326,6 +334,8 @@ struct ContentView: View {
                     ImportView()
                 case .patterns:
                     ApprovedPatternManagementView()
+                case .wiki:
+                    WikiView()
                 case .mail:
                     MailIntegrationView()
                 case .settings:

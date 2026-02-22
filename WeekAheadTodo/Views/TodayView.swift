@@ -48,7 +48,6 @@ struct TodayView: View {
     @AppStorage("focusModeEnabled") private var isFocusMode = false
 
     // 체크인 관련
-    @State private var showingCheckinSheet = false
     @State private var selectedCheckinTask: Task?
 
     private var displayedTasks: [Task] {
@@ -93,13 +92,11 @@ struct TodayView: View {
 
                         // 미체크인 경고 배너
                         MissedCheckinBanner(
-                            showingCheckinSheet: $showingCheckinSheet,
                             selectedCheckinTask: $selectedCheckinTask
                         )
 
                         // 체크인 필요 태스크 목록
                         CheckinNeededListView(
-                            showingCheckinSheet: $showingCheckinSheet,
                             selectedCheckinTask: $selectedCheckinTask
                         )
 
@@ -153,10 +150,11 @@ struct TodayView: View {
                 }
             )
         }
-        .sheet(isPresented: $showingCheckinSheet) {
-            if let task = selectedCheckinTask {
-                CheckinView(task: task, isPresented: $showingCheckinSheet)
-            }
+        .sheet(item: $selectedCheckinTask) { task in
+            CheckinView(task: task, isPresented: Binding(
+                get: { selectedCheckinTask != nil },
+                set: { if !$0 { selectedCheckinTask = nil } }
+            ))
         }
         .alert("오늘로 이동 완료", isPresented: $showingMoveToTodayAlert) {
             Button("확인", role: .cancel) { }

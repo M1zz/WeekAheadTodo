@@ -117,7 +117,6 @@ struct CheckinResponseButton: View {
 /// 미체크인 경고 배너
 struct MissedCheckinBanner: View {
     @EnvironmentObject var viewModel: TaskViewModel
-    @Binding var showingCheckinSheet: Bool
     @Binding var selectedCheckinTask: Task?
 
     var body: some View {
@@ -138,7 +137,6 @@ struct MissedCheckinBanner: View {
                 ForEach(viewModel.tasksWithMissedCheckins.prefix(3)) { task in
                     Button(action: {
                         selectedCheckinTask = task
-                        showingCheckinSheet = true
                     }) {
                         HStack {
                             Text(task.title)
@@ -170,7 +168,6 @@ struct MissedCheckinBanner: View {
 /// 체크인 필요 태스크 목록 뷰
 struct CheckinNeededListView: View {
     @EnvironmentObject var viewModel: TaskViewModel
-    @Binding var showingCheckinSheet: Bool
     @Binding var selectedCheckinTask: Task?
 
     var body: some View {
@@ -190,7 +187,6 @@ struct CheckinNeededListView: View {
                 ForEach(viewModel.tasksNeedingCheckin) { task in
                     Button(action: {
                         selectedCheckinTask = task
-                        showingCheckinSheet = true
                     }) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
