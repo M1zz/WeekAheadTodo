@@ -1,6 +1,7 @@
 import WeekAheadShared
 import Foundation
 import SwiftUI
+import SwiftData
 import CloudKit
 import Combine
 
@@ -100,6 +101,9 @@ class TaskViewModel: ObservableObject {
 
     private var container: CKContainer?
     private var database: CKDatabase?
+
+    // MARK: - SwiftData (로컬 저장)
+    var modelContext: ModelContext?
 
     // MARK: - Auto Backup
     private var autoBackupTimer: Timer?
@@ -982,18 +986,23 @@ class TaskViewModel: ObservableObject {
                 return
             }
 
-            // 4. 둘 다 데이터가 있으면 lastSyncDate 비교
+            // 4. 둘 다 데이터가 있으면 개수와 lastSyncDate 비교
             if !tasks.isEmpty && !cloudPreview.isEmpty {
                 let localLastModified = lastSyncDate ?? Date.distantPast
                 let cloudLastModified = cloudPreview.lastSyncDate ?? Date.distantPast
 
-
-                // iCloud가 더 최신이면 복원
-                if cloudLastModified > localLastModified {
+                // 클라우드에 더 많은 데이터가 있으면 복원 우선 (다른 기기에서 추가된 데이터 보호)
+                if cloudPreview.taskCount > tasks.count {
+                    print("☁️ [performInitialSync] 클라우드(\(cloudPreview.taskCount)개)가 로컬(\(tasks.count)개)보다 많음 → 복원")
                     try await restoreFromCloud()
-                } else if localLastModified > cloudLastModified {
+                } else if cloudLastModified > localLastModified {
+                    print("☁️ [performInitialSync] 클라우드가 더 최신 → 복원")
+                    try await restoreFromCloud()
+                } else if localLastModified > cloudLastModified && tasks.count >= cloudPreview.taskCount {
+                    print("💾 [performInitialSync] 로컬이 더 최신, 데이터도 같거나 많음 → 백업")
                     try await saveToCloud()
                 } else {
+                    print("✅ [performInitialSync] 동기화 상태 최신")
                 }
             } else {
             }
@@ -1300,123 +1309,69 @@ class TaskViewModel: ObservableObject {
 
         defer { isSyncing = false }
 
-        // Get saved recordNames from UserDefaults
-        let taskRecordNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
-        let projectRecordNames = UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames") ?? []
-
+        // 항상 CKQuery로 모든 레코드 가져오기 (다른 기기에서 추가된 데이터도 포함)
 
         // Restore tasks
         var cloudTasks: [Task] = []
 
-        if !taskRecordNames.isEmpty {
-            // recordNames가 있으면 직접 fetch
-            let taskRecordIDs = taskRecordNames.map { CKRecord.ID(recordName: $0) }
-
-            // Fetch in batches of 200
-            for batch in taskRecordIDs.chunked(into: 200) {
-                do {
-                    let results = try await database.records(for: batch)
-                    let batchTasks = results.values.compactMap { result in
-                        try? result.get()
-                    }.compactMap { ckRecordToTask($0) }
-                    cloudTasks.append(contentsOf: batchTasks)
-                } catch let error as CKError {
-                    // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
-                    if error.code == .unknownItem {
-                    } else {
-                        throw error
-                    }
-                }
-            }
-        } else {
-            // recordNames가 없으면 CKQuery로 모든 레코드 가져오기
+        do {
             let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
             query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
-            do {
-                // 모든 필수 필드를 명시적으로 지정 (CloudKit은 desiredKeys 생략 시 일부 필드만 가져올 수 있음)
-                let results = try await database.records(matching: query, desiredKeys: [
-                    "title", "taskDescription", "dueDate", "scheduledStartTime", "estimatedMinutes", "leadTimeDays",
-                    "taskType", "taskRole", "status", "priority", "createdAt",
-                    "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
-                    "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
-                    "lastCheckinDate", "consecutiveMissedCheckins", "completedAt"
-                ])
+            let results = try await database.records(matching: query, desiredKeys: [
+                "title", "taskDescription", "dueDate", "scheduledStartTime", "estimatedMinutes", "leadTimeDays",
+                "taskType", "taskRole", "status", "priority", "createdAt",
+                "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
+                "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
+                "lastCheckinDate", "consecutiveMissedCheckins", "completedAt"
+            ])
 
-                cloudTasks = results.matchResults.compactMap { (recordID, result) in
-                    guard let record = try? result.get() else {
-                        return nil
-                    }
-                    let task = ckRecordToTask(record)
-                    if task == nil {
-                    }
-                    return task
-                }
-
-                // 가져온 레코드 ID를 UserDefaults에 저장
-                let fetchedRecordNames = cloudTasks.map { $0.id.uuidString }
-                UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudTaskRecordNames")
-            } catch {
-                throw error
+            cloudTasks = results.matchResults.compactMap { (recordID, result) in
+                guard let record = try? result.get() else { return nil }
+                return ckRecordToTask(record)
             }
+
+            // 가져온 레코드 ID를 UserDefaults에 저장
+            let fetchedRecordNames = cloudTasks.map { $0.id.uuidString }
+            UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudTaskRecordNames")
+            print("☁️ [restoreFromCloud] CKQuery로 태스크 \(cloudTasks.count)개 복원")
+        } catch {
+            print("❌ [restoreFromCloud] 태스크 쿼리 실패: \(error)")
+            throw error
         }
 
         // Restore projects
         var cloudProjects: [Project] = []
 
-        if !projectRecordNames.isEmpty {
-            // recordNames가 있으면 직접 fetch
-            let projectRecordIDs = projectRecordNames.map { CKRecord.ID(recordName: $0) }
-
-            // Fetch in batches of 200
-            for batch in projectRecordIDs.chunked(into: 200) {
-                do {
-                    let results = try await database.records(for: batch)
-                    let batchProjects = results.values.compactMap { result in
-                        try? result.get()
-                    }.compactMap { ckRecordToProject($0) }
-                    cloudProjects.append(contentsOf: batchProjects)
-                } catch let error as CKError {
-                    // unknownItem 에러는 레코드가 삭제된 경우이므로 경고만 출력
-                    if error.code == .unknownItem {
-                    } else {
-                        throw error
-                    }
-                }
-            }
-        } else {
-            // recordNames가 없으면 CKQuery로 모든 레코드 가져오기
+        do {
             let query = CKQuery(recordType: "Project", predicate: NSPredicate(value: true))
 
-            do {
-                // 모든 필수 필드를 명시적으로 지정
-                let results = try await database.records(matching: query, desiredKeys: ["name", "color", "icon"])
+            let results = try await database.records(matching: query, desiredKeys: ["name", "color", "icon"])
 
-                cloudProjects = results.matchResults.compactMap { (recordID, result) in
-                    guard let record = try? result.get() else {
-                        return nil
-                    }
-                    let project = ckRecordToProject(record)
-                    if project == nil {
-                    }
-                    return project
-                }
-
-                // 가져온 레코드 ID를 UserDefaults에 저장
-                let fetchedRecordNames = cloudProjects.map { $0.id.uuidString }
-                UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudProjectRecordNames")
-            } catch {
-                throw error
+            cloudProjects = results.matchResults.compactMap { (recordID, result) in
+                guard let record = try? result.get() else { return nil }
+                return ckRecordToProject(record)
             }
+
+            let fetchedRecordNames = cloudProjects.map { $0.id.uuidString }
+            UserDefaults.standard.set(fetchedRecordNames, forKey: "cloudProjectRecordNames")
+            print("☁️ [restoreFromCloud] CKQuery로 프로젝트 \(cloudProjects.count)개 복원")
+        } catch {
+            print("❌ [restoreFromCloud] 프로젝트 쿼리 실패: \(error)")
+            throw error
         }
 
         tasks = cloudTasks
-
         projects = cloudProjects
+
+        // SwiftData에도 동기화
+        syncAllTasksToSwiftData()
+        syncAllProjectsToSwiftData()
 
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
+        print("✅ [restoreFromCloud] 복원 완료 - 태스크: \(tasks.count)개, 프로젝트: \(projects.count)개")
     }
 
     /// 데이터 초기화 (로컬 + 클라우드)
@@ -1915,6 +1870,86 @@ class TaskViewModel: ObservableObject {
 
     func incompleteTasks(for projectId: UUID) -> [Task] {
         tasks.filter { $0.projectId == projectId && !$0.isCompleted }
+    }
+
+    // MARK: - SwiftData Setup (로컬 저장)
+
+    /// ModelContext를 연결하고 SwiftData에 데이터 마이그레이션
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
+        migrateToSwiftDataIfNeeded()
+    }
+
+    private let swiftDataMigrationKey = "SwiftDataMigrationCompleted"
+
+    /// UserDefaults → SwiftData 일회성 마이그레이션
+    private func migrateToSwiftDataIfNeeded() {
+        guard let modelContext = modelContext else { return }
+        guard !UserDefaults.standard.bool(forKey: swiftDataMigrationKey) else { return }
+
+        print("🔄 [마이그레이션] UserDefaults → SwiftData 시작: \(tasks.count)개 태스크, \(projects.count)개 프로젝트")
+
+        for task in tasks {
+            modelContext.insert(TaskItem(from: task))
+        }
+        for project in projects {
+            modelContext.insert(ProjectItem(from: project))
+        }
+
+        do {
+            try modelContext.save()
+            UserDefaults.standard.set(true, forKey: swiftDataMigrationKey)
+            print("✅ [마이그레이션] 완료")
+        } catch {
+            print("❌ [마이그레이션] 실패: \(error)")
+        }
+    }
+
+    /// 현재 태스크를 SwiftData에 동기화
+    func syncTaskToSwiftData(_ task: Task) {
+        guard let modelContext = modelContext else { return }
+
+        let taskId = task.id
+        let descriptor = FetchDescriptor<TaskItem>(predicate: #Predicate { $0.id == taskId })
+
+        if let existing = try? modelContext.fetch(descriptor).first {
+            existing.update(from: task)
+        } else {
+            modelContext.insert(TaskItem(from: task))
+        }
+        try? modelContext.save()
+    }
+
+    /// 모든 태스크를 SwiftData에 동기화
+    func syncAllTasksToSwiftData() {
+        guard let modelContext = modelContext else { return }
+
+        for task in tasks {
+            let taskId = task.id
+            let descriptor = FetchDescriptor<TaskItem>(predicate: #Predicate { $0.id == taskId })
+            if let existing = try? modelContext.fetch(descriptor).first {
+                existing.update(from: task)
+            } else {
+                modelContext.insert(TaskItem(from: task))
+            }
+        }
+        try? modelContext.save()
+    }
+
+    /// 모든 프로젝트를 SwiftData에 동기화
+    func syncAllProjectsToSwiftData() {
+        guard let modelContext = modelContext else { return }
+
+        for project in projects {
+            let projectId = project.id
+            let descriptor = FetchDescriptor<ProjectItem>(predicate: #Predicate { $0.id == projectId })
+            if let existing = try? modelContext.fetch(descriptor).first {
+                existing.update(from: project)
+            } else {
+                modelContext.insert(ProjectItem(from: project))
+            }
+        }
+        try? modelContext.save()
     }
 }
 

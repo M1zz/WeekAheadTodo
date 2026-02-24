@@ -10,24 +10,27 @@ struct WeekAheadTodoApp: App {
 
         let schema = Schema([
             ApprovedPattern.self,
+            TaskItem.self,
+            ProjectItem.self,
         ])
 
-        // Try persistent storage first (WITHOUT CloudKit sync)
+        // SwiftData 로컬 저장 (CloudKit 동기화는 기존 수동 CKRecord 방식 사용)
         let persistentConfig = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none  // Disable CloudKit integration for SwiftData
+            cloudKitDatabase: .none
         )
 
         var container: ModelContainer?
 
-        // First attempt: Normal persistent storage
+        // First attempt: Normal persistent storage with CloudKit sync
         do {
             container = try ModelContainer(
                 for: schema,
                 configurations: [persistentConfig]
             )
         } catch {
+            print("❌ [ModelContainer] 첫 번째 시도 실패: \(error)")
 
             // Delete old SwiftData files
             Self.deleteSwiftDataStore()
@@ -39,8 +42,9 @@ struct WeekAheadTodoApp: App {
                     configurations: [persistentConfig]
                 )
             } catch {
+                print("❌ [ModelContainer] 두 번째 시도 실패: \(error)")
 
-                // Third attempt: Fall back to in-memory storage
+                // Third attempt: Fall back to in-memory storage (CloudKit 없이)
                 do {
                     let inMemoryConfig = ModelConfiguration(
                         schema: schema,
@@ -51,9 +55,9 @@ struct WeekAheadTodoApp: App {
                         for: schema,
                         configurations: [inMemoryConfig]
                     )
+                    print("⚠️ [ModelContainer] 인메모리 모드로 폴백 (동기화 불가)")
                 } catch {
-
-                    // Last resort: Don't set container here, will be handled below
+                    print("❌ [ModelContainer] 인메모리 시도도 실패: \(error)")
                     container = nil
                 }
             }

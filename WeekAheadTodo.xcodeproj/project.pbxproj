@@ -49,6 +49,7 @@
 		A1664A74F5515FFCE4F1EA33 /* CalendarEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1578DEE4987F86FBBAC2939 /* CalendarEvent.swift */; };
 		A19ACD8EEF2A67E02C87D79C /* CalendarIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */; };
 		A1AAA111111111111111111B /* ApprovedPattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AAA111111111111111111A /* ApprovedPattern.swift */; };
+		A1TASKITEM00000000BUILD1 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TASKITEM00000000FREF01 /* TaskItem.swift */; };
 		A1BBB222222222222222222C /* PatternManagementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1BBB222222222222222222B /* PatternManagementService.swift */; };
 		A1C544133BCB00D56FD0DFFC /* PatternDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */; };
 		A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */; };
@@ -148,6 +149,7 @@
 		A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		A18D1386D284CA97002326B1 /* RecurrencePattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurrencePattern.swift; sourceTree = "<group>"; };
 		A1AAA111111111111111111A /* ApprovedPattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPattern.swift; sourceTree = "<group>"; };
+		A1TASKITEM00000000FREF01 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
 		A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternReviewView.swift; sourceTree = "<group>"; };
 		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
 		A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPatternManagementView.swift; sourceTree = "<group>"; };
@@ -301,6 +303,7 @@
 				A1578DEE4987F86FBBAC2939 /* CalendarEvent.swift */,
 				A18D1386D284CA97002326B1 /* RecurrencePattern.swift */,
 				A1AAA111111111111111111A /* ApprovedPattern.swift */,
+				A1TASKITEM00000000FREF01 /* TaskItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -600,6 +603,7 @@
 				A100D58EF96DA4DC19E5B6A2 /* PatternReviewView.swift in Sources */,
 				A1029A05FBB79BD181DD2B22 /* PatternDetailView.swift in Sources */,
 				A1AAA111111111111111111B /* ApprovedPattern.swift in Sources */,
+				A1TASKITEM00000000BUILD1 /* TaskItem.swift in Sources */,
 				A1BBB222222222222222222C /* PatternManagementService.swift in Sources */,
 				A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */,
 				A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */,

@@ -5,38 +5,38 @@ import SwiftData
 @Model
 final class ApprovedPattern {
     // MARK: - Identity
-    @Attribute(.unique) var id: UUID
-    var patternType: String  // PatternType.rawValue for Codable compatibility
+    var id: UUID = UUID()
+    var patternType: String = "weeklyFixedDay"
 
     // MARK: - Pattern Metadata
-    var approvedAt: Date
+    var approvedAt: Date = Date()
     var lastGeneratedTaskDate: Date?
-    var detectedAt: Date
-    var confidenceScore: Double
+    var detectedAt: Date = Date()
+    var confidenceScore: Double = 0.0
 
     // MARK: - Calendar Information
-    var calendarTitles: [String]
-    var primaryCalendar: String
+    var calendarTitles: [String] = []
+    var primaryCalendar: String = ""
 
     // MARK: - Recurrence Information
-    var recurrenceFrequency: String  // RecurrenceFrequency.rawValue
-    var recurrenceInterval: Int
+    var recurrenceFrequency: String = "weekly"
+    var recurrenceInterval: Int = 1
     var recurrenceDaysOfWeek: [Int]?
-    var nextOccurrenceDate: Date
+    var nextOccurrenceDate: Date = Date()
 
     // MARK: - Task Generation Settings
-    var taskTitle: String
-    var estimatedMinutes: Int
-    var leadTimeDays: Int
-    var taskTypeRaw: String  // TaskType.rawValue
+    var taskTitle: String = ""
+    var estimatedMinutes: Int = 30
+    var leadTimeDays: Int = 0
+    var taskTypeRaw: String = "미리 가능"
 
     // MARK: - State Management
-    var isActive: Bool  // Enable/disable pattern
-    var isUserModified: Bool  // Track if user edited the suggested values
+    var isActive: Bool = true
+    var isUserModified: Bool = false
 
     // MARK: - Sample Events (for reference)
-    var sampleEventTitles: [String]
-    var sampleEventDates: [Date]
+    var sampleEventTitles: [String] = []
+    var sampleEventDates: [Date] = []
 
     init(from pattern: RecurrencePattern) {
         self.id = pattern.id

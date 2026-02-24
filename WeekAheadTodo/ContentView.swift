@@ -174,7 +174,10 @@ struct ContentView: View {
             }
         }
         .task {
-            // 앱 시작 시 iCloud와 자동 동기화 (로컬 데이터로 클라우드를 덮어쓰는 것을 방지)
+            // SwiftData ModelContext 연결 (CloudKit 자동 동기화)
+            viewModel.setModelContext(modelContext)
+
+            // SwiftData에서 최신 데이터 로드
             await viewModel.performInitialSync()
 
             // 서비스 설정
