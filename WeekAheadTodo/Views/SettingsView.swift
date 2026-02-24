@@ -296,13 +296,13 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Button(action: { checkDataDifferenceBeforeSync(operation: .save) }) {
-                        Label("클라우드에 저장", systemImage: "icloud.and.arrow.up")
+                        Label("강제 백업", systemImage: "icloud.and.arrow.up")
                     }
                     .buttonStyle(.bordered)
                     .disabled(cloudOperationInProgress)
 
                     Button(action: { showCloudDataPreview() }) {
-                        Label("클라우드에서 복원", systemImage: "icloud.and.arrow.down")
+                        Label("강제 복원", systemImage: "icloud.and.arrow.down")
                     }
                     .buttonStyle(.bordered)
                     .disabled(cloudOperationInProgress)
@@ -371,13 +371,26 @@ struct SettingsView: View {
                 Text("데이터를 동기화하시겠습니까?")
             }
         }
-        .alert("클라우드에 저장", isPresented: $showingSaveToCloudAlert) {
+        .alert("클라우드에 강제 저장", isPresented: $showingSaveToCloudAlert) {
             Button("취소", role: .cancel) { }
-            Button("저장") {
+            Button("전체 덮어쓰기", role: .destructive) {
                 _Concurrency.Task { await saveToCloud() }
             }
         } message: {
-            Text("현재 \(viewModel.tasks.count)개의 할 일을 클라우드에 저장합니다. 기존 클라우드 데이터는 덮어씌워집니다.")
+            if let comparison = dataComparison {
+                Text("""
+                ⚠️ 이 작업은 되돌릴 수 없습니다!
+
+                로컬 데이터 \(comparison.localTaskCount)개 태스크로
+                클라우드 데이터 \(comparison.cloudTaskCount)개 태스크를
+                완전히 덮어씁니다.
+
+                다른 기기의 클라우드 데이터가 사라집니다.
+                정말 강제 저장하시겠습니까?
+                """)
+            } else {
+                Text("⚠️ 이 작업은 되돌릴 수 없습니다!\n\n현재 로컬 데이터 \(viewModel.tasks.count)개 태스크로 클라우드를 완전히 덮어씁니다.")
+            }
         }
         .alert("클라우드 데이터 미리보기", isPresented: $showingCloudPreviewAlert) {
             Button("취소", role: .cancel) { }
@@ -417,13 +430,26 @@ struct SettingsView: View {
                 Text("클라우드 데이터를 확인하는 중...")
             }
         }
-        .alert("클라우드에서 복원", isPresented: $showingRestoreFromCloudAlert) {
+        .alert("클라우드에서 강제 복원", isPresented: $showingRestoreFromCloudAlert) {
             Button("취소", role: .cancel) { }
-            Button("복원", role: .destructive) {
+            Button("전체 덮어쓰기", role: .destructive) {
                 _Concurrency.Task { await restoreFromCloud() }
             }
         } message: {
-            Text("클라우드 데이터로 복원합니다. 현재 로컬 데이터는 덮어씌워집니다.")
+            if let comparison = dataComparison {
+                Text("""
+                ⚠️ 이 작업은 되돌릴 수 없습니다!
+
+                클라우드 데이터 \(comparison.cloudTaskCount)개 태스크로
+                로컬 데이터 \(comparison.localTaskCount)개 태스크를
+                완전히 덮어씁니다.
+
+                현재 로컬 변경사항이 모두 사라집니다.
+                정말 강제 복원하시겠습니까?
+                """)
+            } else {
+                Text("⚠️ 이 작업은 되돌릴 수 없습니다!\n\n클라우드 데이터로 로컬 데이터 \(viewModel.tasks.count)개 태스크를 완전히 덮어씁니다.")
+            }
         }
         .alert("모든 데이터 초기화", isPresented: $showingResetDataAlert) {
             Button("취소", role: .cancel) { }
@@ -461,21 +487,13 @@ struct SettingsView: View {
             do {
                 let comparison = try await viewModel.compareLocalAndCloudData()
 
-                // 차이가 큰 경우 사용자에게 확인
-                if comparison.hasSignificantDifference {
-                    await MainActor.run {
-                        dataComparison = comparison
-                        showingDataDifferenceAlert = true
-                    }
-                } else {
-                    // 차이가 작으면 기존 확인 alert 표시
-                    await MainActor.run {
-                        switch operation {
-                        case .save:
-                            showingSaveToCloudAlert = true
-                        case .restore:
-                            showingRestoreFromCloudAlert = true
-                        }
+                await MainActor.run {
+                    dataComparison = comparison  // 항상 저장 (alert 메시지에서 개수 표시용)
+                    switch operation {
+                    case .save:
+                        showingSaveToCloudAlert = true
+                    case .restore:
+                        showingRestoreFromCloudAlert = true
                     }
                 }
             } catch {
