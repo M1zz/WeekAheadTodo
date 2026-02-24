@@ -210,6 +210,9 @@ public struct Task: Identifiable {
     // 완료 관련
     public var completedAt: Date?               // 완료된 시간
 
+    // 수정 시각 (per-task 병합 동기화 기준)
+    public var modifiedAt: Date                 // 마지막 수정 시각
+
     // 하위 할 일
     public var subtasks: [Subtask] = []
 
@@ -252,6 +255,7 @@ public struct Task: Identifiable {
         self.createdAt = Date()
         self.calendarEventId = nil
         self.patternId = nil
+        self.modifiedAt = Date()
     }
 
     // MARK: - 시간 계산
@@ -498,6 +502,7 @@ extension Task: Codable {
         case subtasks
         case isMIT
         case linkedWikiPageIds
+        case modifiedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -544,6 +549,9 @@ extension Task: Codable {
 
         // 위키 연결 (없으면 빈 배열)
         linkedWikiPageIds = try container.decodeIfPresent([UUID].self, forKey: .linkedWikiPageIds) ?? []
+
+        // 수정 시각 (없으면 createdAt으로 fallback - 기존 데이터 호환)
+        modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -585,6 +593,9 @@ extension Task: Codable {
 
         // 위키 연결
         try container.encode(linkedWikiPageIds, forKey: .linkedWikiPageIds)
+
+        // 수정 시각
+        try container.encode(modifiedAt, forKey: .modifiedAt)
     }
 }
 

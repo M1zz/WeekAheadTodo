@@ -107,6 +107,11 @@ class TaskViewModel: ObservableObject {
     private let autoBackupDelay: TimeInterval = 10.0 // 10초 후 자동 백업
     private var initialSyncCompleted: Bool = false   // 초기 동기화 완료 플래그
 
+    // 삭제된 태스크 tombstone: [taskId → deletedAt]
+    // 클라우드에 삭제를 전파하고, 다른 기기의 삭제를 받아 로컬에 적용하는 데 사용
+    private var taskTombstones: [UUID: Date] = [:]
+    private let tombstonesKey = "TaskTombstones_v2"
+
     // Calendar reference for time block calculation
     weak var calendarViewModel: CalendarViewModel?
 
@@ -164,6 +169,7 @@ class TaskViewModel: ObservableObject {
 
         loadTasks()
         loadProjects()
+        loadTombstones()
 
         // 체크인 관련 옵저버 등록
         setupCheckinObservers()
@@ -389,6 +395,28 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Tombstone Persistence
+
+    private func loadTombstones() {
+        guard let data = UserDefaults.standard.data(forKey: tombstonesKey),
+              let dict = try? JSONDecoder().decode([String: Double].self, from: data) else { return }
+        taskTombstones = Dictionary(uniqueKeysWithValues: dict.compactMap { (key, value) -> (UUID, Date)? in
+            guard let id = UUID(uuidString: key) else { return nil }
+            return (id, Date(timeIntervalSince1970: value))
+        })
+        print("ℹ️ [loadTombstones] \(taskTombstones.count)개 로드")
+    }
+
+    private func saveTombstones() {
+        // 60일 이상 된 tombstone 정리
+        let cutoff = Calendar.current.date(byAdding: .day, value: -60, to: Date())!
+        taskTombstones = taskTombstones.filter { $0.value > cutoff }
+        let dict = Dictionary(uniqueKeysWithValues: taskTombstones.map { ($0.key.uuidString, $0.value.timeIntervalSince1970) })
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: tombstonesKey)
+        }
+    }
+
     // MARK: - Computed Properties
     
     /// 시간 지평선별로 그룹화된 태스크
@@ -544,8 +572,10 @@ class TaskViewModel: ObservableObject {
     // MARK: - Task CRUD
     
     func addTask(_ task: Task) {
-        tasks.append(task)
-        allocateTaskToTimeBlock(task)
+        var t = task
+        t.modifiedAt = Date()
+        tasks.append(t)
+        allocateTaskToTimeBlock(t)
     }
     
     func addTaskWithSubtasks(mainTask: Task, template: TaskTemplate) {
@@ -586,6 +616,7 @@ class TaskViewModel: ObservableObject {
                 tasks[index].status = .notStarted
                 tasks[index].completedAt = nil     // 완료 취소 시 초기화
             }
+            tasks[index].modifiedAt = Date()
         }
     }
     
@@ -615,6 +646,13 @@ class TaskViewModel: ObservableObject {
             allTaskIdsToDelete.formUnion(childTaskIds)
         }
 
+        // Tombstone 기록 (클라우드 삭제 전파용)
+        let deletedAt = Date()
+        for id in allTaskIdsToDelete {
+            taskTombstones[id] = deletedAt
+        }
+        saveTombstones()
+
         // 태스크 삭제
         tasks.removeAll { allTaskIdsToDelete.contains($0.id) }
 
@@ -637,12 +675,14 @@ class TaskViewModel: ObservableObject {
         let currentCount = tasks.filter { $0.isMIT && !$0.isCompleted }.count
         if !tasks[index].isMIT && currentCount >= 3 { return }
         tasks[index].isMIT.toggle()
+        tasks[index].modifiedAt = Date()
         print("⭐ [toggleMIT] \(tasks[index].title) isMIT=\(tasks[index].isMIT)")
     }
 
     func updateTask(_ task: Task) {
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             var updatedTask = task
+            updatedTask.modifiedAt = Date()
             // 오늘 이외의 horizon으로 이동하면 수동 순서 초기화
             if updatedTask.currentHorizon != .today {
                 updatedTask.manualPriority = nil
@@ -660,6 +700,7 @@ class TaskViewModel: ObservableObject {
         for (index, task) in reorderedTasks.enumerated() {
             if let taskIndex = tasks.firstIndex(where: { $0.id == task.id }) {
                 tasks[taskIndex].manualPriority = index
+                tasks[taskIndex].modifiedAt = Date()
             }
         }
     }
@@ -674,6 +715,7 @@ class TaskViewModel: ObservableObject {
             return
         }
         tasks[taskIndex].subtasks[subtaskIndex].isCompleted.toggle()
+        tasks[taskIndex].modifiedAt = Date()
         print("✅ [TaskViewModel] 하위 할 일 완료 토글: \(tasks[taskIndex].subtasks[subtaskIndex].title)")
     }
 
@@ -691,6 +733,7 @@ class TaskViewModel: ObservableObject {
         for (index, taskId) in ordered.enumerated() {
             if let taskIndex = tasks.firstIndex(where: { $0.id == taskId }) {
                 tasks[taskIndex].manualPriority = index
+                tasks[taskIndex].modifiedAt = Date()
             }
         }
     }
@@ -951,56 +994,298 @@ class TaskViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Initial Sync
+    // MARK: - Merge Sync (태스크 ID 기준 양방향 병합)
 
-    /// 앱 시작 시 자동 동기화 (iCloud와 로컬 데이터 비교)
-    func performInitialSync() async {
+    /// 앱 시작 및 포그라운드 복귀 시 호출하는 완전한 양방향 병합 동기화.
+    /// "마지막 타임스탬프 승" 방식 대신 태스크 ID별 modifiedAt 비교로 충돌 해결.
+    /// - 클라우드에만 있는 태스크 → 로컬에 추가
+    /// - 로컬에만 있는 태스크 → 클라우드에 업로드
+    /// - 양쪽에 있을 때 → modifiedAt 최신 버전 사용
+    /// - 삭제된 태스크 → tombstone으로 양방향 전파
+    func performMergeSync() async {
+        guard let _ = database else { return }
+        guard !isSyncing else { return }
+
+        isSyncing = true
+        syncError = nil
 
         defer {
-            // 초기 동기화 완료 플래그 설정 (동기화 성공 여부와 관계없이)
+            isSyncing = false
             initialSyncCompleted = true
         }
 
-        // CloudKit이 초기화되지 않았으면 로컬 데이터만 사용
-        guard let database = database else {
-            return
+        do {
+            print("🔄 [performMergeSync] 시작 - 로컬: \(tasks.count)개 태스크")
+
+            // 1. 클라우드에서 모든 태스크와 tombstone 가져오기
+            let cloudTasks = try await fetchAllCloudTasksForMerge()
+            let cloudTombstones = try await fetchCloudTombstones()
+
+            let cloudDict = Dictionary(uniqueKeysWithValues: cloudTasks.map { ($0.id, $0) })
+            print("☁️ [performMergeSync] 클라우드: \(cloudTasks.count)개, tombstone: \(cloudTombstones.count)개")
+
+            var mergedTasks = tasks
+            var tasksToUpsert: [Task] = []
+            var idsToDeleteFromCloud: [UUID] = []
+
+            // 2. 클라우드 tombstone을 로컬에 적용
+            for (deletedId, cloudDeletedAt) in cloudTombstones {
+                if let localTask = mergedTasks.first(where: { $0.id == deletedId }) {
+                    if localTask.modifiedAt <= cloudDeletedAt {
+                        // 클라우드에서 삭제됐고 로컬이 더 최신이 아님 → 로컬에서도 삭제
+                        mergedTasks.removeAll { $0.id == deletedId }
+                        print("🗑️ [merge] 클라우드 삭제 적용: \(localTask.title)")
+                    }
+                    // 로컬이 더 최신이면: 로컬 유지 (step 4에서 클라우드에 복원됨)
+                }
+                // 우리 로컬 tombstone에서 제거 (클라우드가 이미 알고 있음)
+                taskTombstones.removeValue(forKey: deletedId)
+            }
+
+            // 3. 클라우드 태스크를 로컬에 병합
+            for cloudTask in cloudTasks {
+                let localIndex = mergedTasks.firstIndex(where: { $0.id == cloudTask.id })
+
+                if let idx = localIndex {
+                    // 양쪽에 있음 → modifiedAt 비교
+                    let localTask = mergedTasks[idx]
+                    if cloudTask.modifiedAt > localTask.modifiedAt {
+                        mergedTasks[idx] = cloudTask
+                        print("⬇️ [merge] 클라우드→로컬 업데이트: \(cloudTask.title)")
+                    } else if localTask.modifiedAt > cloudTask.modifiedAt {
+                        tasksToUpsert.append(localTask)
+                        print("⬆️ [merge] 로컬→클라우드 업데이트: \(localTask.title)")
+                    }
+                    // 동일하면 무시
+                } else if let tombstoneDate = taskTombstones[cloudTask.id] {
+                    // 우리가 삭제한 태스크가 클라우드에 있음
+                    if cloudTask.modifiedAt > tombstoneDate {
+                        // 삭제 후 클라우드에서 수정됨 → 클라우드 버전 복원
+                        mergedTasks.append(cloudTask)
+                        taskTombstones.removeValue(forKey: cloudTask.id)
+                        print("↩️ [merge] 삭제 후 재수정됨, 복원: \(cloudTask.title)")
+                    } else {
+                        // 우리 삭제가 유효 → 클라우드에서도 삭제 필요
+                        idsToDeleteFromCloud.append(cloudTask.id)
+                        taskTombstones.removeValue(forKey: cloudTask.id)
+                    }
+                } else {
+                    // 클라우드에만 있고 우리가 삭제하지 않음 → 로컬에 추가 (다른 기기에서 추가됨)
+                    mergedTasks.append(cloudTask)
+                    print("➕ [merge] 클라우드→로컬 추가: \(cloudTask.title)")
+                }
+            }
+
+            // 4. 로컬에만 있는 태스크 → 클라우드에 업로드
+            for localTask in tasks {
+                if cloudDict[localTask.id] == nil && taskTombstones[localTask.id] == nil {
+                    tasksToUpsert.append(localTask)
+                    print("⬆️ [merge] 로컬→클라우드 신규: \(localTask.title)")
+                }
+            }
+
+            // 중복 제거 (같은 태스크가 upsert 목록에 두 번 들어갈 수 있음)
+            let uniqueUpsert = Array(Dictionary(uniqueKeysWithValues: tasksToUpsert.map { ($0.id, $0) }).values)
+
+            // 5. 병합 결과 적용
+            let prevCount = tasks.count
+            tasks = mergedTasks
+            saveTombstones()
+            print("✅ [performMergeSync] 병합: \(prevCount)개 → \(mergedTasks.count)개, 업로드: \(uniqueUpsert.count)개, 클라우드삭제: \(idsToDeleteFromCloud.count)개")
+
+            // 6. 클라우드 upsert (변경된/새로운 태스크)
+            for task in uniqueUpsert {
+                try await upsertTaskToCloud(task)
+            }
+
+            // 7. 클라우드에서 삭제 (우리가 삭제한 태스크)
+            for id in idsToDeleteFromCloud {
+                try await deleteTaskRecordFromCloud(id)
+            }
+
+            // 8. 로컬 tombstone을 클라우드에 저장
+            if !taskTombstones.isEmpty {
+                try await saveCloudTombstones()
+            }
+
+            // 9. SyncMetadata 업데이트
+            lastSyncDate = Date()
+            UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
+            try await updateSyncMetadata()
+
+        } catch {
+            syncError = "동기화 실패: \(error.localizedDescription)"
+            print("❌ [performMergeSync] 실패: \(error)")
+        }
+    }
+
+    // MARK: - CloudKit Per-Record Operations
+
+    /// 단일 태스크를 CloudKit에 upsert (저장/갱신)
+    private func upsertTaskToCloud(_ task: Task) async throws {
+        guard let database = database else { return }
+        let record = taskToCKRecord(task)
+        do {
+            try await database.modifyRecords(saving: [record], deleting: [])
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            // 서버 버전과 충돌 → 우리 버전을 강제 저장
+            let serverRecord = error.serverRecord ?? record
+            let fields: [String] = ["title", "taskDescription", "dueDate", "scheduledStartTime",
+                                     "estimatedMinutes", "leadTimeDays", "taskType", "taskRole",
+                                     "status", "priority", "manualPriority", "projectId",
+                                     "parentTaskId", "mainTaskId", "targetDate",
+                                     "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
+                                     "lastCheckinDate", "consecutiveMissedCheckins", "completedAt",
+                                     "isMIT", "subtasks", "linkedWikiPageIds", "modifiedAt"]
+            for field in fields {
+                serverRecord[field] = record[field]
+            }
+            try await database.modifyRecords(saving: [serverRecord], deleting: [])
+        }
+    }
+
+    /// CloudKit에서 단일 태스크 레코드 삭제
+    private func deleteTaskRecordFromCloud(_ id: UUID) async throws {
+        guard let database = database else { return }
+        let recordID = CKRecord.ID(recordName: id.uuidString)
+        do {
+            try await database.modifyRecords(saving: [], deleting: [recordID])
+        } catch let error as CKError where error.code == .unknownItem {
+            // 이미 없으면 무시
+        }
+    }
+
+    /// 클라우드에서 모든 태스크 가져오기 (병합용)
+    private func fetchAllCloudTasksForMerge() async throws -> [Task] {
+        guard let database = database else { return [] }
+
+        var allTasks: [Task] = []
+
+        // 저장된 recordNames로 직접 fetch (빠름)
+        let savedNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
+        if !savedNames.isEmpty {
+            let recordIDs = savedNames.map { CKRecord.ID(recordName: $0) }
+            for batch in recordIDs.chunked(into: 200) {
+                let results = try await database.records(for: batch)
+                let batchTasks = results.values.compactMap { result -> Task? in
+                    guard let record = try? result.get() else { return nil }
+                    return ckRecordToTask(record)
+                }
+                allTasks.append(contentsOf: batchTasks)
+            }
+        }
+
+        // CKQuery fallback (recordNames가 없거나 새 기기)
+        let query = CKQuery(recordType: "Task", predicate: NSPredicate(value: true))
+        do {
+            let results = try await database.records(matching: query, desiredKeys: [
+                "title", "taskDescription", "dueDate", "scheduledStartTime", "estimatedMinutes", "leadTimeDays",
+                "taskType", "taskRole", "status", "priority", "createdAt",
+                "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
+                "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
+                "lastCheckinDate", "consecutiveMissedCheckins", "completedAt",
+                "isMIT", "subtasks", "linkedWikiPageIds", "modifiedAt"
+            ])
+            let queryTasks = results.matchResults.compactMap { (_, result) -> Task? in
+                guard let record = try? result.get() else { return nil }
+                return ckRecordToTask(record)
+            }
+            // savedNames로 가져온 것과 중복 제거 (ID 기준)
+            let existingIds = Set(allTasks.map { $0.id })
+            let newTasks = queryTasks.filter { !existingIds.contains($0.id) }
+            allTasks.append(contentsOf: newTasks)
+
+            // recordNames 갱신
+            let allNames = allTasks.map { $0.id.uuidString }
+            UserDefaults.standard.set(allNames, forKey: "cloudTaskRecordNames")
+        } catch {
+            // Query 실패 시 savedNames fetch 결과만 사용
+            print("⚠️ [fetchAllCloudTasksForMerge] CKQuery 실패 (savedNames 결과 사용): \(error)")
+        }
+
+        return allTasks
+    }
+
+    /// CloudKit SyncMetadata에서 tombstone 가져오기
+    private func fetchCloudTombstones() async throws -> [UUID: Date] {
+        guard let database = database else { return [:] }
+        let metadataRecordID = CKRecord.ID(recordName: "SyncMetadata")
+        do {
+            let record = try await database.record(for: metadataRecordID)
+            guard let json = record["tombstones"] as? String,
+                  let data = json.data(using: .utf8),
+                  let array = try? JSONDecoder().decode([[String: Double]].self, from: data) else {
+                return [:]
+            }
+            var result: [UUID: Date] = [:]
+            for item in array {
+                guard let idStr = item.keys.first,
+                      let timestamp = item.values.first,
+                      let id = UUID(uuidString: idStr) else { continue }
+                result[id] = Date(timeIntervalSince1970: timestamp)
+            }
+            return result
+        } catch let error as CKError where error.code == .unknownItem {
+            return [:]
+        }
+    }
+
+    /// 로컬 tombstone을 CloudKit SyncMetadata에 저장
+    private func saveCloudTombstones() async throws {
+        guard let database = database else { return }
+        let array = taskTombstones.map { (id, date) -> [String: Double] in
+            [id.uuidString: date.timeIntervalSince1970]
+        }
+        guard let data = try? JSONEncoder().encode(array),
+              let json = String(data: data, encoding: .utf8) else { return }
+
+        let metadataRecordID = CKRecord.ID(recordName: "SyncMetadata")
+        let record: CKRecord
+        do {
+            record = try await database.record(for: metadataRecordID)
+        } catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(recordType: "SyncMetadata", recordID: metadataRecordID)
+        }
+        record["tombstones"] = json as CKRecordValue
+        try await database.modifyRecords(saving: [record], deleting: [])
+    }
+
+    /// SyncMetadata 업데이트
+    private func updateSyncMetadata() async throws {
+        guard let database = database else { return }
+        let metadataRecordID = CKRecord.ID(recordName: "SyncMetadata")
+        let record: CKRecord
+        do {
+            record = try await database.record(for: metadataRecordID)
+        } catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(recordType: "SyncMetadata", recordID: metadataRecordID)
+        }
+        record["lastSyncDate"] = lastSyncDate! as CKRecordValue
+        record["taskCount"] = tasks.count as CKRecordValue
+        record["projectCount"] = projects.count as CKRecordValue
+
+        // tombstones도 함께 저장
+        let array = taskTombstones.map { (id, date) -> [String: Double] in
+            [id.uuidString: date.timeIntervalSince1970]
+        }
+        if let data = try? JSONEncoder().encode(array),
+           let json = String(data: data, encoding: .utf8) {
+            record["tombstones"] = json as CKRecordValue
         }
 
         do {
-            // 1. iCloud 데이터 개수 확인
-            let cloudPreview = try await getCloudDataPreview()
-
-            // 2. 로컬이 비어있고 iCloud에 데이터가 있으면 복원
-            if tasks.isEmpty && projects.isEmpty && !cloudPreview.isEmpty {
-                try await restoreFromCloud()
-                return
-            }
-
-            // 3. iCloud가 비어있고 로컬에 데이터가 있으면 백업
-            if cloudPreview.isEmpty && (!tasks.isEmpty || !projects.isEmpty) {
-                try await saveToCloud()
-                return
-            }
-
-            // 4. 둘 다 데이터가 있으면 lastSyncDate 비교
-            if !tasks.isEmpty && !cloudPreview.isEmpty {
-                let localLastModified = lastSyncDate ?? Date.distantPast
-                let cloudLastModified = cloudPreview.lastSyncDate ?? Date.distantPast
-
-
-                // iCloud가 더 최신이면 복원
-                if cloudLastModified > localLastModified {
-                    try await restoreFromCloud()
-                } else if localLastModified > cloudLastModified {
-                    try await saveToCloud()
-                } else {
-                }
-            } else {
-            }
-
+            try await database.modifyRecords(saving: [record], deleting: [])
+            print("✅ [updateSyncMetadata] lastSyncDate: \(lastSyncDate!), tasks: \(tasks.count)")
         } catch {
+            print("⚠️ [updateSyncMetadata] 실패: \(error)")
         }
+    }
 
+    // MARK: - Initial Sync
+
+    /// 앱 시작 시 자동 동기화 → 태스크 ID 기준 양방향 병합으로 위임
+    func performInitialSync() async {
+        await performMergeSync()
     }
 
     // MARK: - Cloud Sync
@@ -1150,30 +1435,10 @@ class TaskViewModel: ObservableObject {
 
     // MARK: - Foreground Sync
 
-    /// 앱이 포그라운드로 복귀할 때 클라우드와 동기화
-    /// 클라우드가 더 최신이면 복원, 로컬이 더 최신이면 백업
+    /// 앱이 포그라운드로 복귀할 때 클라우드와 동기화 → 태스크 ID 기준 양방향 병합으로 위임
     func syncOnForeground() async {
-        guard let _ = database else { return }
-        guard !isSyncing else { return }
         guard initialSyncCompleted else { return }
-
-        do {
-            let cloudPreview = try await getCloudDataPreview()
-            let localLastModified = lastSyncDate ?? Date.distantPast
-            let cloudLastModified = cloudPreview.lastSyncDate ?? Date.distantPast
-
-            if cloudLastModified > localLastModified {
-                print("☁️ [syncOnForeground] 클라우드가 더 최신 → 자동 복원")
-                try await restoreFromCloud()
-            } else if localLastModified > cloudLastModified, (!tasks.isEmpty || !projects.isEmpty) {
-                print("💾 [syncOnForeground] 로컬이 더 최신 → 자동 백업")
-                try await saveToCloud()
-            } else {
-                print("✅ [syncOnForeground] 동기화 상태 최신")
-            }
-        } catch {
-            print("⚠️ [syncOnForeground] 동기화 실패: \(error.localizedDescription)")
-        }
+        await performMergeSync()
     }
 
     // MARK: - Auto Backup
@@ -1211,25 +1476,14 @@ class TaskViewModel: ObservableObject {
 
     }
 
-    /// 자동 백업 실행
+    /// 자동 백업 실행 → 병합 동기화로 위임
     private func performAutoBackup() async {
-        // 마지막 변경 후 충분한 시간이 지났는지 확인
-        guard let lastChange = lastChangeDate else {
-            return
-        }
-
+        guard let lastChange = lastChangeDate else { return }
         let timeSinceChange = Date().timeIntervalSince(lastChange)
-        guard timeSinceChange >= autoBackupDelay else {
-            return
-        }
+        guard timeSinceChange >= autoBackupDelay else { return }
 
-
-        do {
-            try await saveToCloud()
-            lastAutoBackupDate = Date()
-        } catch {
-            // 자동 백업 실패는 사용자에게 알리지 않음 (조용히 실패)
-        }
+        await performMergeSync()
+        lastAutoBackupDate = Date()
     }
 
     /// 클라우드에 저장
@@ -1287,7 +1541,11 @@ class TaskViewModel: ObservableObject {
     }
 
     /// 클라우드에서 복원
-    func restoreFromCloud() async throws {
+    /// - Parameter syncDate: 복원 후 설정할 lastSyncDate (nil이면 현재 시각 사용)
+    ///   자동 동기화 시에는 클라우드 SyncMetadata 타임스탬프를 전달해야 함.
+    ///   그렇지 않으면 복원 직후 로컬이 클라우드보다 "더 최신"으로 보여
+    ///   syncOnForeground()가 복원 데이터를 다시 덮어쓰는 버그가 발생함.
+    func restoreFromCloud(syncDate: Date? = nil) async throws {
 
         guard let database = database else {
             throw NSError(domain: "CloudKit", code: -1, userInfo: [
@@ -1340,7 +1598,8 @@ class TaskViewModel: ObservableObject {
                     "taskType", "taskRole", "status", "priority", "createdAt",
                     "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
                     "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
-                    "lastCheckinDate", "consecutiveMissedCheckins", "completedAt"
+                    "lastCheckinDate", "consecutiveMissedCheckins", "completedAt",
+                    "isMIT", "subtasks", "linkedWikiPageIds"
                 ])
 
                 cloudTasks = results.matchResults.compactMap { (recordID, result) in
@@ -1414,7 +1673,12 @@ class TaskViewModel: ObservableObject {
 
         projects = cloudProjects
 
-        lastSyncDate = Date()
+        // 동기화 날짜 설정:
+        // - 수동 복원(syncDate == nil): 현재 시각 사용
+        // - 자동 복원(syncDate 전달됨): 클라우드 타임스탬프 사용
+        //   → 이렇게 해야 복원 후 syncOnForeground()가 "로컬이 더 최신"으로
+        //     오판하여 불완전한 데이터를 다시 클라우드에 덮어쓰는 버그를 방지함
+        lastSyncDate = syncDate ?? Date()
         UserDefaults.standard.set(lastSyncDate, forKey: syncDateKey)
 
     }
@@ -1574,6 +1838,26 @@ class TaskViewModel: ObservableObject {
             record["completedAt"] = completedAt as CKRecordValue
         }
 
+        // MIT
+        record["isMIT"] = task.isMIT as CKRecordValue
+
+        // 수정 시각 (per-task 병합 기준)
+        record["modifiedAt"] = task.modifiedAt as CKRecordValue
+
+        // 하위 할 일 (JSON 직렬화)
+        if !task.subtasks.isEmpty,
+           let subtasksData = try? JSONEncoder().encode(task.subtasks),
+           let subtasksString = String(data: subtasksData, encoding: .utf8) {
+            record["subtasks"] = subtasksString as CKRecordValue
+        }
+
+        // 위키 연결 (UUID 배열을 JSON 직렬화)
+        if !task.linkedWikiPageIds.isEmpty,
+           let idsData = try? JSONEncoder().encode(task.linkedWikiPageIds.map { $0.uuidString }),
+           let idsString = String(data: idsData, encoding: .utf8) {
+            record["linkedWikiPageIds"] = idsString as CKRecordValue
+        }
+
         return record
     }
 
@@ -1666,6 +1950,27 @@ class TaskViewModel: ObservableObject {
         task.lastCheckinDate = lastCheckinDate
         task.consecutiveMissedCheckins = consecutiveMissedCheckins
         task.completedAt = completedAt
+
+        // MIT
+        task.isMIT = record["isMIT"] as? Bool ?? false
+
+        // 수정 시각 (없으면 createdAt fallback)
+        task.modifiedAt = record["modifiedAt"] as? Date ?? task.createdAt
+
+        // 하위 할 일 (JSON 역직렬화)
+        if let subtasksString = record["subtasks"] as? String,
+           let subtasksData = subtasksString.data(using: .utf8),
+           let subtasks = try? JSONDecoder().decode([Subtask].self, from: subtasksData) {
+            task.subtasks = subtasks
+        }
+
+        // 위키 연결 (JSON 역직렬화)
+        if let idsString = record["linkedWikiPageIds"] as? String,
+           let idsData = idsString.data(using: .utf8),
+           let idStrings = try? JSONDecoder().decode([String].self, from: idsData) {
+            task.linkedWikiPageIds = idStrings.compactMap { UUID(uuidString: $0) }
+        }
+
         return task
     }
 
@@ -1819,6 +2124,7 @@ class TaskViewModel: ObservableObject {
         // 체크인 시간 기록
         tasks[index].lastCheckinDate = Date()
         tasks[index].consecutiveMissedCheckins = 0
+        tasks[index].modifiedAt = Date()
 
         switch response {
         case .onTrack:
