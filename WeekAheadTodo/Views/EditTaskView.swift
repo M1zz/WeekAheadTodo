@@ -64,6 +64,19 @@ struct EditTaskView: View {
                     TextField("제목", text: $title)
                     TextField("설명 (선택)", text: $description)
                     DatePicker("마감일", selection: $dueDate, displayedComponents: .date)
+                        .onChange(of: dueDate) { newDueDate in
+                            // 마감일 변경 시 시작 시간의 날짜 부분도 동기화
+                            if hasStartTime {
+                                let calendar = Calendar.current
+                                var timeComponents = calendar.dateComponents([.hour, .minute], from: startTime)
+                                var dateComponents = calendar.dateComponents([.year, .month, .day], from: newDueDate)
+                                dateComponents.hour = timeComponents.hour
+                                dateComponents.minute = timeComponents.minute
+                                if let updated = calendar.date(from: dateComponents) {
+                                    startTime = updated
+                                }
+                            }
+                        }
 
                     Picker("우선순위", selection: $priority) {
                         ForEach(TaskPriority.allCases, id: \.self) { priority in

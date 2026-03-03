@@ -32,7 +32,9 @@ struct TodayView: View {
     @EnvironmentObject var notificationService: NotificationService
     @EnvironmentObject var calendarViewModel: CalendarViewModel
     @EnvironmentObject var assistantService: ProactiveAssistantService
+    @EnvironmentObject var wikiViewModel: WikiViewModel
     @State private var showingAddTask = false
+    @State private var editingTask: Task? = nil
     @State private var showingNotificationPreview = false
     @State private var isEditMode = false
     @State private var selectedTasks: Set<UUID> = []
@@ -156,6 +158,11 @@ struct TodayView: View {
                 set: { if !$0 { selectedCheckinTask = nil } }
             ))
         }
+        .sheet(item: $editingTask) { task in
+            EditTaskView(task: task)
+                .environmentObject(viewModel)
+                .environmentObject(wikiViewModel)
+        }
         .alert("오늘로 이동 완료", isPresented: $showingMoveToTodayAlert) {
             Button("확인", role: .cancel) { }
         } message: {
@@ -183,7 +190,10 @@ struct TodayView: View {
                 moveTasksToToday(taskIds: [taskId])
             }
         case .reschedule:
-            break
+            if let taskId = suggestion.relatedTaskIds.first,
+               let task = viewModel.tasks.first(where: { $0.id == taskId }) {
+                editingTask = task
+            }
         case .dismiss:
             assistantService.dismissSuggestion(suggestion)
         }

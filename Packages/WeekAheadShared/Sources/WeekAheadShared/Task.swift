@@ -201,6 +201,7 @@ public struct Task: Identifiable {
     public var calendarEventId: String?         // 원본 EKEvent ID
     public var isFromCalendarPattern: Bool = false  // 캘린더 패턴에서 생성되었는지
     public var patternId: UUID?                 // 어느 패턴에서 생성되었는지
+    public var patternOccurrenceDate: Date?     // 패턴이 이 태스크를 생성한 원래 발생일 (사용자가 dueDate를 변경해도 유지)
     public var autoRecurring: Bool = false      // 자동 반복 생성 여부
 
     // 체크인 관련
@@ -496,7 +497,7 @@ extension Task: Codable {
         case taskType, taskRole, status, priority
         case projectId, parentTaskId, mainTaskId, targetDate, createdAt
         case manualPriority
-        case calendarEventId, isFromCalendarPattern, patternId, autoRecurring
+        case calendarEventId, isFromCalendarPattern, patternId, patternOccurrenceDate, autoRecurring
         case lastCheckinDate, consecutiveMissedCheckins
         case completedAt
         case subtasks
@@ -529,6 +530,7 @@ extension Task: Codable {
         manualPriority = try container.decodeIfPresent(Int.self, forKey: .manualPriority)
         calendarEventId = try container.decodeIfPresent(String.self, forKey: .calendarEventId)
         patternId = try container.decodeIfPresent(UUID.self, forKey: .patternId)
+        patternOccurrenceDate = try container.decodeIfPresent(Date.self, forKey: .patternOccurrenceDate)
 
         // Bool 필드 (없으면 기본값 false)
         isFromCalendarPattern = try container.decodeIfPresent(Bool.self, forKey: .isFromCalendarPattern) ?? false
@@ -576,6 +578,7 @@ extension Task: Codable {
         try container.encodeIfPresent(calendarEventId, forKey: .calendarEventId)
         try container.encode(isFromCalendarPattern, forKey: .isFromCalendarPattern)
         try container.encodeIfPresent(patternId, forKey: .patternId)
+        try container.encodeIfPresent(patternOccurrenceDate, forKey: .patternOccurrenceDate)
         try container.encode(autoRecurring, forKey: .autoRecurring)
 
         // 체크인 필드

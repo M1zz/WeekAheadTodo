@@ -702,47 +702,40 @@ struct TaskDropDelegate: DropDelegate {
     private let calendar = Calendar.current
 
     func performDrop(info: DropInfo) -> Bool {
-        viewModel.dragPreview = nil
-        viewModel.currentDraggingTaskId = nil
-
-        guard let itemProvider = info.itemProviders(for: [.text]).first else {
+        // currentDraggingTaskId를 직접 사용해 동기적으로 처리 (비동기 loadItem 사용 시 드롭 후 순간 원위치 복귀 버그 발생)
+        guard let taskId = viewModel.currentDraggingTaskId,
+              let task = viewModel.tasks.first(where: { $0.id == taskId }) else {
+            viewModel.dragPreview = nil
+            viewModel.currentDraggingTaskId = nil
             return false
         }
 
-        itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (item, error) in
-            guard let data = item as? Data,
-                  let taskIdString = String(data: data, encoding: .utf8),
-                  let taskId = UUID(uuidString: taskIdString) else {
-                return
-            }
+        let dropY = info.location.y
+        let slotIndex = Int(floor(dropY / slotHeight))
 
-            DispatchQueue.main.async {
-                guard let task = viewModel.tasks.first(where: { $0.id == taskId }) else {
-                    return
-                }
+        let startHour = viewModel.calendarStartHour
+        let totalMinutesFromStart = slotIndex * 15
+        let hour = min(startHour + (totalMinutesFromStart / 60), 23)
+        let minute = totalMinutesFromStart % 60
 
-                let dropY = info.location.y
-                let slotIndex = Int(floor(dropY / slotHeight))
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = hour
+        components.minute = minute
 
-                let startHour = viewModel.calendarStartHour
-                let totalMinutesFromStart = slotIndex * 15
-                let hour = min(startHour + (totalMinutesFromStart / 60), 23)
-                let minute = totalMinutesFromStart % 60
-
-                var components = calendar.dateComponents([.year, .month, .day], from: date)
-                components.hour = hour
-                components.minute = minute
-
-                guard let newTargetTime = calendar.date(from: components) else {
-                    return
-                }
-
-                var updatedTask = task
-                updatedTask.targetDate = newTargetTime
-                updatedTask.dueDate = date
-                viewModel.updateTask(updatedTask)
-            }
+        guard let newTargetTime = calendar.date(from: components) else {
+            viewModel.dragPreview = nil
+            viewModel.currentDraggingTaskId = nil
+            return false
         }
+
+        var updatedTask = task
+        updatedTask.targetDate = newTargetTime
+        updatedTask.dueDate = date
+
+        // 태스크 업데이트 후 드래그 상태 초기화 (즉시 반영)
+        viewModel.updateTask(updatedTask)
+        viewModel.dragPreview = nil
+        viewModel.currentDraggingTaskId = nil
 
         return true
     }

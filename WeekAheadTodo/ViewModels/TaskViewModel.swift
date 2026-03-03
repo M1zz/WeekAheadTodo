@@ -116,6 +116,14 @@ class TaskViewModel: ObservableObject {
     private var taskTombstones: [UUID: Date] = [:]
     private let tombstonesKey = "TaskTombstones_v2"
 
+    // 세션 간 유지되는 편집 ID 목록: [taskId → lastEditedAt], 24시간 TTL
+    // 클라우드 동기화 시 이 태스크들은 로컬 버전을 항상 우선함 (타임스탬프 역전 방지, 앱 재시작 후에도 유지)
+    private var sessionEditedTaskIds: [UUID: Date] = [:]
+    private let sessionEditedKey = "SessionEditedTaskIds_v1"
+
+    // 이번 sync 사이클에서 fetch된 CKRecord 캐시 (changeTag 보존 → serverRecordChanged 방지)
+    private var fetchedCloudRecords: [UUID: CKRecord] = [:]
+
     // Calendar reference for time block calculation
     weak var calendarViewModel: CalendarViewModel?
 
@@ -174,6 +182,7 @@ class TaskViewModel: ObservableObject {
         loadTasks()
         loadProjects()
         loadTombstones()
+        loadSessionEditedIds()
 
         // 체크인 관련 옵저버 등록
         setupCheckinObservers()
@@ -181,6 +190,9 @@ class TaskViewModel: ObservableObject {
 
         // 태스크 시간 데이터 마이그레이션 (scheduledStartTime 기반으로 dueDate 동기화)
         migrateTaskTimes()
+
+        // 기존 패턴 태스크의 patternOccurrenceDate 소급 적용
+        migratePatternOccurrenceDates()
     }
 
     // MARK: - Task Time Migration
@@ -214,9 +226,10 @@ class TaskViewModel: ObservableObject {
 
         var migrationCount = 0
         let calendar = Calendar.current
+        var newTasks = tasks
 
-        for index in tasks.indices {
-            let task = tasks[index]
+        for index in newTasks.indices {
+            let task = newTasks[index]
 
             // 1. targetDate가 있으면 dueDate = targetDate + estimatedMinutes
             if let targetDate = task.targetDate {
@@ -224,8 +237,8 @@ class TaskViewModel: ObservableObject {
 
                 if !calendar.isDate(task.dueDate, equalTo: calculatedDueDate, toGranularity: .minute) {
 
-                    tasks[index].dueDate = calculatedDueDate
-                    tasks[index].scheduledStartTime = targetDate
+                    newTasks[index].dueDate = calculatedDueDate
+                    newTasks[index].scheduledStartTime = targetDate
                     migrationCount += 1
                 }
             }
@@ -236,7 +249,7 @@ class TaskViewModel: ObservableObject {
                 // dueDate가 계산된 값과 다르면 동기화
                 if !calendar.isDate(task.dueDate, equalTo: calculatedDueDate, toGranularity: .minute) {
 
-                    tasks[index].dueDate = calculatedDueDate
+                    newTasks[index].dueDate = calculatedDueDate
                     migrationCount += 1
                 }
             }
@@ -252,21 +265,51 @@ class TaskViewModel: ObservableObject {
                 // scheduledStartTime = dueDate - estimatedMinutes
                 let calculatedStartTime = calendar.date(byAdding: .minute, value: -task.estimatedMinutes, to: newDueDate) ?? newDueDate
 
-
-                tasks[index].dueDate = newDueDate
-                tasks[index].scheduledStartTime = calculatedStartTime
+                newTasks[index].dueDate = newDueDate
+                newTasks[index].scheduledStartTime = calculatedStartTime
                 migrationCount += 1
             }
         }
 
         if migrationCount > 0 {
+            tasks = newTasks
             saveTasks()
-        } else {
         }
 
         // 마이그레이션 완료 버전 기록 (이후 앱 시작 시 건너뜀)
         UserDefaults.standard.set(currentMigrationVersion, forKey: timeMigrationVersionKey)
         print("✅ [migrateTaskTimes] v\(currentMigrationVersion) 완료, \(migrationCount)개 수정")
+    }
+
+    /// 기존 패턴 태스크에 patternOccurrenceDate 소급 적용 (최초 1회)
+    /// patternId가 있지만 patternOccurrenceDate가 없는 태스크에 dueDate를 원래 발생일로 기록
+    private func migratePatternOccurrenceDates() {
+        let migrationKey = "patternOccurrenceDateMigrationDone"
+        let alreadyDone = UserDefaults.standard.bool(forKey: migrationKey)
+        print("🔍 [migratePatternOccurrenceDates] 실행 - 이미완료=\(alreadyDone), 전체태스크=\(tasks.count)개")
+        guard !alreadyDone else { return }
+
+        var newTasks = tasks
+        var count = 0
+        for index in newTasks.indices {
+            if newTasks[index].patternId != nil && newTasks[index].patternOccurrenceDate == nil {
+                let t = newTasks[index]
+                print("   📌 소급: \"\(t.title)\" dueDate=\(shortDate(t.dueDate)) → patternOccurrenceDate 설정")
+                newTasks[index].patternOccurrenceDate = t.dueDate
+                count += 1
+            }
+        }
+        if count > 0 {
+            tasks = newTasks
+        }
+        print("✅ [migratePatternOccurrenceDates] 완료 - \(count)개 소급 적용")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "M/d HH:mm"
+        return f.string(from: date)
     }
 
     /// dueDate가 자정(00:00)인지 확인
@@ -343,16 +386,21 @@ class TaskViewModel: ObservableObject {
     }
 
     private func loadTasks() {
+        print("📂 [loadTasks] 호출됨")
 
         guard let data = UserDefaults.standard.data(forKey: tasksKey) else {
+            print("📂 [loadTasks] 저장된 데이터 없음")
             return
         }
-
 
         do {
             let decoder = JSONDecoder()
             tasks = try decoder.decode([Task].self, from: data)
-            if tasks.count > 0 {
+            print("📂 [loadTasks] \(tasks.count)개 로드 완료")
+            // 패턴 태스크 상태 출력
+            let patternTasks = tasks.filter { $0.patternId != nil }
+            for t in patternTasks {
+                print("   패턴태스크: \"\(t.title)\" dueDate=\(shortDate(t.dueDate)) occDate=\(t.patternOccurrenceDate.map { shortDate($0) } ?? "nil") horizon=\(t.currentHorizon.rawValue)")
             }
         } catch {
 
@@ -418,6 +466,29 @@ class TaskViewModel: ObservableObject {
         let dict = Dictionary(uniqueKeysWithValues: taskTombstones.map { ($0.key.uuidString, $0.value.timeIntervalSince1970) })
         if let data = try? JSONEncoder().encode(dict) {
             UserDefaults.standard.set(data, forKey: tombstonesKey)
+        }
+    }
+
+    // MARK: - Session Edited IDs Persistence
+
+    /// 세션 편집 ID를 UserDefaults에서 로드 (24시간 TTL 적용)
+    private func loadSessionEditedIds() {
+        guard let data = UserDefaults.standard.data(forKey: sessionEditedKey),
+              let dict = try? JSONDecoder().decode([String: Double].self, from: data) else { return }
+        let cutoff = Calendar.current.date(byAdding: .hour, value: -24, to: Date())!
+        sessionEditedTaskIds = Dictionary(uniqueKeysWithValues: dict.compactMap { (key, value) -> (UUID, Date)? in
+            guard let id = UUID(uuidString: key) else { return nil }
+            let date = Date(timeIntervalSince1970: value)
+            return date > cutoff ? (id, date) : nil
+        })
+        print("ℹ️ [loadSessionEditedIds] \(sessionEditedTaskIds.count)개 로드")
+    }
+
+    /// 세션 편집 ID를 UserDefaults에 저장
+    private func saveSessionEditedIds() {
+        let dict = Dictionary(uniqueKeysWithValues: sessionEditedTaskIds.map { ($0.key.uuidString, $0.value.timeIntervalSince1970) })
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: sessionEditedKey)
         }
     }
 
@@ -607,21 +678,22 @@ class TaskViewModel: ObservableObject {
     }
     
     func toggleTaskCompletion(_ task: Task) {
-        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-            // Cycle through: notStarted -> inProgress -> completed -> notStarted
-            switch tasks[index].status {
-            case .notStarted:
-                tasks[index].status = .inProgress
-                tasks[index].completedAt = nil
-            case .inProgress:
-                tasks[index].status = .completed
-                tasks[index].completedAt = Date()  // 완료 시간 기록
-            case .completed:
-                tasks[index].status = .notStarted
-                tasks[index].completedAt = nil     // 완료 취소 시 초기화
-            }
-            tasks[index].modifiedAt = Date()
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        // @Published 배열 서브스크립트 변경은 objectWillChange를 보장하지 않으므로 전체 배열 재할당
+        var newTasks = tasks
+        switch newTasks[index].status {
+        case .notStarted:
+            newTasks[index].status = .inProgress
+            newTasks[index].completedAt = nil
+        case .inProgress:
+            newTasks[index].status = .completed
+            newTasks[index].completedAt = Date()
+        case .completed:
+            newTasks[index].status = .notStarted
+            newTasks[index].completedAt = nil
         }
+        newTasks[index].modifiedAt = Date()
+        tasks = newTasks
     }
     
     func deleteTask(_ task: Task) {
@@ -678,21 +750,38 @@ class TaskViewModel: ObservableObject {
         guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
         let currentCount = tasks.filter { $0.isMIT && !$0.isCompleted }.count
         if !tasks[index].isMIT && currentCount >= 3 { return }
-        tasks[index].isMIT.toggle()
-        tasks[index].modifiedAt = Date()
-        print("⭐ [toggleMIT] \(tasks[index].title) isMIT=\(tasks[index].isMIT)")
+        var newTasks = tasks
+        newTasks[index].isMIT.toggle()
+        newTasks[index].modifiedAt = Date()
+        print("⭐ [toggleMIT] \(newTasks[index].title) isMIT=\(newTasks[index].isMIT)")
+        tasks = newTasks
     }
 
     func updateTask(_ task: Task) {
-        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-            var updatedTask = task
-            updatedTask.modifiedAt = Date()
-            // 오늘 이외의 horizon으로 이동하면 수동 순서 초기화
-            if updatedTask.currentHorizon != .today {
-                updatedTask.manualPriority = nil
-            }
-            tasks[index] = updatedTask
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        var updatedTask = task
+        updatedTask.modifiedAt = Date()
+        // 패턴 태스크를 처음 편집할 때 원래 발생일을 patternOccurrenceDate에 기록
+        if updatedTask.patternId != nil && updatedTask.patternOccurrenceDate == nil {
+            let originalDueDate = tasks[index].dueDate
+            updatedTask.patternOccurrenceDate = originalDueDate
+            print("📌 [updateTask] 패턴 발생일 기록: \"\(updatedTask.title)\" occurrenceDate=\(shortDate(originalDueDate))")
         }
+        let oldHorizon = tasks[index].currentHorizon
+        let newHorizon = updatedTask.currentHorizon
+        let oldDue = tasks[index].dueDate
+        let newDue = updatedTask.dueDate
+        print("✏️ [updateTask] \"\(updatedTask.title)\" dueDate: \(shortDate(oldDue))→\(shortDate(newDue)) horizon: \(oldHorizon.rawValue)→\(newHorizon.rawValue) patternOccDate=\(updatedTask.patternOccurrenceDate.map { shortDate($0) } ?? "nil")")
+        // 오늘 이외의 horizon으로 이동하면 수동 순서 초기화
+        if newHorizon != .today {
+            updatedTask.manualPriority = nil
+        }
+        // 이 태스크를 편집 ID 목록에 기록 (앱 재시작 후에도 24시간 cloud overwrite 방지)
+        sessionEditedTaskIds[updatedTask.id] = Date()
+        saveSessionEditedIds()
+        var newTasks = tasks
+        newTasks[index] = updatedTask
+        tasks = newTasks
     }
 
     /// 오늘 태스크 순서를 수동으로 재조정
@@ -700,13 +789,14 @@ class TaskViewModel: ObservableObject {
         var reorderedTasks = todayTasks
         reorderedTasks.move(fromOffsets: source, toOffset: destination)
 
-        // 새 순서에 따라 manualPriority 할당 (0, 1, 2, ...)
+        var newTasks = tasks
         for (index, task) in reorderedTasks.enumerated() {
-            if let taskIndex = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[taskIndex].manualPriority = index
-                tasks[taskIndex].modifiedAt = Date()
+            if let taskIndex = newTasks.firstIndex(where: { $0.id == task.id }) {
+                newTasks[taskIndex].manualPriority = index
+                newTasks[taskIndex].modifiedAt = Date()
             }
         }
+        tasks = newTasks
     }
 
     // MARK: - 하위 할 일 관련
@@ -718,9 +808,11 @@ class TaskViewModel: ObservableObject {
             print("⚠️ [TaskViewModel] 하위 할 일 찾기 실패: taskId=\(taskId), subtaskId=\(subtaskId)")
             return
         }
-        tasks[taskIndex].subtasks[subtaskIndex].isCompleted.toggle()
-        tasks[taskIndex].modifiedAt = Date()
-        print("✅ [TaskViewModel] 하위 할 일 완료 토글: \(tasks[taskIndex].subtasks[subtaskIndex].title)")
+        var newTasks = tasks
+        newTasks[taskIndex].subtasks[subtaskIndex].isCompleted.toggle()
+        newTasks[taskIndex].modifiedAt = Date()
+        print("✅ [TaskViewModel] 하위 할 일 완료 토글: \(newTasks[taskIndex].subtasks[subtaskIndex].title)")
+        tasks = newTasks
     }
 
     /// 드래그 앤 드롭으로 오늘 태스크 순서 재조정 (표시된 목록 기준, UUID 배열 사용)
@@ -734,19 +826,23 @@ class TaskViewModel: ObservableObject {
                      toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
 
         // 새 순서에 따라 manualPriority 재할당
+        var newTasks = tasks
         for (index, taskId) in ordered.enumerated() {
-            if let taskIndex = tasks.firstIndex(where: { $0.id == taskId }) {
-                tasks[taskIndex].manualPriority = index
-                tasks[taskIndex].modifiedAt = Date()
+            if let taskIndex = newTasks.firstIndex(where: { $0.id == taskId }) {
+                newTasks[taskIndex].manualPriority = index
+                newTasks[taskIndex].modifiedAt = Date()
             }
         }
+        tasks = newTasks
     }
 
     /// 모든 태스크의 수동 우선순위 초기화 (자동 정렬로 복귀)
     func resetManualPriorities() {
-        for index in 0..<tasks.count {
-            tasks[index].manualPriority = nil
+        var newTasks = tasks
+        for index in newTasks.indices {
+            newTasks[index].manualPriority = nil
         }
+        tasks = newTasks
     }
 
     // MARK: - Time Block Management
@@ -896,25 +992,48 @@ class TaskViewModel: ObservableObject {
     func generateTasksFromApprovedPatterns(patternService: PatternManagementService) async {
         do {
             let patternsNeedingTasks = try patternService.getPatternsNeedingTaskGeneration()
-
+            print("🔄 [generatePatterns] 시작 - 패턴 \(patternsNeedingTasks.count)개, 현재 태스크 \(tasks.count)개")
 
             for pattern in patternsNeedingTasks {
+                print("   📋 패턴: \"\(pattern.taskTitle)\" id=\(pattern.id.uuidString.prefix(8))")
 
                 // 앞으로 5주간의 발생일을 계산
                 let calendar = Calendar.current
                 var currentOccurrence = pattern.nextOccurrenceDate
                 let fiveWeeksFromNow = calendar.date(byAdding: .day, value: 35, to: Date())!
 
+                // 이 패턴과 연결된 기존 태스크 목록 출력
+                let existingForPattern = tasks.filter { $0.patternId == pattern.id }
+                for t in existingForPattern {
+                    print("      기존태스크: \"\(t.title)\" dueDate=\(shortDate(t.dueDate)) occDate=\(t.patternOccurrenceDate.map { shortDate($0) } ?? "nil") horizon=\(t.currentHorizon.rawValue)")
+                }
+
                 var occurrenceCount = 0
                 while currentOccurrence <= fiveWeeksFromNow && occurrenceCount < 10 {
 
-                    // 해당 패턴과 날짜에 대한 Task가 이미 존재하는지 확인
+                    // 해당 패턴과 발생일에 대한 Task가 이미 존재하는지 확인
+                    // patternOccurrenceDate를 우선 확인하고, 없으면 dueDate로 fallback (기존 태스크 호환)
+                    var matchedBy = "없음"
                     let alreadyExists = tasks.contains { task in
-                        task.patternId == pattern.id &&
-                        calendar.isDate(task.dueDate, inSameDayAs: currentOccurrence)
+                        guard task.patternId == pattern.id else { return false }
+                        if let occDate = task.patternOccurrenceDate {
+                            if calendar.isDate(occDate, inSameDayAs: currentOccurrence) {
+                                matchedBy = "occurrenceDate(\(shortDate(occDate)))"
+                                return true
+                            }
+                            return false
+                        }
+                        if calendar.isDate(task.dueDate, inSameDayAs: currentOccurrence) {
+                            matchedBy = "dueDate(fallback, \(shortDate(task.dueDate)))"
+                            return true
+                        }
+                        return false
                     }
 
+                    print("      발생일=\(shortDate(currentOccurrence)) → 이미존재=\(alreadyExists) [\(matchedBy)]")
+
                     if !alreadyExists {
+                        print("      ⚠️ 새 태스크 생성: \"\(pattern.taskTitle)\" dueDate=\(shortDate(currentOccurrence))")
                         // Create task (패턴에서 생성되는 태스크는 일반 태스크)
                         let task = Task(
                             title: pattern.taskTitle,
@@ -930,12 +1049,10 @@ class TaskViewModel: ObservableObject {
                         var calendarTask = task
                         calendarTask.isFromCalendarPattern = true
                         calendarTask.patternId = pattern.id
+                        calendarTask.patternOccurrenceDate = currentOccurrence  // 원래 발생일 기록
                         calendarTask.autoRecurring = true
 
                         addTask(calendarTask)
-                        let dueDateStr = task.dueDate.formatted(date: .abbreviated, time: .omitted)
-                        let startDateStr = task.effectiveStartDate.formatted(date: .abbreviated, time: .omitted)
-                    } else {
                     }
 
                     // 다음 발생일 계산
@@ -1053,14 +1170,28 @@ class TaskViewModel: ObservableObject {
                 if let idx = localIndex {
                     // 양쪽에 있음 → modifiedAt 비교
                     let localTask = mergedTasks[idx]
-                    if cloudTask.modifiedAt > localTask.modifiedAt {
+                    let isSessionEdited = sessionEditedTaskIds[cloudTask.id] != nil
+                    if isSessionEdited {
+                        // 이 세션에서 사용자가 직접 편집한 태스크 → 항상 로컬 우선
+                        if cloudTask.dueDate != localTask.dueDate || cloudTask.modifiedAt != localTask.modifiedAt {
+                            tasksToUpsert.append(localTask)
+                            print("🛡️ [merge] 세션편집 보호: \"\(localTask.title)\" 로컬유지 local=\(shortDate(localTask.dueDate))/\(shortDate(localTask.modifiedAt)) cloud=\(shortDate(cloudTask.dueDate))/\(shortDate(cloudTask.modifiedAt))")
+                        }
+                    } else if cloudTask.modifiedAt.timeIntervalSince(localTask.modifiedAt) > 1.0 {
+                        // cloud가 1초 이상 최신 → cloud 우선
                         mergedTasks[idx] = cloudTask
-                        print("⬇️ [merge] 클라우드→로컬 업데이트: \(cloudTask.title)")
-                    } else if localTask.modifiedAt > cloudTask.modifiedAt {
+                        print("⬇️ [merge] 클라우드→로컬 덮어씀: \"\(cloudTask.title)\" cloud=\(shortDate(cloudTask.dueDate))/\(shortDate(cloudTask.modifiedAt)) local=\(shortDate(localTask.dueDate))/\(shortDate(localTask.modifiedAt))")
+                    } else if localTask.modifiedAt.timeIntervalSince(cloudTask.modifiedAt) > 1.0 {
+                        // local이 1초 이상 최신 → local 우선, cloud 업데이트
                         tasksToUpsert.append(localTask)
-                        print("⬆️ [merge] 로컬→클라우드 업데이트: \(localTask.title)")
+                        print("⬆️ [merge] 로컬→클라우드 업데이트: \"\(localTask.title)\" local=\(shortDate(localTask.dueDate))")
+                    } else {
+                        // 1초 이내 차이(sub-second 정밀도 오차 포함) → 동일하다고 간주
+                        // UserDefaults JSON ↔ CloudKit Date 직렬화 오차를 무시
+                        if cloudTask.dueDate != localTask.dueDate {
+                            print("⚠️ [merge] modifiedAt 거의 동일하지만 dueDate 다름: \"\(cloudTask.title)\" cloud=\(shortDate(cloudTask.dueDate)) local=\(shortDate(localTask.dueDate))")
+                        }
                     }
-                    // 동일하면 무시
                 } else if let tombstoneDate = taskTombstones[cloudTask.id] {
                     // 우리가 삭제한 태스크가 클라우드에 있음
                     if cloudTask.modifiedAt > tombstoneDate {
@@ -1088,10 +1219,27 @@ class TaskViewModel: ObservableObject {
                 }
             }
 
+            // 5. 병합 결과 적용
+            // sync 중 로컬에서 편집된 태스크 보호 (race condition 방지)
+            // mergedTasks는 네트워크 호출 전 스냅샷 기준 → 그 사이 편집된 로컬 버전 우선
+            for currentTask in tasks {
+                if let mergedIdx = mergedTasks.firstIndex(where: { $0.id == currentTask.id }) {
+                    if currentTask.modifiedAt > mergedTasks[mergedIdx].modifiedAt {
+                        mergedTasks[mergedIdx] = currentTask
+                        // 클라우드도 업데이트 필요
+                        tasksToUpsert.append(currentTask)
+                        print("🔒 [merge] sync 중 편집 보호: \(currentTask.title)")
+                    }
+                } else {
+                    // sync 중 새로 추가된 태스크도 보존하고 클라우드에 업로드
+                    mergedTasks.append(currentTask)
+                    tasksToUpsert.append(currentTask)
+                }
+            }
+
             // 중복 제거 (같은 태스크가 upsert 목록에 두 번 들어갈 수 있음)
             let uniqueUpsert = Array(Dictionary(uniqueKeysWithValues: tasksToUpsert.map { ($0.id, $0) }).values)
 
-            // 5. 병합 결과 적용
             let prevCount = tasks.count
             tasks = mergedTasks
             saveTombstones()
@@ -1126,25 +1274,29 @@ class TaskViewModel: ObservableObject {
     // MARK: - CloudKit Per-Record Operations
 
     /// 단일 태스크를 CloudKit에 upsert (저장/갱신)
+    /// 이전 sync에서 fetch한 CKRecord가 캐시에 있으면 재사용 (changeTag 보존 → serverRecordChanged 방지)
     private func upsertTaskToCloud(_ task: Task) async throws {
         guard let database = database else { return }
-        let record = taskToCKRecord(task)
+
+        // 캐시에 기존 레코드가 있으면 changeTag를 유지한 채 필드만 업데이트
+        let record: CKRecord
+        if let cached = fetchedCloudRecords[task.id] {
+            record = cached
+        } else {
+            record = CKRecord(recordType: "Task", recordID: CKRecord.ID(recordName: task.id.uuidString))
+        }
+        populateCKRecord(record, from: task)
+
         do {
             try await database.modifyRecords(saving: [record], deleting: [])
+            fetchedCloudRecords[task.id] = record
         } catch let error as CKError where error.code == .serverRecordChanged {
-            // 서버 버전과 충돌 → 우리 버전을 강제 저장
+            // 캐시가 stale한 경우 (다른 기기에서 수정됨) → 서버 레코드에 우리 필드 덮어씀
             let serverRecord = error.serverRecord ?? record
-            let fields: [String] = ["title", "taskDescription", "dueDate", "scheduledStartTime",
-                                     "estimatedMinutes", "leadTimeDays", "taskType", "taskRole",
-                                     "status", "priority", "manualPriority", "projectId",
-                                     "parentTaskId", "mainTaskId", "targetDate",
-                                     "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
-                                     "lastCheckinDate", "consecutiveMissedCheckins", "completedAt",
-                                     "isMIT", "subtasks", "linkedWikiPageIds", "modifiedAt"]
-            for field in fields {
-                serverRecord[field] = record[field]
-            }
+            populateCKRecord(serverRecord, from: task)
             try await database.modifyRecords(saving: [serverRecord], deleting: [])
+            fetchedCloudRecords[task.id] = serverRecord
+            print("⚠️ [upsertTaskToCloud] serverRecordChanged 해결 (stale 캐시): \(task.title)")
         }
     }
 
@@ -1160,10 +1312,12 @@ class TaskViewModel: ObservableObject {
     }
 
     /// 클라우드에서 모든 태스크 가져오기 (병합용)
+    /// 가져온 CKRecord는 fetchedCloudRecords에 캐시 → upsert 시 changeTag 재사용으로 serverRecordChanged 방지
     private func fetchAllCloudTasksForMerge() async throws -> [Task] {
         guard let database = database else { return [] }
 
         var allTasks: [Task] = []
+        fetchedCloudRecords.removeAll()
 
         // 저장된 recordNames로 직접 fetch (빠름)
         let savedNames = UserDefaults.standard.stringArray(forKey: "cloudTaskRecordNames") ?? []
@@ -1171,11 +1325,13 @@ class TaskViewModel: ObservableObject {
             let recordIDs = savedNames.map { CKRecord.ID(recordName: $0) }
             for batch in recordIDs.chunked(into: 200) {
                 let results = try await database.records(for: batch)
-                let batchTasks = results.values.compactMap { result -> Task? in
-                    guard let record = try? result.get() else { return nil }
-                    return ckRecordToTask(record)
+                for (_, result) in results {
+                    guard let record = try? result.get() else { continue }
+                    if let task = ckRecordToTask(record), let id = UUID(uuidString: record.recordID.recordName) {
+                        allTasks.append(task)
+                        fetchedCloudRecords[id] = record
+                    }
                 }
-                allTasks.append(contentsOf: batchTasks)
             }
         }
 
@@ -1186,18 +1342,19 @@ class TaskViewModel: ObservableObject {
                 "title", "taskDescription", "dueDate", "scheduledStartTime", "estimatedMinutes", "leadTimeDays",
                 "taskType", "taskRole", "status", "priority", "createdAt",
                 "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
-                "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
+                "calendarEventId", "isFromCalendarPattern", "patternId", "patternOccurrenceDate", "autoRecurring",
                 "lastCheckinDate", "consecutiveMissedCheckins", "completedAt",
                 "isMIT", "subtasks", "linkedWikiPageIds", "modifiedAt"
             ])
-            let queryTasks = results.matchResults.compactMap { (_, result) -> Task? in
-                guard let record = try? result.get() else { return nil }
-                return ckRecordToTask(record)
-            }
-            // savedNames로 가져온 것과 중복 제거 (ID 기준)
             let existingIds = Set(allTasks.map { $0.id })
-            let newTasks = queryTasks.filter { !existingIds.contains($0.id) }
-            allTasks.append(contentsOf: newTasks)
+            for (_, result) in results.matchResults {
+                guard let record = try? result.get(),
+                      let task = ckRecordToTask(record),
+                      let id = UUID(uuidString: record.recordID.recordName),
+                      !existingIds.contains(id) else { continue }
+                allTasks.append(task)
+                fetchedCloudRecords[id] = record
+            }
 
             // recordNames 갱신
             let allNames = allTasks.map { $0.id.uuidString }
@@ -1730,10 +1887,8 @@ class TaskViewModel: ObservableObject {
     }
 
 
-    private func taskToCKRecord(_ task: Task) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: task.id.uuidString)
-        let record = CKRecord(recordType: "Task", recordID: recordID)
-
+    /// CKRecord에 Task 필드를 채움 (신규 또는 기존 레코드 모두 사용 가능)
+    private func populateCKRecord(_ record: CKRecord, from task: Task) {
         // 기본 정보
         record["title"] = task.title as CKRecordValue
         record["taskDescription"] = task.description as CKRecordValue
@@ -1747,45 +1902,26 @@ class TaskViewModel: ObservableObject {
         record["createdAt"] = task.createdAt as CKRecordValue
 
         // Optional 필드들
-        if let scheduledStartTime = task.scheduledStartTime {
-            record["scheduledStartTime"] = scheduledStartTime as CKRecordValue
-        }
-        if let parentId = task.parentTaskId {
-            record["parentTaskId"] = parentId.uuidString as CKRecordValue
-        }
-        if let mainId = task.mainTaskId {
-            record["mainTaskId"] = mainId.uuidString as CKRecordValue
-        }
-        if let targetDate = task.targetDate {
-            record["targetDate"] = targetDate as CKRecordValue
-        }
-        if let projectId = task.projectId {
-            record["projectId"] = projectId.uuidString as CKRecordValue
-        }
-        if let manualPriority = task.manualPriority {
-            record["manualPriority"] = manualPriority as CKRecordValue
-        }
+        record["scheduledStartTime"] = task.scheduledStartTime as CKRecordValue?
+        record["parentTaskId"] = task.parentTaskId?.uuidString as CKRecordValue?
+        record["mainTaskId"] = task.mainTaskId?.uuidString as CKRecordValue?
+        record["targetDate"] = task.targetDate as CKRecordValue?
+        record["projectId"] = task.projectId?.uuidString as CKRecordValue?
+        record["manualPriority"] = task.manualPriority as CKRecordValue?
 
         // 캘린더 연동 정보
-        if let calendarEventId = task.calendarEventId {
-            record["calendarEventId"] = calendarEventId as CKRecordValue
-        }
+        record["calendarEventId"] = task.calendarEventId as CKRecordValue?
         record["isFromCalendarPattern"] = task.isFromCalendarPattern as CKRecordValue
-        if let patternId = task.patternId {
-            record["patternId"] = patternId.uuidString as CKRecordValue
-        }
+        record["patternId"] = task.patternId?.uuidString as CKRecordValue?
+        record["patternOccurrenceDate"] = task.patternOccurrenceDate as CKRecordValue?
         record["autoRecurring"] = task.autoRecurring as CKRecordValue
 
         // 체크인 정보
-        if let lastCheckinDate = task.lastCheckinDate {
-            record["lastCheckinDate"] = lastCheckinDate as CKRecordValue
-        }
+        record["lastCheckinDate"] = task.lastCheckinDate as CKRecordValue?
         record["consecutiveMissedCheckins"] = task.consecutiveMissedCheckins as CKRecordValue
 
         // 완료 정보
-        if let completedAt = task.completedAt {
-            record["completedAt"] = completedAt as CKRecordValue
-        }
+        record["completedAt"] = task.completedAt as CKRecordValue?
 
         // MIT
         record["isMIT"] = task.isMIT as CKRecordValue
@@ -1798,6 +1934,8 @@ class TaskViewModel: ObservableObject {
            let subtasksData = try? JSONEncoder().encode(task.subtasks),
            let subtasksString = String(data: subtasksData, encoding: .utf8) {
             record["subtasks"] = subtasksString as CKRecordValue
+        } else {
+            record["subtasks"] = nil
         }
 
         // 위키 연결 (UUID 배열을 JSON 직렬화)
@@ -1805,10 +1943,18 @@ class TaskViewModel: ObservableObject {
            let idsData = try? JSONEncoder().encode(task.linkedWikiPageIds.map { $0.uuidString }),
            let idsString = String(data: idsData, encoding: .utf8) {
             record["linkedWikiPageIds"] = idsString as CKRecordValue
+        } else {
+            record["linkedWikiPageIds"] = nil
         }
+    }
 
+    private func taskToCKRecord(_ task: Task) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: task.id.uuidString)
+        let record = CKRecord(recordType: "Task", recordID: recordID)
+        populateCKRecord(record, from: task)
         return record
     }
+
 
     private func ckRecordToTask(_ record: CKRecord) -> Task? {
         // 필수 필드 체크 및 상세 로깅
@@ -1865,6 +2011,7 @@ class TaskViewModel: ObservableObject {
         let calendarEventId = record["calendarEventId"] as? String
         let isFromCalendarPattern = record["isFromCalendarPattern"] as? Bool ?? false
         let patternId = (record["patternId"] as? String).flatMap { UUID(uuidString: $0) }
+        let patternOccurrenceDate = record["patternOccurrenceDate"] as? Date
         let autoRecurring = record["autoRecurring"] as? Bool ?? false
 
         // 체크인 정보
@@ -1895,6 +2042,7 @@ class TaskViewModel: ObservableObject {
         task.calendarEventId = calendarEventId
         task.isFromCalendarPattern = isFromCalendarPattern
         task.patternId = patternId
+        task.patternOccurrenceDate = patternOccurrenceDate
         task.autoRecurring = autoRecurring
         task.lastCheckinDate = lastCheckinDate
         task.consecutiveMissedCheckins = consecutiveMissedCheckins
@@ -2070,10 +2218,11 @@ class TaskViewModel: ObservableObject {
             return
         }
 
+        var newTasks = tasks
         // 체크인 시간 기록
-        tasks[index].lastCheckinDate = Date()
-        tasks[index].consecutiveMissedCheckins = 0
-        tasks[index].modifiedAt = Date()
+        newTasks[index].lastCheckinDate = Date()
+        newTasks[index].consecutiveMissedCheckins = 0
+        newTasks[index].modifiedAt = Date()
 
         switch response {
         case .onTrack:
@@ -2082,20 +2231,21 @@ class TaskViewModel: ObservableObject {
 
         case .completed:
             // 완료 처리
-            tasks[index].status = .completed
+            newTasks[index].status = .completed
 
         case .needHelp:
             // 문제 있음 - 우선순위 상향
-            if tasks[index].priority != .urgent {
-                tasks[index].priority = .high
+            if newTasks[index].priority != .urgent {
+                newTasks[index].priority = .high
             }
 
         case .postponed:
             // 연기 - 마감일 하루 연장
-            if let newDueDate = Calendar.current.date(byAdding: .day, value: 1, to: tasks[index].dueDate) {
-                tasks[index].dueDate = newDueDate
+            if let newDueDate = Calendar.current.date(byAdding: .day, value: 1, to: newTasks[index].dueDate) {
+                newTasks[index].dueDate = newDueDate
             }
         }
+        tasks = newTasks
     }
 
     /// 미체크인 태스크 감지 (앱 시작 시 호출)
@@ -2103,19 +2253,21 @@ class TaskViewModel: ObservableObject {
         let calendar = Calendar.current
         let yesterday = calendar.date(byAdding: .day, value: -1, to: Date())!
 
-        for index in tasks.indices {
-            guard tasks[index].isInProgress else { continue }
+        var newTasks = tasks
+        for index in newTasks.indices {
+            guard newTasks[index].isInProgress else { continue }
 
             // 어제 체크인하지 않은 경우
-            if let lastCheckin = tasks[index].lastCheckinDate {
+            if let lastCheckin = newTasks[index].lastCheckinDate {
                 if lastCheckin < calendar.startOfDay(for: yesterday) {
-                    tasks[index].consecutiveMissedCheckins += 1
+                    newTasks[index].consecutiveMissedCheckins += 1
                 }
-            } else if tasks[index].status == .inProgress {
+            } else if newTasks[index].status == .inProgress {
                 // 진행 중인데 한 번도 체크인한 적 없음
-                tasks[index].consecutiveMissedCheckins += 1
+                newTasks[index].consecutiveMissedCheckins += 1
             }
         }
+        tasks = newTasks
     }
 
     /// 연속 미체크인 태스크 목록
@@ -2151,11 +2303,13 @@ class TaskViewModel: ObservableObject {
     func deleteProject(_ project: Project) {
         projects.removeAll { $0.id == project.id }
         // 프로젝트에 속한 태스크들의 projectId 제거
-        for i in tasks.indices {
-            if tasks[i].projectId == project.id {
-                tasks[i].projectId = nil
+        var newTasks = tasks
+        for i in newTasks.indices {
+            if newTasks[i].projectId == project.id {
+                newTasks[i].projectId = nil
             }
         }
+        tasks = newTasks
     }
 
     func updateProject(_ project: Project) {

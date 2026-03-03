@@ -266,8 +266,8 @@ struct TaskRowView: View {
             Text("\"\(task.title)\"을(를) 삭제합니다. 이 작업은 되돌릴 수 없습니다.")
         }
 
-        // 세부 항목 장려 메시지 (미시작 + 세부항목 없음)
-        if task.isNotStarted && task.subtasks.isEmpty {
+        // 세부 항목 장려 메시지 (오늘 해야 하지만 아직 시작 못 한 일정에만 표시)
+        if task.isNotStarted && task.subtasks.isEmpty && task.currentHorizon == .today {
             Button(action: { showingEditSheet = true }) {
                 HStack(spacing: 6) {
                     Image(systemName: "plus.circle.dashed")
