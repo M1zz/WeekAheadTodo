@@ -1733,9 +1733,9 @@ class TaskViewModel: ObservableObject {
                 "title", "taskDescription", "dueDate", "scheduledStartTime", "estimatedMinutes", "leadTimeDays",
                 "taskType", "taskRole", "status", "priority", "createdAt",
                 "parentTaskId", "mainTaskId", "targetDate", "projectId", "manualPriority",
-                "calendarEventId", "isFromCalendarPattern", "patternId", "autoRecurring",
+                "calendarEventId", "isFromCalendarPattern", "patternId", "patternOccurrenceDate", "autoRecurring",
                 "lastCheckinDate", "consecutiveMissedCheckins", "completedAt",
-                "isMIT", "subtasks", "linkedWikiPageIds"
+                "isMIT", "subtasks", "linkedWikiPageIds", "modifiedAt"  // modifiedAt 필수! 누락 시 Date()로 초기화돼 타임스탬프 인플레이션 발생
             ])
 
             cloudTasks = results.matchResults.compactMap { (recordID, result) in
@@ -2051,8 +2051,11 @@ class TaskViewModel: ObservableObject {
         // MIT
         task.isMIT = record["isMIT"] as? Bool ?? false
 
-        // 수정 시각 (없으면 createdAt fallback)
-        task.modifiedAt = record["modifiedAt"] as? Date ?? task.createdAt
+        // createdAt: record 값으로 덮어씀 (Task init이 Date()로 설정하기 때문)
+        task.createdAt = createdAt
+
+        // 수정 시각 (없으면 createdAt fallback — modifiedAt 누락 시 Date()를 쓰지 않도록 record createdAt 사용)
+        task.modifiedAt = record["modifiedAt"] as? Date ?? createdAt
 
         // 하위 할 일 (JSON 역직렬화)
         if let subtasksString = record["subtasks"] as? String,
