@@ -49,7 +49,6 @@
 		A1664A74F5515FFCE4F1EA33 /* CalendarEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1578DEE4987F86FBBAC2939 /* CalendarEvent.swift */; };
 		A19ACD8EEF2A67E02C87D79C /* CalendarIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12795EBF5CC911070B1B768 /* CalendarIntegrationView.swift */; };
 		A1AAA111111111111111111B /* ApprovedPattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AAA111111111111111111A /* ApprovedPattern.swift */; };
-		A1TASKITEM00000000BUILD1 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TASKITEM00000000FREF01 /* TaskItem.swift */; };
 		A1BBB222222222222222222C /* PatternManagementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1BBB222222222222222222B /* PatternManagementService.swift */; };
 		A1C544133BCB00D56FD0DFFC /* PatternDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */; };
 		A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */; };
@@ -60,6 +59,7 @@
 		A1MD111111111111111BUILD /* MarkdownParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1MD000000000000000PARSE /* MarkdownParser.swift */; };
 		A1SHARED01234567890000004 /* WeekAheadShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1SHARED01234567890000002 /* WeekAheadShared */; };
 		A1SHARED01234567890000005 /* WeekAheadShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1SHARED01234567890000003 /* WeekAheadShared */; };
+		A1TASKITEM00000000BUILD1 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TASKITEM00000000FREF01 /* TaskItem.swift */; };
 		A1TIP11111111111111BUILD /* TaskInputParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TIP00000000000000PARSE /* TaskInputParser.swift */; };
 		AB8ED9EFA2F548C8BB18302D /* ThisWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED4D94B0815645FD832A7A51 /* ThisWeekView.swift */; };
 		AS3DA3DCD1E94F078C61150 /* AssistantSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */; };
@@ -70,6 +70,7 @@
 		E0A9B9E71EA64E40B49887E2 /* NextWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9723B9D230434FBB93EBEE /* NextWeekView.swift */; };
 		EAF392B156854E358E4CBB47 /* TodayInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */; };
 		F6C42520668C4612BFE0DEC9 /* TimeBasedWeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F878F664DAB24B31A160A340 /* TimeBasedWeekCalendar.swift */; };
+		MERGE0001000000001BUILD /* MergeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = MERGE0001000000001FREF /* MergeEngine.swift */; };
 		WIKI0001000000000BUILD /* WikiViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = WIKI0001000000000FILEREF /* WikiViewModel.swift */; };
 		WIKI0002000000000BUILD /* WikiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WIKI0002000000000FILEREF /* WikiView.swift */; };
 		WIKI0003000000000BUILD /* WikiSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WIKI0003000000000FILEREF /* WikiSidebarView.swift */; };
@@ -149,13 +150,13 @@
 		A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		A18D1386D284CA97002326B1 /* RecurrencePattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurrencePattern.swift; sourceTree = "<group>"; };
 		A1AAA111111111111111111A /* ApprovedPattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPattern.swift; sourceTree = "<group>"; };
-		A1TASKITEM00000000FREF01 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
 		A1B3A77C7BDF76AE8ED798DF /* PatternReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternReviewView.swift; sourceTree = "<group>"; };
 		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
 		A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPatternManagementView.swift; sourceTree = "<group>"; };
 		A1DDD444444444444444444D /* EditApprovedPatternView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditApprovedPatternView.swift; sourceTree = "<group>"; };
 		A1IV000000000000000VIEWW /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
+		A1TASKITEM00000000FREF01 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
 		A1TIP00000000000000PARSE /* TaskInputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInputParser.swift; sourceTree = "<group>"; };
 		AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskSelectionSheet.swift; sourceTree = "<group>"; };
 		AS240FA7021B949C980B0603 /* AssistantSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantSuggestion.swift; sourceTree = "<group>"; };
@@ -173,6 +174,7 @@
 		F878F664DAB24B31A160A340 /* TimeBasedWeekCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeBasedWeekCalendar.swift; sourceTree = "<group>"; };
 		FB9CDE00E19B43078D3A8CD5 /* EditTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTaskView.swift; sourceTree = "<group>"; };
 		FF9F2778A6CC4D5AA970D762 /* QuickAddView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAddView.swift; sourceTree = "<group>"; };
+		MERGE0001000000001FREF /* MergeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeEngine.swift; sourceTree = "<group>"; };
 		WIKI0001000000000FILEREF /* WikiViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiViewModel.swift; sourceTree = "<group>"; };
 		WIKI0002000000000FILEREF /* WikiView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiView.swift; sourceTree = "<group>"; };
 		WIKI0003000000000FILEREF /* WikiSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiSidebarView.swift; sourceTree = "<group>"; };
@@ -315,6 +317,7 @@
 				A1000002234567890000005 /* TaskViewModel.swift */,
 				A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */,
 				WIKI0001000000000FILEREF /* WikiViewModel.swift */,
+				MERGE0001000000001FREF /* MergeEngine.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -644,6 +647,7 @@
 				WIKI0005000000000BUILD /* WikiEditorView.swift in Sources */,
 				WIKI0006000000000BUILD /* WikiPreviewView.swift in Sources */,
 				WIKI0007000000000BUILD /* WikiLinkPickerView.swift in Sources */,
+				MERGE0001000000001BUILD /* MergeEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

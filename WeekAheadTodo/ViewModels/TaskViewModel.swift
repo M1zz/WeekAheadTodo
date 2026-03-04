@@ -1141,104 +1141,41 @@ class TaskViewModel: ObservableObject {
             // 1. 클라우드에서 모든 태스크와 tombstone 가져오기
             let cloudTasks = try await fetchAllCloudTasksForMerge()
             let cloudTombstones = try await fetchCloudTombstones()
-
-            let cloudDict = Dictionary(uniqueKeysWithValues: cloudTasks.map { ($0.id, $0) })
             print("☁️ [performMergeSync] 클라우드: \(cloudTasks.count)개, tombstone: \(cloudTombstones.count)개")
 
-            var mergedTasks = tasks
-            var tasksToUpsert: [Task] = []
-            var idsToDeleteFromCloud: [UUID] = []
+            // 2. MergeEngine으로 순수 병합 계산
+            let result = MergeEngine.compute(
+                localTasks: tasks,
+                cloudTasks: cloudTasks,
+                cloudTombstones: cloudTombstones,
+                localTombstones: taskTombstones,
+                sessionEditedIds: sessionEditedTaskIds
+            )
 
-            // 2. 클라우드 tombstone을 로컬에 적용
-            for (deletedId, cloudDeletedAt) in cloudTombstones {
-                if let localTask = mergedTasks.first(where: { $0.id == deletedId }) {
-                    if localTask.modifiedAt <= cloudDeletedAt {
-                        // 클라우드에서 삭제됐고 로컬이 더 최신이 아님 → 로컬에서도 삭제
-                        mergedTasks.removeAll { $0.id == deletedId }
-                        print("🗑️ [merge] 클라우드 삭제 적용: \(localTask.title)")
-                    }
-                    // 로컬이 더 최신이면: 로컬 유지 (step 4에서 클라우드에 복원됨)
-                }
-                // 우리 로컬 tombstone에서 제거 (클라우드가 이미 알고 있음)
-                taskTombstones.removeValue(forKey: deletedId)
-            }
-
-            // 3. 클라우드 태스크를 로컬에 병합
-            for cloudTask in cloudTasks {
-                let localIndex = mergedTasks.firstIndex(where: { $0.id == cloudTask.id })
-
-                if let idx = localIndex {
-                    // 양쪽에 있음 → modifiedAt 비교
-                    let localTask = mergedTasks[idx]
-                    let isSessionEdited = sessionEditedTaskIds[cloudTask.id] != nil
-                    if isSessionEdited {
-                        // 이 세션에서 사용자가 직접 편집한 태스크 → 항상 로컬 우선
-                        if cloudTask.dueDate != localTask.dueDate || cloudTask.modifiedAt != localTask.modifiedAt {
-                            tasksToUpsert.append(localTask)
-                            print("🛡️ [merge] 세션편집 보호: \"\(localTask.title)\" 로컬유지 local=\(shortDate(localTask.dueDate))/\(shortDate(localTask.modifiedAt)) cloud=\(shortDate(cloudTask.dueDate))/\(shortDate(cloudTask.modifiedAt))")
-                        }
-                    } else if cloudTask.modifiedAt.timeIntervalSince(localTask.modifiedAt) > 1.0 {
-                        // cloud가 1초 이상 최신 → cloud 우선
-                        mergedTasks[idx] = cloudTask
-                        print("⬇️ [merge] 클라우드→로컬 덮어씀: \"\(cloudTask.title)\" cloud=\(shortDate(cloudTask.dueDate))/\(shortDate(cloudTask.modifiedAt)) local=\(shortDate(localTask.dueDate))/\(shortDate(localTask.modifiedAt))")
-                    } else if localTask.modifiedAt.timeIntervalSince(cloudTask.modifiedAt) > 1.0 {
-                        // local이 1초 이상 최신 → local 우선, cloud 업데이트
-                        tasksToUpsert.append(localTask)
-                        print("⬆️ [merge] 로컬→클라우드 업데이트: \"\(localTask.title)\" local=\(shortDate(localTask.dueDate))")
-                    } else {
-                        // 1초 이내 차이(sub-second 정밀도 오차 포함) → 동일하다고 간주
-                        // UserDefaults JSON ↔ CloudKit Date 직렬화 오차를 무시
-                        if cloudTask.dueDate != localTask.dueDate {
-                            print("⚠️ [merge] modifiedAt 거의 동일하지만 dueDate 다름: \"\(cloudTask.title)\" cloud=\(shortDate(cloudTask.dueDate)) local=\(shortDate(localTask.dueDate))")
-                        }
-                    }
-                } else if let tombstoneDate = taskTombstones[cloudTask.id] {
-                    // 우리가 삭제한 태스크가 클라우드에 있음
-                    if cloudTask.modifiedAt > tombstoneDate {
-                        // 삭제 후 클라우드에서 수정됨 → 클라우드 버전 복원
-                        mergedTasks.append(cloudTask)
-                        taskTombstones.removeValue(forKey: cloudTask.id)
-                        print("↩️ [merge] 삭제 후 재수정됨, 복원: \(cloudTask.title)")
-                    } else {
-                        // 우리 삭제가 유효 → 클라우드에서도 삭제 필요
-                        idsToDeleteFromCloud.append(cloudTask.id)
-                        taskTombstones.removeValue(forKey: cloudTask.id)
-                    }
-                } else {
-                    // 클라우드에만 있고 우리가 삭제하지 않음 → 로컬에 추가 (다른 기기에서 추가됨)
-                    mergedTasks.append(cloudTask)
-                    print("➕ [merge] 클라우드→로컬 추가: \(cloudTask.title)")
-                }
-            }
-
-            // 4. 로컬에만 있는 태스크 → 클라우드에 업로드
-            for localTask in tasks {
-                if cloudDict[localTask.id] == nil && taskTombstones[localTask.id] == nil {
-                    tasksToUpsert.append(localTask)
-                    print("⬆️ [merge] 로컬→클라우드 신규: \(localTask.title)")
-                }
-            }
-
-            // 5. 병합 결과 적용
+            // 3. 병합 결과 적용
             // sync 중 로컬에서 편집된 태스크 보호 (race condition 방지)
-            // mergedTasks는 네트워크 호출 전 스냅샷 기준 → 그 사이 편집된 로컬 버전 우선
+            var mergedTasks = result.mergedTasks
+            var tasksToUpsert = result.tasksToUpsert
+
             for currentTask in tasks {
                 if let mergedIdx = mergedTasks.firstIndex(where: { $0.id == currentTask.id }) {
                     if currentTask.modifiedAt > mergedTasks[mergedIdx].modifiedAt {
                         mergedTasks[mergedIdx] = currentTask
-                        // 클라우드도 업데이트 필요
                         tasksToUpsert.append(currentTask)
                         print("🔒 [merge] sync 중 편집 보호: \(currentTask.title)")
                     }
                 } else {
-                    // sync 중 새로 추가된 태스크도 보존하고 클라우드에 업로드
                     mergedTasks.append(currentTask)
                     tasksToUpsert.append(currentTask)
                 }
             }
 
-            // 중복 제거 (같은 태스크가 upsert 목록에 두 번 들어갈 수 있음)
+            // 중복 제거
             let uniqueUpsert = Array(Dictionary(uniqueKeysWithValues: tasksToUpsert.map { ($0.id, $0) }).values)
+            let idsToDeleteFromCloud = result.idsToDeleteFromCloud
+
+            // 4. tombstone 상태 업데이트
+            taskTombstones = result.remainingTombstones
 
             let prevCount = tasks.count
             tasks = mergedTasks

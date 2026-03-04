@@ -12,6 +12,8 @@ struct ImportView: View {
     @State private var showingHelp = false
     @State private var startDate: Date = Date()
     @State private var showingEditSheet = false
+    @State private var selectedProjectId: UUID? = nil
+    @State private var defaultDueDate: Date = Calendar.current.date(byAdding: .day, value: 30, to: Date())!
 
     var body: some View {
         VStack(spacing: 0) {
@@ -172,7 +174,27 @@ struct ImportView: View {
 
             Divider()
 
-            HStack {
+            HStack(spacing: 12) {
+                Picker("프로젝트", selection: $selectedProjectId) {
+                    Text("프로젝트 없음").tag(nil as UUID?)
+                    ForEach(viewModel.projects) { project in
+                        HStack(spacing: 4) {
+                            Image(systemName: project.icon)
+                            Text(project.name)
+                        }
+                        .tag(project.id as UUID?)
+                    }
+                }
+                .frame(maxWidth: 200)
+
+                HStack(spacing: 6) {
+                    Text("마감일")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                    DatePicker("", selection: $defaultDueDate, displayedComponents: .date)
+                        .labelsHidden()
+                }
+
                 Spacer()
 
                 Button("취소") {
@@ -345,7 +367,7 @@ struct ImportView: View {
                             .strikethrough(task.isCompleted)
                             .foregroundColor(task.isCompleted ? .secondary : .primary)
 
-                        Text(formatDate(task.dueDate))
+                        Text(formatDate(defaultDueDate))
                             .font(.callout)
                             .foregroundColor(.secondary)
                     }
@@ -403,12 +425,13 @@ struct ImportView: View {
             let task = Task(
                 title: parsedTask.title,
                 description: "마크다운에서 가져옴",
-                dueDate: parsedTask.dueDate,
+                dueDate: defaultDueDate,
                 estimatedMinutes: parsedTask.estimatedMinutes,
                 leadTimeDays: parsedTask.leadTimeDays,
                 taskType: .preparable,
                 taskRole: .none,
-                status: .notStarted
+                status: .notStarted,
+                projectId: selectedProjectId
             )
 
             viewModel.addTask(task)
