@@ -53,6 +53,8 @@
 		A1C544133BCB00D56FD0DFFC /* PatternDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1766F33B5C0F9085B6C85E5 /* PatternDetectionService.swift */; };
 		A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */; };
 		A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DDD444444444444444444D /* EditApprovedPatternView.swift */; };
+		ADDPAT0000000000001BUILD /* AddApprovedPatternView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDPAT0000000000001FREF /* AddApprovedPatternView.swift */; };
+		FLXPAT0000000000001BUILD /* FlexiblePatternScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLXPAT0000000000001FREF /* FlexiblePatternScheduleView.swift */; };
 		A1EF5AE8B7997DF7B5BB7D8B /* CalendarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1896F70DB009F9CB4059D52 /* CalendarViewModel.swift */; };
 		A1F1E7A4FDB964A04977DB8A /* RecurrencePattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18D1386D284CA97002326B1 /* RecurrencePattern.swift */; };
 		A1IV111111111111111BUILD /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IV000000000000000VIEWW /* ImportView.swift */; };
@@ -154,6 +156,8 @@
 		A1BBB222222222222222222B /* PatternManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternManagementService.swift; sourceTree = "<group>"; };
 		A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovedPatternManagementView.swift; sourceTree = "<group>"; };
 		A1DDD444444444444444444D /* EditApprovedPatternView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditApprovedPatternView.swift; sourceTree = "<group>"; };
+		ADDPAT0000000000001FREF /* AddApprovedPatternView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddApprovedPatternView.swift; sourceTree = "<group>"; };
+		FLXPAT0000000000001FREF /* FlexiblePatternScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlexiblePatternScheduleView.swift; sourceTree = "<group>"; };
 		A1IV000000000000000VIEWW /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		A1MD000000000000000PARSE /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
 		A1TASKITEM00000000FREF01 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
@@ -332,6 +336,8 @@
 				A11F5765D788F9412636B249 /* PatternDetailView.swift */,
 				A1CCC333333333333333333C /* ApprovedPatternManagementView.swift */,
 				A1DDD444444444444444444D /* EditApprovedPatternView.swift */,
+				ADDPAT0000000000001FREF /* AddApprovedPatternView.swift */,
+				FLXPAT0000000000001FREF /* FlexiblePatternScheduleView.swift */,
 				ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */,
 				680B2AAF3D11455E8CF6D561 /* SharedTypes.swift */,
 				7625CEC7174C49BC84F85DF5 /* TodayView.swift */,
@@ -610,6 +616,8 @@
 				A1BBB222222222222222222C /* PatternManagementService.swift in Sources */,
 				A1CCC333333333333333333D /* ApprovedPatternManagementView.swift in Sources */,
 				A1DDD444444444444444444E /* EditApprovedPatternView.swift in Sources */,
+				ADDPAT0000000000001BUILD /* AddApprovedPatternView.swift in Sources */,
+				FLXPAT0000000000001BUILD /* FlexiblePatternScheduleView.swift in Sources */,
 				581C3E9BB5397DA6E7B2ADA3 /* NotificationService.swift in Sources */,
 				293A912635E623BE692B94DA /* NotificationPreviewView.swift in Sources */,
 				3971D3AB777E4853B8F33871 /* SharedTypes.swift in Sources */,

@@ -8,10 +8,13 @@ struct ApprovedPatternManagementView: View {
 
     @State private var selectedPattern: ApprovedPattern?
     @State private var showingEditSheet = false
+    @State private var showingAddSheet = false
     @State private var showingDeleteAlert = false
     @State private var patternToDelete: ApprovedPattern?
     @State private var filterCalendar: String?
     @State private var showActiveOnly = false
+    @State private var flexiblePatternToSchedule: ApprovedPattern?
+    @State private var flexibleNextDate: Date = Date()
 
     private var patternService: PatternManagementService {
         PatternManagementService(modelContext: modelContext)
@@ -64,6 +67,10 @@ struct ApprovedPatternManagementView: View {
                                 onDelete: {
                                     patternToDelete = pattern
                                     showingDeleteAlert = true
+                                },
+                                onSetNextDate: {
+                                    flexibleNextDate = Date()
+                                    flexiblePatternToSchedule = pattern
                                 }
                             )
                         }
@@ -74,6 +81,19 @@ struct ApprovedPatternManagementView: View {
         }
         .sheet(item: $selectedPattern) { pattern in
             EditApprovedPatternView(pattern: pattern)
+        }
+        .sheet(isPresented: $showingAddSheet) {
+            AddApprovedPatternView()
+        }
+        .sheet(item: $flexiblePatternToSchedule) { pattern in
+            FlexiblePatternScheduleView(
+                pattern: pattern,
+                selectedDate: $flexibleNextDate,
+                onConfirm: { date in
+                    setNextOccurrence(pattern: pattern, date: date)
+                    flexiblePatternToSchedule = nil
+                }
+            )
         }
         .alert("패턴 삭제", isPresented: $showingDeleteAlert, presenting: patternToDelete) { pattern in
             Button("취소", role: .cancel) { }
@@ -98,6 +118,10 @@ struct ApprovedPatternManagementView: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
+            Button(action: { showingAddSheet = true }) {
+                Label("패턴 추가", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .background(Color(NSColor.windowBackgroundColor))
@@ -189,6 +213,13 @@ struct ApprovedPatternManagementView: View {
         } catch {
         }
     }
+
+    private func setNextOccurrence(pattern: ApprovedPattern, date: Date) {
+        do {
+            try patternService.setNextOccurrence(for: pattern, date: date)
+        } catch {
+        }
+    }
 }
 
 // MARK: - Approved Pattern Row
@@ -198,6 +229,7 @@ struct ApprovedPatternRow: View {
     let onToggleActive: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    let onSetNextDate: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -254,7 +286,15 @@ struct ApprovedPatternRow: View {
                 .foregroundColor(.secondary)
 
                 // Status indicator
-                if !pattern.isActive {
+                if pattern.isFlexibleSchedule && !pattern.isActive {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .foregroundColor(.blue)
+                        Text("다음 날짜 설정 필요")
+                    }
+                    .font(.callout)
+                    .foregroundColor(.blue)
+                } else if !pattern.isActive {
                     HStack(spacing: 4) {
                         Image(systemName: "pause.circle.fill")
                             .foregroundColor(.orange)
@@ -269,6 +309,15 @@ struct ApprovedPatternRow: View {
 
             // Action buttons
             VStack(spacing: 8) {
+                if pattern.isFlexibleSchedule && !pattern.isActive {
+                    Button(action: onSetNextDate) {
+                        Label("날짜 설정", systemImage: "calendar.badge.plus")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+
                 Button(action: onEdit) {
                     Label("편집", systemImage: "pencil")
                         .font(.callout)
