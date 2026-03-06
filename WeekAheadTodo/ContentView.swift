@@ -171,6 +171,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             _Concurrency.Task { @MainActor in
                 await viewModel.syncOnForeground()
+                await generateTasksIfNeeded()
             }
         }
         .task {
