@@ -94,7 +94,19 @@ class PatternManagementService {
     /// Mark pattern as having generated task
     func markTaskGenerated(for pattern: ApprovedPattern) throws {
         pattern.lastGeneratedTaskDate = Date()
-        pattern.updateNextOccurrence()
+        if pattern.isFlexibleSchedule {
+            // 유동 일정: 다음 날짜를 자동 계산하지 않고 사용자가 직접 설정하도록 대기
+            pattern.isActive = false
+        } else {
+            pattern.updateNextOccurrence()
+        }
+        try modelContext.save()
+    }
+
+    /// 유동 패턴의 다음 발생일을 사용자가 직접 설정하고 활성화
+    func setNextOccurrence(for pattern: ApprovedPattern, date: Date) throws {
+        pattern.nextOccurrenceDate = date
+        pattern.isActive = true
         try modelContext.save()
     }
 

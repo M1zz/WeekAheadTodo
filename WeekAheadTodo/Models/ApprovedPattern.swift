@@ -33,10 +33,45 @@ final class ApprovedPattern {
     // MARK: - State Management
     var isActive: Bool = true
     var isUserModified: Bool = false
+    /// 매주 있지만 요일이 고정되지 않아 사용자가 매번 직접 날짜를 지정해야 하는 패턴
+    var isFlexibleSchedule: Bool = false
 
     // MARK: - Sample Events (for reference)
     var sampleEventTitles: [String] = []
     var sampleEventDates: [Date] = []
+
+    /// 사용자가 직접 패턴을 수동 생성할 때 사용하는 초기화
+    init(
+        taskTitle: String,
+        estimatedMinutes: Int,
+        leadTimeDays: Int,
+        taskType: TaskType,
+        frequency: RecurrenceFrequency,
+        daysOfWeek: [Int]?,
+        nextOccurrenceDate: Date,
+        isFlexibleSchedule: Bool = false
+    ) {
+        self.id = UUID()
+        self.patternType = frequency == .daily ? PatternType.dailySameTime.rawValue : PatternType.weeklyFixedDay.rawValue
+        self.approvedAt = Date()
+        self.detectedAt = Date()
+        self.confidenceScore = 1.0
+        self.calendarTitles = []
+        self.primaryCalendar = "수동 추가"
+        self.recurrenceFrequency = frequency.rawValue
+        self.recurrenceInterval = 1
+        self.recurrenceDaysOfWeek = daysOfWeek
+        self.nextOccurrenceDate = nextOccurrenceDate
+        self.taskTitle = taskTitle
+        self.estimatedMinutes = estimatedMinutes
+        self.leadTimeDays = leadTimeDays
+        self.taskTypeRaw = taskType.rawValue
+        self.isActive = true
+        self.isUserModified = true
+        self.isFlexibleSchedule = isFlexibleSchedule
+        self.sampleEventTitles = []
+        self.sampleEventDates = []
+    }
 
     init(from pattern: RecurrencePattern) {
         self.id = pattern.id
