@@ -9,6 +9,7 @@ struct TaskRowView: View {
 
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
+    @State private var showingPatternSkipAlert = false
     @State private var isHovered = false
     @State private var isPulsing = false
     @State private var isSubtasksExpanded = false
@@ -221,12 +222,18 @@ struct TaskRowView: View {
                     .buttonStyle(.plain)
                     .help("수정")
 
-                    Button(action: { showingDeleteAlert = true }) {
-                        Image(systemName: "trash")
+                    Button(action: {
+                        if task.isFromCalendarPattern {
+                            showingPatternSkipAlert = true
+                        } else {
+                            showingDeleteAlert = true
+                        }
+                    }) {
+                        Image(systemName: task.isFromCalendarPattern ? "arrow.uturn.right.circle" : "trash")
                             .foregroundColor(.red)
                     }
                     .buttonStyle(.plain)
-                    .help("삭제")
+                    .help(task.isFromCalendarPattern ? "이번만 건너뛰기" : "삭제")
                 }
             }
 
@@ -264,6 +271,14 @@ struct TaskRowView: View {
             }
         } message: {
             Text("\"\(task.title)\"을(를) 삭제합니다. 이 작업은 되돌릴 수 없습니다.")
+        }
+        .alert("이번 발생만 건너뛰기", isPresented: $showingPatternSkipAlert) {
+            Button("취소", role: .cancel) { }
+            Button("이번만 건너뛰기", role: .destructive) {
+                viewModel.deleteTask(task)
+            }
+        } message: {
+            Text("이번 발생 일정을 건너뜁니다. 다음 발생 일정은 자동으로 생성됩니다.")
         }
 
         // 세부 항목 장려 메시지 (오늘 해야 하지만 아직 시작 못 한 일정에만 표시)

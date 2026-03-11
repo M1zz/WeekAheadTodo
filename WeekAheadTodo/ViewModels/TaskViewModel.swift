@@ -121,6 +121,11 @@ class TaskViewModel: ObservableObject {
     private var sessionEditedTaskIds: [UUID: Date] = [:]
     private let sessionEditedKey = "SessionEditedTaskIds_v1"
 
+    // 패턴 발생일 스킵 레지스트리: [patternId.uuidString → [occurrenceTimestamp]]
+    // 사용자가 패턴 태스크를 삭제하면 해당 발생일을 기록해 재생성 방지
+    private var patternSkipRegistry: [String: [Double]] = [:]
+    private let patternSkipKey = "PatternSkipRegistry_v1"
+
     // 이번 sync 사이클에서 fetch된 CKRecord 캐시 (changeTag 보존 → serverRecordChanged 방지)
     private var fetchedCloudRecords: [UUID: CKRecord] = [:]
 
@@ -183,6 +188,7 @@ class TaskViewModel: ObservableObject {
         loadProjects()
         loadTombstones()
         loadSessionEditedIds()
+        loadPatternSkipRegistry()
 
         // 체크인 관련 옵저버 등록
         setupCheckinObservers()
@@ -469,6 +475,35 @@ class TaskViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Pattern Skip Registry Persistence
+
+    private func loadPatternSkipRegistry() {
+        guard let data = UserDefaults.standard.data(forKey: patternSkipKey),
+              let dict = try? JSONDecoder().decode([String: [Double]].self, from: data) else { return }
+        // 90일 이상 지난 항목 정리
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: Date())!.timeIntervalSince1970
+        patternSkipRegistry = dict.mapValues { timestamps in
+            timestamps.filter { $0 > cutoff }
+        }.filter { !$0.value.isEmpty }
+        print("ℹ️ [loadPatternSkipRegistry] \(patternSkipRegistry.count)개 패턴 스킵 기록 로드")
+    }
+
+    private func savePatternSkipRegistry() {
+        if let data = try? JSONEncoder().encode(patternSkipRegistry) {
+            UserDefaults.standard.set(data, forKey: patternSkipKey)
+        }
+    }
+
+    /// 해당 패턴의 발생일이 사용자에 의해 스킵(삭제)된 적 있는지 확인
+    private func isPatternOccurrenceSkipped(patternId: UUID, occurrenceDate: Date) -> Bool {
+        let key = patternId.uuidString
+        guard let timestamps = patternSkipRegistry[key] else { return false }
+        let calendar = Calendar.current
+        return timestamps.contains { timestamp in
+            calendar.isDate(Date(timeIntervalSince1970: timestamp), inSameDayAs: occurrenceDate)
+        }
+    }
+
     // MARK: - Session Edited IDs Persistence
 
     /// 세션 편집 ID를 UserDefaults에서 로드 (24시간 TTL 적용)
@@ -728,6 +763,21 @@ class TaskViewModel: ObservableObject {
             taskTombstones[id] = deletedAt
         }
         saveTombstones()
+
+        // 패턴 태스크 삭제 시 발생일을 스킵 레지스트리에 기록 (재생성 방지)
+        for task in tasksToDelete where task.isFromCalendarPattern {
+            if let patternId = task.patternId {
+                let occurrenceDate = task.patternOccurrenceDate ?? task.dueDate
+                let key = patternId.uuidString
+                let timestamp = occurrenceDate.timeIntervalSince1970
+                if patternSkipRegistry[key] == nil {
+                    patternSkipRegistry[key] = []
+                }
+                patternSkipRegistry[key]?.append(timestamp)
+                print("⏭️ [deleteTasks] 패턴 스킵 등록: patternId=\(key.prefix(8)) date=\(shortDate(occurrenceDate))")
+            }
+        }
+        savePatternSkipRegistry()
 
         // 태스크 삭제
         tasks.removeAll { allTaskIdsToDelete.contains($0.id) }
@@ -1030,9 +1080,12 @@ class TaskViewModel: ObservableObject {
                         return false
                     }
 
-                    print("      발생일=\(shortDate(currentOccurrence)) → 이미존재=\(alreadyExists) [\(matchedBy)]")
+                    // 사용자가 이전에 이 발생일의 태스크를 삭제했는지 확인
+                    let isSkipped = isPatternOccurrenceSkipped(patternId: pattern.id, occurrenceDate: currentOccurrence)
 
-                    if !alreadyExists {
+                    print("      발생일=\(shortDate(currentOccurrence)) → 이미존재=\(alreadyExists) [\(matchedBy)] 스킵=\(isSkipped)")
+
+                    if !alreadyExists && !isSkipped {
                         print("      ⚠️ 새 태스크 생성: \"\(pattern.taskTitle)\" dueDate=\(shortDate(currentOccurrence))")
                         // Create task (패턴에서 생성되는 태스크는 일반 태스크)
                         let task = Task(
