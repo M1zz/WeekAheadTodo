@@ -232,9 +232,29 @@ struct MonthCalendarView: View {
     }
 
     private func tasksForDate(_ date: Date) -> [Task] {
-        viewModel.tasks.filter { task in
-            calendar.isDate(task.dueDate, inSameDayAs: date)
+        var result: [Task] = []
+        for task in viewModel.tasks {
+            if calendar.isDate(task.dueDate, inSameDayAs: date) {
+                result.append(task)
+            }
+            // 하위 할 일: scheduledDate가 있으면 그 날짜 기준, 없으면 parent와 같은 날
+            for subtask in task.subtasks {
+                let subtaskDate = subtask.scheduledDate ?? task.dueDate
+                guard calendar.isDate(subtaskDate, inSameDayAs: date) else { continue }
+                var subtaskTask = Task(
+                    id: subtask.id,
+                    title: subtask.title,
+                    dueDate: subtaskDate,
+                    estimatedMinutes: 30,
+                    taskRole: .preparation,
+                    parentTaskId: task.id
+                )
+                subtaskTask.targetDate = subtask.scheduledDate ?? task.targetDate
+                subtaskTask.status = subtask.isCompleted ? .completed : .notStarted
+                result.append(subtaskTask)
+            }
         }
+        return result
     }
 }
 
@@ -264,15 +284,23 @@ struct MonthDateCell: View {
             // 태스크 표시 (최대 3개)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(tasks.prefix(3)) { task in
+                    let isSubtask = isSubtaskItem(task)
                     HStack(spacing: 4) {
-                        Circle()
-                            .fill(taskColor(task))
-                            .frame(width: 6, height: 6)
+                        if isSubtask {
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(taskColor(task).opacity(0.7))
+                                .frame(width: 5, height: 5)
+                        } else {
+                            Circle()
+                                .fill(taskColor(task))
+                                .frame(width: 6, height: 6)
+                        }
                         Text(task.title)
                             .font(.system(size: 17))
                             .lineLimit(1)
-                            .foregroundColor(isCurrentMonth ? .primary : .secondary)
+                            .foregroundColor((isCurrentMonth ? Color.primary : Color.secondary).opacity(isSubtask ? 0.7 : 1.0))
                     }
+                    .padding(.leading, isSubtask ? 8 : 0)
                 }
 
                 // 더 많은 태스크가 있으면 표시
@@ -307,6 +335,12 @@ struct MonthDateCell: View {
         }
 
         return isCurrentMonth ? .primary : .secondary
+    }
+
+    /// 가상 하위 할 일 Task인지 확인 (실제 viewModel.tasks에 없는 synthetic Task)
+    private func isSubtaskItem(_ task: Task) -> Bool {
+        guard task.parentTaskId != nil else { return false }
+        return !viewModel.tasks.contains(where: { $0.id == task.id })
     }
 
     private func taskColor(_ task: Task) -> Color {

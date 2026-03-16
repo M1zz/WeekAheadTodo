@@ -25,14 +25,37 @@ struct NextWeekView: View {
 
     private func tasks(for date: Date) -> [Task] {
         let calendar = Calendar.current
-        return viewModel.tasks.filter { task in
+        var result: [Task] = []
+        for task in viewModel.tasks {
+            // 메인 태스크 필터링
+            let matches: Bool
             switch taskFilterMode {
             case .byStartDate:
-                return calendar.isDate(task.effectiveStartDate, inSameDayAs: date)
+                matches = calendar.isDate(task.effectiveStartDate, inSameDayAs: date)
             case .byDueDate:
-                return calendar.isDate(task.dueDate, inSameDayAs: date)
+                matches = calendar.isDate(task.dueDate, inSameDayAs: date)
+            }
+            if matches {
+                result.append(task)
+            }
+            // 하위 할 일: scheduledDate가 있으면 그 날짜 기준, 없으면 parent와 같은 날
+            for subtask in task.subtasks {
+                let subtaskDate = subtask.scheduledDate ?? task.dueDate
+                guard calendar.isDate(subtaskDate, inSameDayAs: date) else { continue }
+                var subtaskTask = Task(
+                    id: subtask.id,
+                    title: subtask.title,
+                    dueDate: subtaskDate,
+                    estimatedMinutes: 30,
+                    taskRole: .preparation,
+                    parentTaskId: task.id
+                )
+                subtaskTask.targetDate = subtask.scheduledDate ?? task.targetDate
+                subtaskTask.status = subtask.isCompleted ? .completed : .notStarted
+                result.append(subtaskTask)
             }
         }
+        return result
     }
 
     private var allNextWeekTasks: [Task] {

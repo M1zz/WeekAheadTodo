@@ -3,6 +3,12 @@ import SwiftUI
 
 // MARK: - Time Based Week Calendar (Google Calendar Style)
 
+// 하위 할 일 시트 표시용 식별자
+struct SubtaskSelection: Identifiable {
+    let id: UUID          // subtaskId
+    let parentTaskId: UUID
+}
+
 struct TimeBasedWeekCalendar: View {
     let weekDates: [Date]
     let tasksForDate: (Date) -> [Task]
@@ -10,6 +16,7 @@ struct TimeBasedWeekCalendar: View {
     @EnvironmentObject var viewModel: TaskViewModel
     @State private var showingAddTask = false
     @State private var showingEditTask: Task?
+    @State private var showingSubtask: SubtaskSelection?
     @State private var newTaskDate: Date = Date()
     @State private var newTaskTime: Date = Date()
     @State private var hoveredTaskId: UUID?
@@ -68,6 +75,13 @@ struct TimeBasedWeekCalendar: View {
         .sheet(item: $showingEditTask) { task in
             EditTaskView(task: task)
                 .environmentObject(viewModel)
+        }
+        .sheet(item: $showingSubtask) { selection in
+            SubtaskDetailSheet(
+                parentTaskId: selection.parentTaskId,
+                subtaskId: selection.id
+            )
+            .environmentObject(viewModel)
         }
     }
 
@@ -151,7 +165,13 @@ struct TimeBasedWeekCalendar: View {
                                 date: date,
                                 hoveredTaskId: $hoveredTaskId,
                                 onTaskTap: { task in
-                                    showingEditTask = task
+                                    // 하위 할 일(synthetic Task)은 하위 할 일 전용 시트 열기
+                                    if let parentId = task.parentTaskId,
+                                       !viewModel.tasks.contains(where: { $0.id == task.id }) {
+                                        showingSubtask = SubtaskSelection(id: task.id, parentTaskId: parentId)
+                                    } else {
+                                        showingEditTask = task
+                                    }
                                 }
                             )
 
@@ -379,7 +399,16 @@ struct TaskLayoutView: View {
                     dayColumnWidth: dayColumnWidth,
                     isHovered: hoveredTaskId == layoutInfo.task.id,
                     onTap: { onTaskTap(layoutInfo.task) },
-                    onToggleComplete: { viewModel.toggleTaskCompletion(layoutInfo.task) },
+                    onToggleComplete: {
+                        // 하위 할 일(synthetic Task)이면 subtask 토글, 아니면 일반 토글
+                        if let parentId = layoutInfo.task.parentTaskId,
+                           viewModel.tasks.contains(where: { $0.id == parentId }),
+                           !viewModel.tasks.contains(where: { $0.id == layoutInfo.task.id }) {
+                            viewModel.toggleSubtaskCompletion(taskId: parentId, subtaskId: layoutInfo.task.id)
+                        } else {
+                            viewModel.toggleTaskCompletion(layoutInfo.task)
+                        }
+                    },
                     onHover: { isHovered in
                         hoveredTaskId = isHovered ? layoutInfo.task.id : nil
                     }
@@ -441,9 +470,15 @@ struct TaskTimeBlock: View {
     private let calendar = Calendar.current
     private let resizeHandleHeight: CGFloat = 12
 
+    /// 가상 하위 할 일 Task인지 확인 (실제 viewModel.tasks에 없는 synthetic Task)
+    private var isSubtaskItem: Bool {
+        guard task.parentTaskId != nil else { return false }
+        return !viewModel.tasks.contains(where: { $0.id == task.id })
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // 드래그 가능한 메인 영역
+            // 메인 영역 (하위 할 일은 드래그 비활성화)
             mainContent
                 .frame(height: max(taskHeight - resizeHandleHeight, 20))
                 .contentShape(Rectangle())
@@ -452,20 +487,39 @@ struct TaskTimeBlock: View {
                 }
                 .onDrag {
                     viewModel.currentDraggingTaskId = task.id
+                    if isSubtaskItem {
+                        viewModel.currentDraggingSubtaskParentId = task.parentTaskId
+                    } else {
+                        viewModel.currentDraggingSubtaskParentId = nil
+                    }
                     return NSItemProvider(object: task.id.uuidString as NSString)
                 }
 
-            // 리사이즈 핸들 영역 (하단)
-            resizeHandle
-                .frame(height: min(resizeHandleHeight, taskHeight - 20))
+            // 리사이즈 핸들 영역 (하위 할 일은 비활성화)
+            if !isSubtaskItem {
+                resizeHandle
+                    .frame(height: min(resizeHandleHeight, taskHeight - 20))
+            } else {
+                Color.clear
+                    .frame(height: min(resizeHandleHeight, taskHeight - 20))
+            }
         }
         .frame(width: columnWidth, height: taskHeight)
-        .background(taskColor)
+        .background(taskColor.opacity(isSubtaskItem ? 0.7 : 1.0))
         .cornerRadius(4)
         .overlay(
             RoundedRectangle(cornerRadius: 4)
                 .strokeBorder(taskBorderColor, lineWidth: isHovered ? 2 : 1)
         )
+        .overlay(alignment: .leading) {
+            // 하위 할 일 표시 인디케이터
+            if isSubtaskItem {
+                Rectangle()
+                    .fill(Color.white.opacity(0.5))
+                    .frame(width: 3)
+                    .padding(.vertical, 4)
+            }
+        }
         .shadow(color: isHovered ? Color.black.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 2)
         .offset(x: columnOffset, y: taskOffset)
         .opacity(viewModel.currentDraggingTaskId == task.id ? 0.3 : 1.0)
@@ -496,10 +550,22 @@ struct TaskTimeBlock: View {
             }
 
             if taskHeight > 35 {
-                Text(timeRangeString)
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.85))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(timeRangeString)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+
+                    if !isSubtaskItem, let progressText = task.subtaskProgressText {
+                        Text(progressText)
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.white.opacity(task.allSubtasksCompleted ? 0.35 : 0.2))
+                            .cornerRadius(4)
+                            .foregroundColor(.white)
+                    }
+                }
             }
         }
         .padding(.horizontal, 6)
@@ -703,10 +769,10 @@ struct TaskDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         // currentDraggingTaskId를 직접 사용해 동기적으로 처리 (비동기 loadItem 사용 시 드롭 후 순간 원위치 복귀 버그 발생)
-        guard let taskId = viewModel.currentDraggingTaskId,
-              let task = viewModel.tasks.first(where: { $0.id == taskId }) else {
+        guard let taskId = viewModel.currentDraggingTaskId else {
             viewModel.dragPreview = nil
             viewModel.currentDraggingTaskId = nil
+            viewModel.currentDraggingSubtaskParentId = nil
             return false
         }
 
@@ -725,6 +791,23 @@ struct TaskDropDelegate: DropDelegate {
         guard let newTargetTime = calendar.date(from: components) else {
             viewModel.dragPreview = nil
             viewModel.currentDraggingTaskId = nil
+            viewModel.currentDraggingSubtaskParentId = nil
+            return false
+        }
+
+        // 하위 할 일 드롭 처리
+        if let parentTaskId = viewModel.currentDraggingSubtaskParentId {
+            viewModel.updateSubtaskSchedule(parentTaskId: parentTaskId, subtaskId: taskId, newDate: newTargetTime)
+            viewModel.dragPreview = nil
+            viewModel.currentDraggingTaskId = nil
+            viewModel.currentDraggingSubtaskParentId = nil
+            return true
+        }
+
+        // 일반 태스크 드롭 처리
+        guard let task = viewModel.tasks.first(where: { $0.id == taskId }) else {
+            viewModel.dragPreview = nil
+            viewModel.currentDraggingTaskId = nil
             return false
         }
 
@@ -741,7 +824,11 @@ struct TaskDropDelegate: DropDelegate {
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        guard let taskId = viewModel.currentDraggingTaskId,
+        guard let taskId = viewModel.currentDraggingTaskId else {
+            return DropProposal(operation: .move)
+        }
+        // 하위 할 일인 경우 dragPreview는 부모 태스크 기준으로 표시 (또는 생략)
+        guard viewModel.currentDraggingSubtaskParentId == nil,
               let task = viewModel.tasks.first(where: { $0.id == taskId }) else {
             return DropProposal(operation: .move)
         }
@@ -775,6 +862,90 @@ struct TaskDropDelegate: DropDelegate {
 
     func validateDrop(info: DropInfo) -> Bool {
         return info.hasItemsConforming(to: [.text])
+    }
+}
+
+// MARK: - Subtask Detail Sheet
+
+struct SubtaskDetailSheet: View {
+    @EnvironmentObject var viewModel: TaskViewModel
+    let parentTaskId: UUID
+    let subtaskId: UUID
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var title: String = ""
+
+    private var parentTask: Task? {
+        viewModel.tasks.first(where: { $0.id == parentTaskId })
+    }
+
+    private var subtask: Subtask? {
+        parentTask?.subtasks.first(where: { $0.id == subtaskId })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // 헤더
+            HStack {
+                Text("하위 할 일")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("닫기") { dismiss() }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
+            }
+
+            // 완료 토글 + 제목
+            HStack(spacing: 12) {
+                Button(action: {
+                    viewModel.toggleSubtaskCompletion(taskId: parentTaskId, subtaskId: subtaskId)
+                }) {
+                    Image(systemName: subtask?.isCompleted == true ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(subtask?.isCompleted == true ? .green : .gray)
+                }
+                .buttonStyle(.plain)
+
+                TextField("하위 할 일 제목", text: $title)
+                    .font(.body)
+                    .textFieldStyle(.plain)
+                    .onSubmit { saveTitle() }
+            }
+
+            // 상위 태스크 정보
+            if let parent = parentTask {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.turn.up.left")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                    Text("상위 태스크: \(parent.title)")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("저장") { saveTitle(); dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 360, minHeight: 180)
+        .onAppear {
+            title = subtask?.title ?? ""
+        }
+    }
+
+    private func saveTitle() {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              var parentTask = parentTask,
+              let idx = parentTask.subtasks.firstIndex(where: { $0.id == subtaskId }) else { return }
+        parentTask.subtasks[idx].title = trimmed
+        viewModel.updateTask(parentTask)
     }
 }
 

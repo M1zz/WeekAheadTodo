@@ -84,6 +84,7 @@ class TaskViewModel: ObservableObject {
     // MARK: - Drag Preview
     @Published var dragPreview: DragPreviewInfo? = nil
     @Published var currentDraggingTaskId: UUID? = nil  // 현재 드래그 중인 태스크 ID
+    @Published var currentDraggingSubtaskParentId: UUID? = nil  // 드래그 중인 subtask의 부모 태스크 ID
 
     // MARK: - CloudKit
     @Published var isSyncing = false
@@ -862,6 +863,20 @@ class TaskViewModel: ObservableObject {
         newTasks[taskIndex].subtasks[subtaskIndex].isCompleted.toggle()
         newTasks[taskIndex].modifiedAt = Date()
         print("✅ [TaskViewModel] 하위 할 일 완료 토글: \(newTasks[taskIndex].subtasks[subtaskIndex].title)")
+        tasks = newTasks
+    }
+
+    /// 하위 할 일의 독립 일정(scheduledDate) 업데이트
+    func updateSubtaskSchedule(parentTaskId: UUID, subtaskId: UUID, newDate: Date) {
+        guard let taskIndex = tasks.firstIndex(where: { $0.id == parentTaskId }),
+              let subtaskIndex = tasks[taskIndex].subtasks.firstIndex(where: { $0.id == subtaskId }) else {
+            print("⚠️ [TaskViewModel] 하위 할 일 일정 업데이트 실패: parentTaskId=\(parentTaskId), subtaskId=\(subtaskId)")
+            return
+        }
+        var newTasks = tasks
+        newTasks[taskIndex].subtasks[subtaskIndex].scheduledDate = newDate
+        newTasks[taskIndex].modifiedAt = Date()
+        print("✅ [TaskViewModel] 하위 할 일 일정 업데이트: \(newTasks[taskIndex].subtasks[subtaskIndex].title) → \(newDate)")
         tasks = newTasks
     }
 

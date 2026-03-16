@@ -168,12 +168,14 @@ public struct Subtask: Identifiable, Codable, Hashable {
     public var title: String
     public var isCompleted: Bool
     public var createdAt: Date
+    public var scheduledDate: Date?  // 독립 일정 날짜 (드래그로 설정됨, nil이면 parent의 날짜 사용)
 
-    public init(id: UUID = UUID(), title: String, isCompleted: Bool = false) {
+    public init(id: UUID = UUID(), title: String, isCompleted: Bool = false, scheduledDate: Date? = nil) {
         self.id = id
         self.title = title
         self.isCompleted = isCompleted
         self.createdAt = Date()
+        self.scheduledDate = scheduledDate
     }
 }
 
