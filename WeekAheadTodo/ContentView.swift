@@ -64,6 +64,7 @@ struct ContentView: View {
         case patterns = "패턴 관리"
         case wiki = "위키"
         case mail = "메일"
+        case reportingHabits = "보고 습관"
         case settings = "설정"
 
         var icon: String {
@@ -82,6 +83,7 @@ struct ContentView: View {
             case .patterns: return "arrow.triangle.2.circlepath"
             case .wiki: return "book.closed.fill"
             case .mail: return "envelope.fill"
+            case .reportingHabits: return "star.circle.fill"
             case .settings: return "gear"
             }
         }
@@ -125,6 +127,10 @@ struct ContentView: View {
 
                 Section("문서") {
                     sidebarItem(.wiki)
+                }
+
+                Section("성장") {
+                    sidebarItem(.reportingHabits)
                 }
 
                 Section("관리") {
@@ -342,6 +348,8 @@ struct ContentView: View {
                     WikiView()
                 case .mail:
                     MailIntegrationView()
+                case .reportingHabits:
+                    ReportingHabitsView()
                 case .settings:
                     SettingsView()
                 }

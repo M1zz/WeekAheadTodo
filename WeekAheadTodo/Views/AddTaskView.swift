@@ -5,6 +5,7 @@ import SwiftUI
 
 struct AddTaskView: View {
     @EnvironmentObject var viewModel: TaskViewModel
+    @EnvironmentObject var notificationService: NotificationService
     @Environment(\.dismiss) var dismiss
 
     var preselectedProjectId: UUID? = nil
@@ -26,6 +27,37 @@ struct AddTaskView: View {
     @State private var selectedTemplate: TaskTemplate?
     @State private var showDetailedForm = false
     @State private var selectedProjectId: UUID? = nil
+
+    // 보고 습관 알림
+    @State private var scheduleStartReportAlert = false
+    @State private var scheduleEightyPercentAlert = false
+
+    // 보고 서브태스크 자동 생성
+    @State private var autoCreateReportSubtasks = false
+
+    /// 보고 서브태스크 미리보기 목록 (UI 표시용)
+    private var reportSubtaskPreviews: [(icon: String, label: String, date: Date, color: Color)] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let startDate = leadTimeDays > 0
+            ? (cal.date(byAdding: .day, value: -leadTimeDays, to: dueDate) ?? today)
+            : today
+        var items: [(String, String, Date, Color)] = []
+
+        // 01 착수 보고 — 시작일 당일
+        items.append(("envelope.fill", "착수 보고", startDate, .blue))
+
+        // 02 중간 보고 — 50% 시점 (선행 2일 이상일 때만)
+        if leadTimeDays >= 2 {
+            let midDate = cal.date(byAdding: .day, value: max(1, leadTimeDays / 2), to: startDate) ?? startDate
+            items.append(("chart.line.uptrend.xyaxis", "중간 보고", midDate, .orange))
+        }
+
+        // 03 완료 보고 — 마감일
+        items.append(("checkmark.seal.fill", "완료 보고", cal.startOfDay(for: dueDate), .green))
+
+        return items
+    }
 
     init(preselectedProjectId: UUID? = nil, defaultDueDate: Date? = nil, initialDate: Date? = nil, initialTime: Date? = nil) {
         self.preselectedProjectId = preselectedProjectId
@@ -179,6 +211,78 @@ struct AddTaskView: View {
                         }
                     }
 
+                    Section {
+                        Toggle(isOn: $autoCreateReportSubtasks) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label("보고 서브태스크 자동 생성", systemImage: "list.bullet.clipboard.fill")
+                                    .font(.body)
+                                Text("착수·중간·완료 보고 항목이 할 일에 자동 추가됩니다")
+                                    .font(.callout)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if autoCreateReportSubtasks {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("생성될 보고 서브태스크")
+                                    .font(.callout)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+
+                                ForEach(reportSubtaskPreviews, id: \.label) { item in
+                                    HStack(spacing: 10) {
+                                        Image(systemName: item.icon)
+                                            .font(.callout)
+                                            .foregroundColor(item.color)
+                                            .frame(width: 20)
+                                        Text(item.label)
+                                            .font(.callout)
+                                            .fontWeight(.semibold)
+                                        Spacer()
+                                        Text(item.date.formatted(date: .abbreviated, time: .omitted))
+                                            .font(.callout)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
+                    } header: {
+                        Label("보고 서브태스크", systemImage: "list.bullet.clipboard.fill")
+                    } footer: {
+                        if !autoCreateReportSubtasks {
+                            Text("선행 일수 설정 시 중간 보고 항목도 자동 포함됩니다")
+                                .font(.callout)
+                        }
+                    }
+
+                    Section {
+                        Toggle(isOn: $scheduleStartReportAlert) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label("착수 보고 알림 예약", systemImage: "arrow.up.circle.fill")
+                                    .font(.body)
+                                Text("추가 후 1시간 뒤 착수 보고 리마인더")
+                                    .font(.callout)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if leadTimeDays >= 2 {
+                            Toggle(isOn: $scheduleEightyPercentAlert) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Label("80% 시점 공유 알림", systemImage: "chart.pie.fill")
+                                        .font(.body)
+                                    Text("선행 일수 80% 지난 시점에 초안 공유 리마인더")
+                                        .font(.callout)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    } header: {
+                        Label("보고 습관 알림", systemImage: "star.circle.fill")
+                    }
+
                     Section("템플릿 (선택)") {
                         Toggle("템플릿 사용", isOn: $useTemplate)
 
@@ -221,7 +325,7 @@ struct AddTaskView: View {
             }
             .formStyle(.grouped)
         }
-        .frame(width: 500, height: showDetailedForm ? 700 : 400)
+        .frame(width: 520, height: showDetailedForm ? 800 : 400)
         .onAppear { selectedProjectId = preselectedProjectId }
     }
 
@@ -268,6 +372,28 @@ struct AddTaskView: View {
             viewModel.addTaskWithSubtasks(mainTask: task, template: template)
         } else {
             viewModel.addTask(task)
+        }
+
+        // 보고 태스크 자동 생성 (별도 Task로 할 일 목록에 추가)
+        if autoCreateReportSubtasks {
+            viewModel.addReportTasks(for: task)
+        }
+
+        // 보고 습관 알림 예약
+        if scheduleStartReportAlert {
+            _Concurrency.Task {
+                await notificationService.scheduleStartReportReminder(taskId: task.id, taskTitle: task.title)
+            }
+        }
+        if scheduleEightyPercentAlert && leadTimeDays >= 2 {
+            _Concurrency.Task {
+                await notificationService.scheduleEightyPercentReminder(
+                    taskId: task.id,
+                    taskTitle: task.title,
+                    dueDate: dueDate,
+                    leadTimeDays: leadTimeDays
+                )
+            }
         }
 
         dismiss()

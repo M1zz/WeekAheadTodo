@@ -480,6 +480,12 @@ public struct Task: Identifiable {
         status == .notStarted
     }
 
+    /// 보고 태스크 여부 (자동 생성된 착수/중간/완료 보고 태스크)
+    public var isReportTask: Bool {
+        taskRole == .followUp && parentTaskId != nil &&
+        (title.hasPrefix("✉️") || title.hasPrefix("📊") || title.hasPrefix("✅"))
+    }
+
     /// 미시작 상태로 effectiveStartDate가 지난 일수. 2일 미만이면 nil
     public var staleDays: Int? {
         guard isNotStarted else { return nil }

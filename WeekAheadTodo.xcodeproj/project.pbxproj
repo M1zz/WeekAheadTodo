@@ -68,6 +68,7 @@
 		B575498D038744CDBA484308 /* QuickAddView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F2778A6CC4D5AA970D762 /* QuickAddView.swift */; };
 		BD2FEE0FD4C9451282D78E19 /* MonthCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B6E15FA4424F33AEDF8B47 /* MonthCalendarView.swift */; };
 		CHECKIN1111111111BUILD /* CheckinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHECKIN0000000000VIEWW /* CheckinView.swift */; };
+		REPORTHAB00000000BUILD /* ReportingHabitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = REPORTHAB0000FILEREF /* ReportingHabitsView.swift */; };
 		D38F945F45D24E618775DE4C /* SomedayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010532356AA3497A9B77816D /* SomedayView.swift */; };
 		E0A9B9E71EA64E40B49887E2 /* NextWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9723B9D230434FBB93EBEE /* NextWeekView.swift */; };
 		EAF392B156854E358E4CBB47 /* TodayInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */; };
@@ -168,6 +169,7 @@
 		C4062740E3F5473CA643B58E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		C793D84A5C8231A5D6F641C7 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		CHECKIN0000000000VIEWW /* CheckinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckinView.swift; sourceTree = "<group>"; };
+		REPORTHAB0000FILEREF /* ReportingHabitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportingHabitsView.swift; sourceTree = "<group>"; };
 		D40A9BF302A74489B556F1BA /* Mail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mail.swift; sourceTree = "<group>"; };
 		D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayInsightsView.swift; sourceTree = "<group>"; };
 		DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtension.swift; sourceTree = "<group>"; };
@@ -362,6 +364,7 @@
 				1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */,
 				X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */,
 				CHECKIN0000000000VIEWW /* CheckinView.swift */,
+				REPORTHAB0000FILEREF /* ReportingHabitsView.swift */,
 				WIKI0002000000000FILEREF /* WikiView.swift */,
 				WIKI0003000000000FILEREF /* WikiSidebarView.swift */,
 				WIKI0004000000000FILEREF /* WikiContentView.swift */,
@@ -648,6 +651,7 @@
 				0D2DACC501F94EE79677F103 /* DateHelpers.swift in Sources */,
 				6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */,
 				CHECKIN1111111111BUILD /* CheckinView.swift in Sources */,
+				REPORTHAB00000000BUILD /* ReportingHabitsView.swift in Sources */,
 				WIKI0001000000000BUILD /* WikiViewModel.swift in Sources */,
 				WIKI0002000000000BUILD /* WikiView.swift in Sources */,
 				WIKI0003000000000BUILD /* WikiSidebarView.swift in Sources */,

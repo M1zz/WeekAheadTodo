@@ -689,6 +689,64 @@ class TaskViewModel: ObservableObject {
         allocateTaskToTimeBlock(t)
     }
     
+    /// 보고 태스크 자동 생성 (착수/중간/완료 보고를 별도 Task로 추가)
+    func addReportTasks(for mainTask: Task) {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let dueStart = cal.startOfDay(for: mainTask.dueDate)
+        let leadDays = mainTask.leadTimeDays
+
+        // 시작일: leadTimeDays 있으면 dueDate - leadTimeDays, 없으면 오늘
+        let startDate: Date
+        if leadDays > 0, let d = cal.date(byAdding: .day, value: -leadDays, to: dueStart) {
+            startDate = d
+        } else {
+            startDate = today
+        }
+
+        var reportTasks: [(title: String, date: Date)] = []
+
+        // 01. 착수 보고 — 시작일 (1시간 이내)
+        reportTasks.append((
+            title: "✉️ 착수 보고 — \(mainTask.title)",
+            date: startDate
+        ))
+
+        // 02. 중간 보고 — 50% 시점 (선행 2일 이상)
+        if leadDays >= 2 {
+            let halfDays = max(1, leadDays / 2)
+            let midDate = cal.date(byAdding: .day, value: halfDays, to: startDate) ?? startDate
+            reportTasks.append((
+                title: "📊 중간 보고 — \(mainTask.title)",
+                date: midDate
+            ))
+        }
+
+        // 03. 완료 보고 — 마감일 (30분 이내)
+        reportTasks.append((
+            title: "✅ 완료 보고 — \(mainTask.title)",
+            date: dueStart
+        ))
+
+        for item in reportTasks {
+            var reportTask = Task(
+                title: item.title,
+                description: "선제적 보고 — 결론 먼저, 수치로 말하기",
+                dueDate: item.date,
+                estimatedMinutes: 10,
+                leadTimeDays: 0,
+                taskType: .dateSpecific,
+                taskRole: .followUp,
+                priority: .high,
+                projectId: mainTask.projectId,
+                parentTaskId: mainTask.id
+            )
+            reportTask.modifiedAt = Date()
+            tasks.append(reportTask)
+            print("✅ [TaskViewModel] 보고 태스크 생성: \(reportTask.title) → \(item.date)")
+        }
+    }
+
     func addTaskWithSubtasks(mainTask: Task, template: TaskTemplate) {
         // 일반 태스크 추가 (role을 main으로 설정)
         var main = mainTask

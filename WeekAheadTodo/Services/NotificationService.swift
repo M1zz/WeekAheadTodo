@@ -426,6 +426,125 @@ class NotificationService: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - 보고 습관 알림
+
+    /// 착수 보고 리마인더: 태스크 추가 후 1시간 뒤 "착수 보고 보냈나요?" 알림
+    func scheduleStartReportReminder(taskId: UUID, taskTitle: String) async {
+        guard isNotificationEnabled else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "착수 보고 보냈나요? 📢"
+        content.body = "'\(taskTitle)' 업무 받은 지 1시간이 됐어요. 착수 보고 1줄이면 충분합니다."
+        content.sound = .default
+        content.categoryIdentifier = "TASK_REMINDER"
+        content.userInfo = ["type": "startReport", "taskId": taskId.uuidString]
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "start-report-\(taskId.uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        do {
+            try await center.add(request)
+            print("✅ [NotificationService] 착수 보고 알림 예약: \(taskTitle)")
+        } catch {
+            print("❌ [NotificationService] 착수 보고 알림 예약 실패: \(error)")
+        }
+    }
+
+    /// 착수 보고 알림 취소
+    func cancelStartReportReminder(taskId: UUID) {
+        center.removePendingNotificationRequests(withIdentifiers: ["start-report-\(taskId.uuidString)"])
+    }
+
+    /// 80% 시점 공유 알림: leadTimeDays 기반으로 80% 지점에 알림
+    /// - 예: leadTimeDays=5이면 dueDate 5일 전이 시작, 4일 후(80%)에 알림
+    func scheduleEightyPercentReminder(taskId: UUID, taskTitle: String, dueDate: Date, leadTimeDays: Int) async {
+        guard isNotificationEnabled else { return }
+        guard leadTimeDays >= 2 else { return }  // 선행 일수 2일 이상일 때만
+
+        let calendar = Calendar.current
+        let startDate = calendar.date(byAdding: .day, value: -leadTimeDays, to: dueDate) ?? dueDate
+        let totalSeconds = dueDate.timeIntervalSince(startDate)
+        let eightyPercentDate = startDate.addingTimeInterval(totalSeconds * 0.8)
+
+        guard eightyPercentDate > Date() else { return }
+
+        var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: eightyPercentDate)
+        components.hour = 9
+        components.minute = 30
+
+        let content = UNMutableNotificationContent()
+        content.title = "초안 공유할 시점이에요! 📤"
+        content.body = "'\(taskTitle)' 80% 완성 시점입니다. \"아직 완성은 아닌데…\"로 시작해 먼저 공유해 보세요."
+        content.sound = .default
+        content.categoryIdentifier = "TASK_REMINDER"
+        content.userInfo = ["type": "eightyPercent", "taskId": taskId.uuidString]
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "eighty-percent-\(taskId.uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
+        do {
+            try await center.add(request)
+            print("✅ [NotificationService] 80% 공유 알림 예약: \(taskTitle), 날짜: \(eightyPercentDate)")
+        } catch {
+            print("❌ [NotificationService] 80% 공유 알림 예약 실패: \(error)")
+        }
+    }
+
+    /// 주간 루틴 보고 알림: 월/수/금 지정 시간에 "간단 보고 루틴 시간!" 알림
+    func scheduleWeeklyRoutineReminders(hour: Int, minute: Int) async {
+        guard isNotificationEnabled else { return }
+
+        // 기존 주간 루틴 알림 제거
+        center.removePendingNotificationRequests(withIdentifiers: [
+            "weekly-routine-mon", "weekly-routine-wed", "weekly-routine-fri"
+        ])
+
+        let weekdays: [(identifier: String, weekday: Int, label: String)] = [
+            ("weekly-routine-mon", 2, "월요일"),
+            ("weekly-routine-wed", 4, "수요일"),
+            ("weekly-routine-fri", 6, "금요일")
+        ]
+
+        for (identifier, weekday, label) in weekdays {
+            let content = UNMutableNotificationContent()
+            content.title = "주간 루틴 보고 시간 🗓️"
+            content.body = "\(label) 간단 보고 루틴! 1~2줄 현황 공유로 신뢰를 쌓아요."
+            content.sound = .default
+            content.categoryIdentifier = "TASK_REMINDER"
+
+            var components = DateComponents()
+            components.weekday = weekday
+            components.hour = hour
+            components.minute = minute
+
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+
+            do {
+                try await center.add(request)
+            } catch {
+                print("❌ [NotificationService] 주간 루틴 알림 예약 실패 (\(label)): \(error)")
+            }
+        }
+        print("✅ [NotificationService] 주간 루틴 보고 알림 예약 완료 (월/수/금 \(hour):\(String(format: "%02d", minute)))")
+    }
+
+    /// 주간 루틴 알림 전체 취소
+    func cancelWeeklyRoutineReminders() {
+        center.removePendingNotificationRequests(withIdentifiers: [
+            "weekly-routine-mon", "weekly-routine-wed", "weekly-routine-fri"
+        ])
+        print("ℹ️ [NotificationService] 주간 루틴 보고 알림 취소됨")
+    }
+
     // MARK: - 즉시 테스트 알림
 
     /// 테스트용 즉시 알림 발송

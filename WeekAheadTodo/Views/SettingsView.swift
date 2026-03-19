@@ -13,6 +13,11 @@ struct SettingsView: View {
     @EnvironmentObject var calendarViewModel: CalendarViewModel
     @EnvironmentObject var notificationService: NotificationService
 
+    // 보고 습관 알림 설정
+    @AppStorage("weeklyRoutineReminderEnabled") private var weeklyRoutineEnabled = false
+    @AppStorage("weeklyRoutineReminderHour") private var weeklyRoutineHour = 9
+    @AppStorage("weeklyRoutineReminderMinute") private var weeklyRoutineMinute = 30
+
     @State private var showingSaveToCloudAlert = false
     @State private var showingRestoreFromCloudAlert = false
     @State private var showingResetDataAlert = false
@@ -60,6 +65,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     notificationSection
+                    reportingHabitsNotificationSection
                     cloudSyncSection
                     CalendarIntegrationView()
                     calendarResetSection
@@ -148,6 +154,100 @@ struct SettingsView: View {
                         Label("테스트 알림 보내기", systemImage: "bell.badge")
                     }
                     .buttonStyle(.bordered)
+                }
+            }
+            .padding(12)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - 보고 습관 알림 섹션
+
+    private var reportingHabitsNotificationSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("보고 습관 알림")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: Binding(
+                    get: { weeklyRoutineEnabled },
+                    set: { newValue in
+                        weeklyRoutineEnabled = newValue
+                        _Concurrency.Task {
+                            if newValue {
+                                await notificationService.scheduleWeeklyRoutineReminders(
+                                    hour: weeklyRoutineHour,
+                                    minute: weeklyRoutineMinute
+                                )
+                            } else {
+                                notificationService.cancelWeeklyRoutineReminders()
+                            }
+                        }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("주간 루틴 보고 알림 (월/수/금)", systemImage: "calendar.badge.checkmark")
+                        Text("매주 월요일, 수요일, 금요일에 간단 보고 루틴 리마인더")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .disabled(!notificationService.isNotificationEnabled)
+
+                if weeklyRoutineEnabled {
+                    HStack(spacing: 16) {
+                        Text("알림 시간")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+
+                        Picker("시", selection: Binding(
+                            get: { weeklyRoutineHour },
+                            set: { newHour in
+                                weeklyRoutineHour = newHour
+                                _Concurrency.Task {
+                                    await notificationService.scheduleWeeklyRoutineReminders(hour: newHour, minute: weeklyRoutineMinute)
+                                }
+                            }
+                        )) {
+                            ForEach(7..<20) { h in
+                                Text("\(h)시").tag(h)
+                            }
+                        }
+                        .frame(width: 90)
+
+                        Picker("분", selection: Binding(
+                            get: { weeklyRoutineMinute },
+                            set: { newMin in
+                                weeklyRoutineMinute = newMin
+                                _Concurrency.Task {
+                                    await notificationService.scheduleWeeklyRoutineReminders(hour: weeklyRoutineHour, minute: newMin)
+                                }
+                            }
+                        )) {
+                            ForEach([0, 15, 30, 45], id: \.self) { m in
+                                Text("\(String(format: "%02d", m))분").tag(m)
+                            }
+                        }
+                        .frame(width: 90)
+
+                        Spacer()
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.callout)
+                        Text("월/수/금 \(weeklyRoutineHour)시 \(String(format: "%02d", weeklyRoutineMinute))분에 알림이 옵니다")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                if !notificationService.isNotificationEnabled {
+                    Text("리마인더 알림을 먼저 활성화하세요")
+                        .font(.callout)
+                        .foregroundColor(.orange)
                 }
             }
             .padding(12)

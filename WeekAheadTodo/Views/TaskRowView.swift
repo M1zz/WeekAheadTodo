@@ -32,6 +32,12 @@ struct TaskRowView: View {
                     .frame(width: 4)
                     .padding(.vertical, -12)
                     .padding(.leading, -12)
+            } else if task.isReportTask {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.orange)
+                    .frame(width: 4)
+                    .padding(.vertical, -12)
+                    .padding(.leading, -12)
             }
 
             Button(action: { viewModel.toggleTaskCompletion(task) }) {

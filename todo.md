@@ -111,6 +111,19 @@ AdvancedTaskParser.swift가 프로젝트에 추가된 후:
 - [x] iOS(TodoAlarm) 파일 컴파일 에러 없음 확인
   - ⚠️ widgetExtension 타깃의 Recovered References 에러는 기존 문제 (CalendarService.swift 등이 프로젝트 루트에 없음)
 
+## ✅ 보고 습관 장치 추가 (2026-03-19)
+- [x] `ReportingHabitsView.swift` 생성 — 사이드바 "성장 > 보고 습관" 섹션
+  - 7가지 오늘의 실천 체크리스트 (매일 자정 자동 초기화)
+  - 4종 보고 템플릿 복사 (착수 보고, 중간 보고, 완료 보고, 이슈 PSAR 보고)
+  - PSAR 문제 메모 입력 + 보고문 즉시 복사
+- [x] `NotificationService.swift` — 보고 습관 알림 3종 추가
+  - `scheduleStartReportReminder()` — 착수 보고 1시간 리마인더
+  - `scheduleEightyPercentReminder()` — 80% 완료 시점 공유 알림
+  - `scheduleWeeklyRoutineReminders()` — 주간 루틴 (월/수/금) 알림
+- [x] `AddTaskView.swift` — 보고 습관 알림 섹션 추가 (착수 보고 + 80% 공유 토글)
+- [x] `SettingsView.swift` — 주간 루틴 보고 알림 설정 섹션 추가
+- [x] `ContentView.swift` — SidebarSection에 `reportingHabits` 추가, "성장" 섹션으로 표시
+
 ## 📋 향후 개선 사항
 
 - [ ] 자동 iCloud 동기화 (현재는 앱 시작 시에만)
