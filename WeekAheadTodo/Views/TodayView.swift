@@ -48,15 +48,28 @@ struct TodayView: View {
     @State private var draggingTaskId: UUID? = nil
     @AppStorage("recommendationSectionExpanded") private var isRecommendationExpanded = true
     @AppStorage("focusModeEnabled") private var isFocusMode = false
+    @AppStorage("hideCompletedTasks") private var hideCompleted = false
+    @State private var showAllTasks = false
 
     // 체크인 관련
     @State private var selectedCheckinTask: Task?
 
     private var displayedTasks: [Task] {
-        // 미완료 태스크 + 오늘 완료된 태스크 (취소선으로 표시)
-        return viewModel.todayTasks.filter { task in
+        let base = viewModel.todayTasks.filter { task in
             !task.isCompleted || task.isCompletedToday
         }
+        // 미완료 먼저, 완료된 것은 뒤로
+        let sorted = base.sorted { lhs, rhs in
+            if lhs.isCompleted != rhs.isCompleted {
+                return !lhs.isCompleted
+            }
+            return false
+        }
+        // 완료 숨기기 옵션 적용
+        if hideCompleted {
+            return sorted.filter { !$0.isCompleted }
+        }
+        return sorted
     }
 
     /// 포커스 모드에서 보여줄 최대 3개 태스크 (MIT 우선, 이후 sortOrder 순)
@@ -669,6 +682,14 @@ struct TodayView: View {
                 Spacer()
 
                 HStack(spacing: 12) {
+                    Button(action: { hideCompleted.toggle() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: hideCompleted ? "eye.slash" : "eye")
+                            Text(hideCompleted ? "완료 보기" : "완료 숨기기")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+
                     Button(action: {
                         isEditMode.toggle()
                         if !isEditMode {
@@ -726,7 +747,8 @@ struct TodayView: View {
                 }
             }
 
-            ForEach(tasks) { task in
+            let visibleTasks = (showAllTasks || isEditMode) ? tasks : Array(tasks.prefix(3))
+            ForEach(visibleTasks) { task in
                 if isEditMode {
                     HStack(spacing: 8) {
                         Button(action: {
@@ -755,7 +777,7 @@ struct TodayView: View {
                         of: [UTType.plainText],
                         delegate: TodayTaskDropDelegate(
                             targetId: task.id,
-                            orderedIds: tasks.map { $0.id },
+                            orderedIds: visibleTasks.map { $0.id },
                             draggingId: $draggingTaskId,
                             onMove: { draggedId, targetId, orderedIds in
                                 viewModel.moveTodayTask(
@@ -767,6 +789,22 @@ struct TodayView: View {
                         )
                     )
                 }
+            }
+
+            // 더 보기 / 접기 버튼
+            if tasks.count > 3 && !isEditMode {
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showAllTasks.toggle() } }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: showAllTasks ? "chevron.up" : "chevron.down")
+                            .font(.callout)
+                        Text(showAllTasks ? "접기" : "더 보기 (\(tasks.count - 3)개)")
+                            .font(.callout)
+                    }
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
             }
         }
         .confirmationDialog(
@@ -968,6 +1006,15 @@ struct TodayView: View {
                     Text("→ \(suggestion.suggestedDate, style: .date)")
                         .foregroundColor(.secondary)
                     Button("옮기기") {
+                        var updatedTask = suggestion.task
+                        // effectiveStartDate = suggestedDate가 되도록 dueDate 계산
+                        let newDueDate = Calendar.current.date(
+                            byAdding: .day,
+                            value: updatedTask.leadTimeDays,
+                            to: suggestion.suggestedDate
+                        ) ?? suggestion.suggestedDate
+                        updatedTask.dueDate = newDueDate
+                        viewModel.updateTask(updatedTask)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)

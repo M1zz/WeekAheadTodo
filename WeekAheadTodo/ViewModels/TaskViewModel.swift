@@ -546,7 +546,11 @@ class TaskViewModel: ObservableObject {
                 }
                 return isToday
             }
-            .sorted { $0.sortOrder < $1.sortOrder }
+            .sorted { lhs, rhs in
+                // 완료된 항목은 기본적으로 맨 아래로
+                if lhs.isCompleted != rhs.isCompleted { return !lhs.isCompleted }
+                return lhs.sortOrder < rhs.sortOrder
+            }
 
         for (index, task) in result.enumerated() {
             let statusIcon = task.isCompleted ? "✅" : "⏳"
@@ -571,7 +575,11 @@ class TaskViewModel: ObservableObject {
                 let startDate = task.effectiveStartDate
                 return startDate >= weekRange.start && startDate <= weekRange.end
             }
-            .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
+            .sorted { lhs, rhs in
+                // 완료된 항목은 기본적으로 맨 아래로
+                if lhs.isCompleted != rhs.isCompleted { return !lhs.isCompleted }
+                return lhs.effectiveStartDate < rhs.effectiveStartDate
+            }
     }
 
     /// 이번 주 할 일 중 미완료만
@@ -593,7 +601,11 @@ class TaskViewModel: ObservableObject {
                 let startDate = task.effectiveStartDate
                 return startDate >= weekRange.start && startDate <= weekRange.end
             }
-            .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
+            .sorted { lhs, rhs in
+                // 완료된 항목은 기본적으로 맨 아래로
+                if lhs.isCompleted != rhs.isCompleted { return !lhs.isCompleted }
+                return lhs.effectiveStartDate < rhs.effectiveStartDate
+            }
     }
 
     /// 다음 주 할 일 중 미완료만
@@ -631,7 +643,11 @@ class TaskViewModel: ObservableObject {
                 let startDate = task.effectiveStartDate
                 return startDate > nextWeekRange.end
             }
-            .sorted { $0.dueDate < $1.dueDate } // 마감일 가까운 순
+            .sorted { lhs, rhs in
+                // 완료된 항목은 기본적으로 맨 아래로
+                if lhs.isCompleted != rhs.isCompleted { return !lhs.isCompleted }
+                return lhs.dueDate < rhs.dueDate // 마감일 가까운 순
+            }
     }
 
     /// 언젠가 할 일 중 미완료만

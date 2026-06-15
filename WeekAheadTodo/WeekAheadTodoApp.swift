@@ -137,6 +137,8 @@ struct WeekAheadTodoApp: App {
 
 extension Notification.Name {
     static let showQuickAdd = Notification.Name("showQuickAdd")
+    /// 승인된 패턴이 추가/수정/활성화되어 태스크 재생성이 필요할 때
+    static let approvedPatternsDidChange = Notification.Name("approvedPatternsDidChange")
 }
 
 // Root View with font scaling

@@ -16,7 +16,13 @@ struct ContentView: View {
     @State private var selectedProjectId: UUID? = nil
     @State private var showingAddProject = false
     @State private var showingQuickAdd = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @Environment(\.modelContext) private var modelContext
+
+    /// 오늘 탭에서 보여줄 이벤트가 없으면 true
+    private var shouldHideSidebar: Bool {
+        currentSection == .today && viewModel.todayTasks.isEmpty
+    }
 
     private var currentSection: SidebarSection {
         SidebarSection(rawValue: selectedSectionRawValue) ?? .today
@@ -92,7 +98,7 @@ struct ContentView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             // 사이드바
             List(selection: selectedSectionBinding) {
                 Section("할 일") {
@@ -149,6 +155,17 @@ struct ContentView: View {
                 .id(selectedSectionRawValue)
         }
         .frame(minWidth: 900, minHeight: 600)
+        .onAppear {
+            if shouldHideSidebar { columnVisibility = .detailOnly }
+        }
+        .onChange(of: currentSection) { _ in
+            columnVisibility = shouldHideSidebar ? .detailOnly : .automatic
+        }
+        .onChange(of: viewModel.todayTasks.count) { _ in
+            if currentSection == .today {
+                columnVisibility = shouldHideSidebar ? .detailOnly : .automatic
+            }
+        }
         .environmentObject(viewModel)
         .environmentObject(calendarViewModel)
         .environmentObject(mailViewModel)
@@ -177,6 +194,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             _Concurrency.Task { @MainActor in
                 await viewModel.syncOnForeground()
+                await generateTasksIfNeeded()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .approvedPatternsDidChange)) { _ in
+            // 패턴 추가/수정/활성화 직후 앱 재시작 없이 즉시 태스크 생성
+            _Concurrency.Task { @MainActor in
                 await generateTasksIfNeeded()
             }
         }

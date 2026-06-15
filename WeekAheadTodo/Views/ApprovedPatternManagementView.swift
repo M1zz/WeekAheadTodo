@@ -203,6 +203,8 @@ struct ApprovedPatternManagementView: View {
     private func toggleActive(_ pattern: ApprovedPattern) {
         do {
             try patternService.togglePatternActive(pattern)
+            // 활성화 시 즉시 태스크 생성되도록 알림
+            NotificationCenter.default.post(name: .approvedPatternsDidChange, object: nil)
         } catch {
         }
     }
@@ -217,6 +219,8 @@ struct ApprovedPatternManagementView: View {
     private func setNextOccurrence(pattern: ApprovedPattern, date: Date) {
         do {
             try patternService.setNextOccurrence(for: pattern, date: date)
+            // 유동 일정 날짜 설정 후 즉시 태스크 생성되도록 알림
+            NotificationCenter.default.post(name: .approvedPatternsDidChange, object: nil)
         } catch {
         }
     }

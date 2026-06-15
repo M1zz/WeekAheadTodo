@@ -120,6 +120,8 @@ struct EditApprovedPatternView: View {
 
         do {
             try modelContext.save()
+            // 패턴 수정 후 즉시 태스크에 반영되도록 알림
+            NotificationCenter.default.post(name: .approvedPatternsDidChange, object: nil)
             dismiss()
         } catch {
         }

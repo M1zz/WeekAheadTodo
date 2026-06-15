@@ -124,6 +124,15 @@ AdvancedTaskParser.swift가 프로젝트에 추가된 후:
 - [x] `SettingsView.swift` — 주간 루틴 보고 알림 설정 섹션 추가
 - [x] `ContentView.swift` — SidebarSection에 `reportingHabits` 추가, "성장" 섹션으로 표시
 
+## ✅ 패턴 즉시 반영 + 완료 항목 정렬 (2026-06-15)
+- [x] 패턴 추가/수정/활성화 직후 앱 재시작 없이 태스크 즉시 생성
+  - `Notification.Name.approvedPatternsDidChange` 추가 (WeekAheadTodoApp.swift)
+  - AddApprovedPatternView, EditApprovedPatternView, ApprovedPatternManagementView(toggleActive/setNextOccurrence)에서 변경 시 알림 발송
+  - ContentView가 알림 수신 시 `generateTasksIfNeeded()` 호출
+- [x] 완료된 항목 기본적으로 맨 아래로 정렬 (오늘/이번주/다음주/언젠가 목록)
+  - TaskViewModel의 todayTasks/thisWeekTasks/nextWeekTasks/somedayTasks 정렬에 "미완료 우선" 1차 기준 추가
+- [x] macOS 빌드 성공 확인
+
 ## 📋 향후 개선 사항
 
 - [ ] 자동 iCloud 동기화 (현재는 앱 시작 시에만)

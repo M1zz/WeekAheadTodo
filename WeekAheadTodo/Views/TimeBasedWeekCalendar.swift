@@ -147,46 +147,48 @@ struct TimeBasedWeekCalendar: View {
 
     private var dayColumns: some View {
         GeometryReader { geometry in
+            // 내부 GeometryReader 중첩 없이 외부 너비로 직접 계산
+            let dividerCount = CGFloat(max(weekDates.count - 1, 0))
+            let columnWidth = (geometry.size.width - dividerCount) / CGFloat(max(weekDates.count, 1))
+
             HStack(spacing: 0) {
                 ForEach(weekDates, id: \.self) { date in
-                    GeometryReader { columnGeometry in
-                        ZStack(alignment: .topLeading) {
-                            // 배경 + 클릭 영역
-                            dayColumnBackground(date: date, columnWidth: columnGeometry.size.width)
+                    ZStack(alignment: .topLeading) {
+                        // 배경 + 클릭 영역
+                        dayColumnBackground(date: date, columnWidth: columnWidth)
 
-                            // 시간 그리드 선
-                            timeGridLines
+                        // 시간 그리드 선
+                        timeGridLines
 
-                            // 태스크 배치
-                            TaskLayoutView(
-                                tasks: tasksForDate(date),
-                                hourHeight: slotHeight,
-                                dayColumnWidth: columnGeometry.size.width,
-                                date: date,
-                                hoveredTaskId: $hoveredTaskId,
-                                onTaskTap: { task in
-                                    // 하위 할 일(synthetic Task)은 하위 할 일 전용 시트 열기
-                                    if let parentId = task.parentTaskId,
-                                       !viewModel.tasks.contains(where: { $0.id == task.id }) {
-                                        showingSubtask = SubtaskSelection(id: task.id, parentTaskId: parentId)
-                                    } else {
-                                        showingEditTask = task
-                                    }
-                                }
-                            )
-
-                            // 현재 시간 표시
-                            if isToday(date) {
-                                currentTimeIndicator
-                            }
-                        }
-                        .frame(height: totalHeight)
-                        .onDrop(of: [.text], delegate: TaskDropDelegate(
+                        // 태스크 배치
+                        TaskLayoutView(
+                            tasks: tasksForDate(date),
+                            hourHeight: slotHeight,
+                            dayColumnWidth: columnWidth,
                             date: date,
-                            slotHeight: slotHeight,
-                            viewModel: viewModel
-                        ))
+                            hoveredTaskId: $hoveredTaskId,
+                            onTaskTap: { task in
+                                // 하위 할 일(synthetic Task)은 하위 할 일 전용 시트 열기
+                                if let parentId = task.parentTaskId,
+                                   !viewModel.tasks.contains(where: { $0.id == task.id }) {
+                                    showingSubtask = SubtaskSelection(id: task.id, parentTaskId: parentId)
+                                } else {
+                                    showingEditTask = task
+                                }
+                            }
+                        )
+
+                        // 현재 시간 표시
+                        if isToday(date) {
+                            currentTimeIndicator
+                        }
                     }
+                    .frame(width: columnWidth, height: totalHeight)
+                    .onDrop(of: [.text], delegate: TaskDropDelegate(
+                        date: date,
+                        slotHeight: slotHeight,
+                        viewModel: viewModel
+                    ))
 
                     if date != weekDates.last {
                         Divider()
@@ -314,59 +316,74 @@ struct TaskLayoutInfo {
     let task: Task
     let column: Int
     let totalColumns: Int
+    /// 실제 표시에 사용할 시작 시간 (미지정 태스크는 순차 배치된 가상 시간)
+    let startTime: Date
 
     static func calculateLayout(for tasks: [Task]) -> [TaskLayoutInfo] {
         guard !tasks.isEmpty else { return [] }
 
         let calendar = Calendar.current
 
-        func effectiveStartTime(for task: Task) -> Date {
-            if let targetDate = task.targetDate {
-                return targetDate
-            } else {
-                var components = calendar.dateComponents([.year, .month, .day], from: task.dueDate)
-                components.hour = 9
-                components.minute = 0
-                return calendar.date(from: components) ?? task.dueDate
-            }
-        }
-
-        let sortedTasks = tasks.sorted { task1, task2 in
-            effectiveStartTime(for: task1) < effectiveStartTime(for: task2)
-        }
+        // targetDate가 있는 태스크(시간 지정)와 없는 태스크(미지정) 분리
+        let scheduledTasks = tasks.filter { $0.targetDate != nil }
+        let unscheduledTasks = tasks.filter { $0.targetDate == nil }
 
         var layoutInfos: [TaskLayoutInfo] = []
-        var columns: [[Task]] = []
 
-        for task in sortedTasks {
-            let taskStart = effectiveStartTime(for: task)
+        // 시간 지정 태스크: 겹침 감지 후 다중 컬럼 배치
+        var columns: [[Task]] = []
+        let sortedScheduled = scheduledTasks.sorted { $0.targetDate! < $1.targetDate! }
+
+        for task in sortedScheduled {
+            let taskStart = task.targetDate!
             let taskEnd = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: taskStart) ?? taskStart
 
             var placedInColumn = false
             for (columnIndex, column) in columns.enumerated() {
                 let canPlace = column.allSatisfy { existingTask in
-                    let existingStart = effectiveStartTime(for: existingTask)
+                    let existingStart = existingTask.targetDate!
                     let existingEnd = calendar.date(byAdding: .minute, value: existingTask.estimatedMinutes, to: existingStart) ?? existingStart
                     return taskEnd <= existingStart || taskStart >= existingEnd
                 }
-
                 if canPlace {
                     columns[columnIndex].append(task)
                     placedInColumn = true
                     break
                 }
             }
-
             if !placedInColumn {
                 columns.append([task])
             }
         }
 
-        let totalColumns = columns.count
+        let totalColumns = max(columns.count, 1)
         for (columnIndex, column) in columns.enumerated() {
             for task in column {
-                layoutInfos.append(TaskLayoutInfo(task: task, column: columnIndex, totalColumns: totalColumns))
+                layoutInfos.append(TaskLayoutInfo(
+                    task: task,
+                    column: columnIndex,
+                    totalColumns: totalColumns,
+                    startTime: task.targetDate!
+                ))
             }
+        }
+
+        // 미지정 태스크: 겹침 감지 없이 9시부터 순차 세로 배치 (전체 너비 사용)
+        var accumulatedMinutes = 0
+        for task in unscheduledTasks {
+            var components = calendar.dateComponents([.year, .month, .day], from: task.dueDate)
+            let totalMinutesFrom9 = accumulatedMinutes
+            components.hour = 9 + totalMinutesFrom9 / 60
+            components.minute = totalMinutesFrom9 % 60
+            let sequentialStart = calendar.date(from: components) ?? task.dueDate
+
+            layoutInfos.append(TaskLayoutInfo(
+                task: task,
+                column: 0,
+                totalColumns: 1,
+                startTime: sequentialStart
+            ))
+            accumulatedMinutes += task.estimatedMinutes
         }
 
         return layoutInfos
@@ -393,6 +410,7 @@ struct TaskLayoutView: View {
             ForEach(layoutInfos, id: \.task.id) { layoutInfo in
                 TaskTimeBlock(
                     task: layoutInfo.task,
+                    startTime: layoutInfo.startTime,
                     hourHeight: hourHeight,
                     column: layoutInfo.column,
                     totalColumns: layoutInfo.totalColumns,
@@ -453,6 +471,7 @@ struct TaskLayoutView: View {
 
 struct TaskTimeBlock: View {
     let task: Task
+    let startTime: Date   // 실제 표시 시작 시간 (미지정 태스크는 순차 배치된 가상 시간)
     let hourHeight: CGFloat
     let column: Int
     let totalColumns: Int
@@ -631,17 +650,8 @@ struct TaskTimeBlock: View {
     }
 
     private var taskOffset: CGFloat {
-        let hour: Int
-        let minute: Int
-
-        if let targetDate = task.targetDate {
-            hour = calendar.component(.hour, from: targetDate)
-            minute = calendar.component(.minute, from: targetDate)
-        } else {
-            hour = 9
-            minute = 0
-        }
-
+        let hour = calendar.component(.hour, from: startTime)
+        let minute = calendar.component(.minute, from: startTime)
         let startHour = viewModel.calendarStartHour
         let minutesFromStart = (hour - startHour) * 60 + minute
         let slotIndex = CGFloat(minutesFromStart) / 15.0
@@ -682,22 +692,10 @@ struct TaskTimeBlock: View {
     }
 
     private var timeRangeString: String {
-        let startDate: Date
-
-        if let targetDate = task.targetDate {
-            startDate = targetDate
-        } else {
-            var components = calendar.dateComponents([.year, .month, .day], from: task.dueDate)
-            components.hour = 9
-            components.minute = 0
-            startDate = calendar.date(from: components) ?? task.dueDate
-        }
-
-        let endDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: startDate) ?? startDate
-
+        let endDate = calendar.date(byAdding: .minute, value: task.estimatedMinutes, to: startTime) ?? startTime
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
+        return "\(formatter.string(from: startTime)) - \(formatter.string(from: endDate))"
     }
 }
 

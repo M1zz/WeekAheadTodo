@@ -165,6 +165,8 @@ struct AddApprovedPatternView: View {
 
         do {
             try modelContext.save()
+            // 패턴 추가 직후 즉시 태스크가 생성되도록 알림 (앱 재시작 없이 반영)
+            NotificationCenter.default.post(name: .approvedPatternsDidChange, object: nil)
             dismiss()
         } catch {
             print("❌ [AddApprovedPatternView] 저장 실패: \(error)")
