@@ -49,6 +49,7 @@ struct TodayView: View {
     @AppStorage("recommendationSectionExpanded") private var isRecommendationExpanded = true
     @AppStorage("focusModeEnabled") private var isFocusMode = false
     @AppStorage("hideCompletedTasks") private var hideCompleted = false
+    @AppStorage("todayInsightsExpanded") private var isInsightsExpanded = false
     @State private var showAllTasks = false
 
     // 체크인 관련
@@ -92,7 +93,8 @@ struct TodayView: View {
                 }
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.xl) {
+                        // 긴급/주의 알림 (조건부) — 핵심 위에 잠깐 표시
                         ForEach(assistantService.activeSuggestions) { suggestion in
                             AssistantSuggestionBannerView(
                                 suggestion: suggestion,
@@ -115,6 +117,7 @@ struct TodayView: View {
                             selectedCheckinTask: $selectedCheckinTask
                         )
 
+                        // ── 핵심 영역 ─────────────────────────────
                         if !viewModel.mitTasks.isEmpty {
                             mitPinnedSection
                         }
@@ -129,20 +132,10 @@ struct TodayView: View {
                             emptyStateView
                         }
 
-                        if !viewModel.recommendPreparableTasks().isEmpty {
-                            recommendationSection
-                        }
-
-                        if viewModel.isTodayOverCapacity {
-                            reallocationSuggestionView
-                        }
-
-                        let futurePreps = viewModel.futureTasksPreparedToday()
-                        if !futurePreps.isEmpty {
-                            futureFeedbackSection(futurePreps: futurePreps)
-                        }
+                        // ── 제안 & 인사이트 (접이식, 기본 접힘) ──────
+                        insightsSection
                     }
-                    .padding(24)
+                    .padding(DS.Spacing.xl)
                 }
             }
         }
@@ -187,6 +180,59 @@ struct TodayView: View {
         .onChange(of: viewModel.tasks.count) { _ in
             assistantService.analyzeTasks(viewModel.tasks)
         }
+    }
+
+    // MARK: - 제안 & 인사이트 (접이식)
+
+    /// 추천·용량 초과 재배치·미래 준비 피드백을 하나로 묶어 기본 접힘으로 노출.
+    /// 진입 시 화면이 핵심 위주로 깔끔하게 보이도록 보조 정보를 한곳에 모은다.
+    @ViewBuilder
+    private var insightsSection: some View {
+        let hasRecommend = !viewModel.recommendPreparableTasks().isEmpty
+        let hasOverCapacity = viewModel.isTodayOverCapacity
+        let futurePreps = viewModel.futureTasksPreparedToday()
+        let hasAny = hasRecommend || hasOverCapacity || !futurePreps.isEmpty
+
+        if hasAny {
+            VStack(alignment: .leading, spacing: 0) {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) { isInsightsExpanded.toggle() }
+                }) {
+                    HStack(spacing: DS.Spacing.sm) {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(DS.Color.highlight)
+                        Text("제안 & 인사이트")
+                            .font(.headline)
+                        if !isInsightsExpanded {
+                            Text("\(insightsCount(hasRecommend, hasOverCapacity, futurePreps.count))")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, DS.Spacing.sm)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                        }
+                        Spacer()
+                        Image(systemName: isInsightsExpanded ? "chevron.up" : "chevron.down")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if isInsightsExpanded {
+                    VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+                        if hasRecommend { recommendationSection }
+                        if hasOverCapacity { reallocationSuggestionView }
+                        if !futurePreps.isEmpty { futureFeedbackSection(futurePreps: futurePreps) }
+                    }
+                    .padding(.top, DS.Spacing.lg)
+                }
+            }
+            .card()
+        }
+    }
+
+    private func insightsCount(_ hasRecommend: Bool, _ hasOver: Bool, _ futureCount: Int) -> Int {
+        (hasRecommend ? 1 : 0) + (hasOver ? 1 : 0) + (futureCount > 0 ? 1 : 0)
     }
 
     // MARK: - Suggestion Action Handler

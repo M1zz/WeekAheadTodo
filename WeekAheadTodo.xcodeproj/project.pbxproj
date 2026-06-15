@@ -27,6 +27,8 @@
 		8CF6E866F2714F108C425F91 /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B32FC14D6774E93BC33B967 /* WeekOverviewView.swift */; };
 		9468934550894104B9A68228 /* TaskSelectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD74B37F668D45CCB759D655 /* TaskSelectionSheet.swift */; };
 		9A2E8D22B9864B26AB02122B /* ColorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */; };
+		A1D5E0010000000000000001 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D5E0010000000000000002 /* DesignSystem.swift */; };
+		A1D5E0010000000000000003 /* SimpleHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D5E0010000000000000004 /* SimpleHomeView.swift */; };
 		9C1EAE202F34841900CB151B /* MailMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE1F2F34841900CB151B /* MailMessage.swift */; };
 		9C1EAE222F34842500CB151B /* MailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE212F34842500CB151B /* MailService.swift */; };
 		9C1EAE242F34843200CB151B /* MailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1EAE232F34843200CB151B /* MailViewModel.swift */; };
@@ -173,6 +175,8 @@
 		D40A9BF302A74489B556F1BA /* Mail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mail.swift; sourceTree = "<group>"; };
 		D6FEEA4A4D0B490499A1C41D /* TodayInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayInsightsView.swift; sourceTree = "<group>"; };
 		DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtension.swift; sourceTree = "<group>"; };
+		A1D5E0010000000000000002 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		A1D5E0010000000000000004 /* SimpleHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleHomeView.swift; sourceTree = "<group>"; };
 		E00C2B6260404860B5B9EC18 /* CompletedTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletedTasksView.swift; sourceTree = "<group>"; };
 		E240FA7021B949C980B0603B /* ProactiveAssistantService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveAssistantService.swift; sourceTree = "<group>"; };
 		ED373D0AC14C3099C6E74CE1 /* NotificationPreviewView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationPreviewView.swift; sourceTree = "<group>"; };
@@ -361,6 +365,8 @@
 				FF9F2778A6CC4D5AA970D762 /* QuickAddView.swift */,
 				6492F14261394545B95A33BB /* NotificationSettingsView.swift */,
 				DE1868D76E0B4385B730A4F4 /* ColorExtension.swift */,
+				A1D5E0010000000000000002 /* DesignSystem.swift */,
+				A1D5E0010000000000000004 /* SimpleHomeView.swift */,
 				1413BEFD1E9241379DB2DF69 /* DateHelpers.swift */,
 				X44IRKX2XE28FK5D8RPB4DUJ /* UpcomingRemindersView.swift */,
 				CHECKIN0000000000VIEWW /* CheckinView.swift */,
@@ -648,6 +654,8 @@
 				B575498D038744CDBA484308 /* QuickAddView.swift in Sources */,
 				3459A39304A94A81B7921779 /* NotificationSettingsView.swift in Sources */,
 				9A2E8D22B9864B26AB02122B /* ColorExtension.swift in Sources */,
+				A1D5E0010000000000000001 /* DesignSystem.swift in Sources */,
+				A1D5E0010000000000000003 /* SimpleHomeView.swift in Sources */,
 				0D2DACC501F94EE79677F103 /* DateHelpers.swift in Sources */,
 				6YOGDVXRVV76ETUU3OOI2U80 /* UpcomingRemindersView.swift in Sources */,
 				CHECKIN1111111111BUILD /* CheckinView.swift in Sources */,

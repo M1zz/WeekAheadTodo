@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var selectedProjectId: UUID? = nil
     @State private var showingAddProject = false
     @State private var showingQuickAdd = false
+    @AppStorage("sidebarToolsExpanded") private var isToolsSectionExpanded = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @Environment(\.modelContext) private var modelContext
 
@@ -97,73 +98,14 @@ struct ContentView: View {
 
     // MARK: - Body
 
+    @AppStorage("simpleModeEnabled") private var simpleModeEnabled = true
+
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            // 사이드바
-            List(selection: selectedSectionBinding) {
-                Section("할 일") {
-                    ForEach(orderedTaskSections, id: \.self) { section in
-                        sidebarItem(section)
-                    }
-                }
-
-                Section("비서") {
-                    sidebarItem(.upcomingReminders)
-                    sidebarItem(.assistantHistory)
-                }
-
-                Section {
-                    ForEach(viewModel.projects) { project in
-                        projectSidebarItem(project)
-                    }
-
-                    Button {
-                        showingAddProject = true
-                    } label: {
-                        Label("새 프로젝트", systemImage: "plus.circle.fill")
-                            .foregroundColor(.blue)
-                    }
-                    .buttonStyle(.plain)
-                } header: {
-                    HStack {
-                        Text("프로젝트")
-                        Spacer()
-                    }
-                }
-
-                Section("문서") {
-                    sidebarItem(.wiki)
-                }
-
-                Section("성장") {
-                    sidebarItem(.reportingHabits)
-                }
-
-                Section("관리") {
-                    sidebarItem(.todayInsights)
-                    sidebarItem(.weekOverview)
-                    sidebarItem(.importTasks)
-                    sidebarItem(.patterns)
-                    sidebarItem(.settings)
-                }
-            }
-            .listStyle(.sidebar)
-            .frame(minWidth: 200)
-        } detail: {
-            // 메인 콘텐츠
-            mainContent
-                .id(selectedSectionRawValue)
-        }
-        .frame(minWidth: 900, minHeight: 600)
-        .onAppear {
-            if shouldHideSidebar { columnVisibility = .detailOnly }
-        }
-        .onChange(of: currentSection) { _ in
-            columnVisibility = shouldHideSidebar ? .detailOnly : .automatic
-        }
-        .onChange(of: viewModel.todayTasks.count) { _ in
-            if currentSection == .today {
-                columnVisibility = shouldHideSidebar ? .detailOnly : .automatic
+        Group {
+            if simpleModeEnabled {
+                SimpleHomeView(onOpenAdvanced: { simpleModeEnabled = false })
+            } else {
+                advancedView
             }
         }
         .environmentObject(viewModel)
@@ -172,10 +114,6 @@ struct ContentView: View {
         .environmentObject(wikiViewModel)
         .environmentObject(notificationService)
         .environmentObject(assistantService)
-        // TODO: URLHandler.swift를 Xcode 프로젝트에 추가한 후 주석 해제
-        // .onOpenURL { url in
-        //     _ = URLHandler.handle(url: url, taskViewModel: viewModel)
-        // }
         .sheet(isPresented: $showingAddProject) {
             AddProjectView(onProjectAdded: { projectId in
                 // 새로 추가된 프로젝트 자동 선택
@@ -215,6 +153,99 @@ struct ContentView: View {
 
             // 승인된 패턴에서 태스크 생성
             await generateTasksIfNeeded()
+        }
+    }
+
+    // MARK: - 고급 모드 (기존 전체 화면)
+
+    private var advancedView: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            // 사이드바
+            List(selection: selectedSectionBinding) {
+                Section {
+                    Button {
+                        simpleModeEnabled = true
+                    } label: {
+                        Label("심플 모드로 돌아가기", systemImage: "rectangle.compress.vertical")
+                            .foregroundColor(.blue)
+                            .font(.headline)
+                    }
+                    .buttonStyle(.plain)
+                    .help("큰 글씨의 간단한 화면으로 돌아갑니다")
+                }
+
+                Section("할 일") {
+                    ForEach(orderedTaskSections, id: \.self) { section in
+                        sidebarItem(section)
+                    }
+                }
+
+                Section("비서") {
+                    sidebarItem(.upcomingReminders)
+                    sidebarItem(.assistantHistory)
+                }
+
+                Section {
+                    ForEach(viewModel.projects) { project in
+                        projectSidebarItem(project)
+                    }
+
+                    Button {
+                        showingAddProject = true
+                    } label: {
+                        Label("새 프로젝트", systemImage: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    HStack {
+                        Text("프로젝트")
+                        Spacer()
+                    }
+                }
+
+                // 부차 기능은 접이식 그룹으로 모아 평소엔 숨김 (기본 접힘)
+                Section("분석 & 도구", isExpanded: $isToolsSectionExpanded) {
+                    sidebarItem(.todayInsights)
+                    sidebarItem(.weekOverview)
+                    sidebarItem(.patterns)
+                    sidebarItem(.importTasks)
+                    sidebarItem(.reportingHabits)
+                    sidebarItem(.wiki)
+                }
+
+                Section {
+                    sidebarItem(.settings)
+                }
+            }
+            .listStyle(.sidebar)
+            .frame(minWidth: 200)
+        } detail: {
+            // 메인 콘텐츠
+            mainContent
+                .id(selectedSectionRawValue)
+        }
+        .frame(minWidth: 900, minHeight: 600)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    simpleModeEnabled = true
+                } label: {
+                    Label("심플 모드", systemImage: "rectangle.compress.vertical")
+                }
+                .help("심플 모드로 돌아가기")
+            }
+        }
+        .onAppear {
+            if shouldHideSidebar { columnVisibility = .detailOnly }
+        }
+        .onChange(of: currentSection) { _ in
+            columnVisibility = shouldHideSidebar ? .detailOnly : .automatic
+        }
+        .onChange(of: viewModel.todayTasks.count) { _ in
+            if currentSection == .today {
+                columnVisibility = shouldHideSidebar ? .detailOnly : .automatic
+            }
         }
     }
 

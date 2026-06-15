@@ -121,7 +121,8 @@ struct WeekAheadTodoApp: App {
                 .modelContainer(modelContainer)
         }
         .windowStyle(.titleBar)
-        .defaultSize(width: 1100, height: 700)
+        // 기본 진입(심플 모드)은 좁은 창. 고급 모드로 가면 최소 폭이 넓어진다.
+        .defaultSize(width: 440, height: 680)
         .commands {
             CommandMenu("태스크") {
                 Button("빠른 추가...") {

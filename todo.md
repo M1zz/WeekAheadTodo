@@ -133,6 +133,43 @@ AdvancedTaskParser.swift가 프로젝트에 추가된 후:
   - TaskViewModel의 todayTasks/thisWeekTasks/nextWeekTasks/somedayTasks 정렬에 "미완료 우선" 1차 기준 추가
 - [x] macOS 빌드 성공 확인
 
+## ✅ 사용성/UI 정리 1차 (2026-06-15)
+- [x] 디자인 시스템 도입 (`Views/DesignSystem.swift`)
+  - `DS.Spacing`(4pt 그리드), `DS.Radius`, `DS.Color`(의미색), `.card()` 모디파이어, `SectionHeader`
+  - Xcode 프로젝트(project.pbxproj)에 파일 참조 4곳 추가
+- [x] 오늘 화면 정리 (TodayView)
+  - 보조 섹션(추천/용량초과 재배치/미래 준비)을 접이식 "제안 & 인사이트" 그룹으로 통합 (기본 접힘)
+  - 진입 시 핵심(오늘의 핵심 + 오늘 해야 할 일)만 보이도록 단순화
+- [x] 사이드바 정리 (ContentView)
+  - 문서/성장/관리 그룹을 접이식 "분석 & 도구"로 통합 (기본 접힘), 설정은 맨 아래 단독
+- [x] 설정 화면 정리 (SettingsView)
+  - 11개 평면 섹션 → 4개 접이식 카테고리(알림 / 동기화 & 캘린더 / 화면 표시 / 작업 관리)
+- [x] macOS 빌드 성공 확인
+- [ ] (후속 폴리시) 전 화면 폰트 레벨·카드 스타일을 DS로 통일, TaskRowView/메일뷰 정리
+
+## ✅ 심플·접근성 모드 (2026-06-15)
+- [x] `Views/SimpleHomeView.swift` 신설 — VoiceOver/시각장애인 중심 최소 화면
+  - 큰 글씨(40pt 제목)·고대비·큰 터치 영역
+  - 오늘/이번 주 전환(세그먼트), 큰 체크 동그라미 목록, 완료는 회색 취소선
+  - 접근성: accessibilityLabel/value/hint/traits, 행 단위 음성 읽기, "삭제" 액션
+  - 심플 추가 시트(제목 + 오늘/내일/이번 주말)
+- [x] 앱 기본 진입을 심플 모드로 (`simpleModeEnabled` 기본 true)
+  - ContentView를 `body`(모드 분기) + `advancedView`(기존 전체)로 분리
+  - 공통 설정(.task, 알림 수신, environmentObject)은 두 모드 공용
+  - 심플 화면의 "고급 모드" 버튼 ↔ 설정 > 화면 표시 > "심플 모드" 토글로 상호 전환
+- [x] SimpleHomeView를 Xcode 프로젝트에 등록, 빌드 + 실행 화면 확인
+- [x] macOS 네이티브 크기로 조정 — 거대 버튼/폰트를 표준 컨트롤 크기로 축소
+- [x] 창 가로 폭 축소 — `defaultSize` 1100×700 → 440×680, 심플 뷰 콘텐츠 maxWidth 560
+- [x] 고급 → 심플 복귀 버튼 추가 (사이드바 최상단 + 툴바, 설정 토글 유지)
+- [x] 심플 화면을 세그먼트 → 섹션 헤더(오늘/이번 주/다음 주)로 재구성
+  - 빈 섹션은 숨김, 섹션 간 중복은 ID로 제거
+- [x] 완료 항목을 토글 대신 각 섹션 맨 아래 접이식(`>` 펼치기/접기)으로 변경
+- [x] iOS 앱(TodoAlarm) macOS 심플 화면과 통일
+  - iOS TaskViewModel에 섹션 접근자(todaySectionTasks/thisWeekSectionTasks/nextWeekSectionTasks, remainingCount) 추가
+  - iOS ContentView를 4탭 TabView → 단일 섹션형 화면(오늘/이번주/다음주 + 완료 접기)으로 재작성
+  - 동기화 버튼·설정 시트·당겨서 새로고침·접근성 라벨 적용 (iOS는 CloudKit 읽기 전용 뷰어 유지)
+  - iOS 빌드 성공 확인 (기존 파일만 수정, pbxproj 변경 없음)
+
 ## 📋 향후 개선 사항
 
 - [ ] 자동 iCloud 동기화 (현재는 앱 시작 시에만)

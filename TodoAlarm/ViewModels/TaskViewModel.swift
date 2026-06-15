@@ -207,6 +207,54 @@ class TaskViewModel: ObservableObject {
         }.sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }
 
+    // MARK: - 심플 화면용 섹션 (완료 포함, macOS SimpleHomeView와 동일한 구성)
+
+    private var startOfToday: Date { Calendar.current.startOfDay(for: Date()) }
+
+    /// 완료는 뒤로 정렬하는 공통 규칙
+    private func sectionSorted(_ list: [TaskModel]) -> [TaskModel] {
+        list.sorted { a, b in
+            if a.isCompleted != b.isCompleted { return !a.isCompleted }
+            return a.effectiveStartDate < b.effectiveStartDate
+        }
+    }
+
+    /// 오늘 섹션 (시작일이 오늘이거나 지난 것, 완료 포함)
+    var todaySectionTasks: [TaskModel] {
+        let cal = Calendar.current
+        let today = startOfToday
+        return sectionSorted(tasks.filter { cal.startOfDay(for: $0.effectiveStartDate) <= today })
+    }
+
+    /// 이번 주 섹션 (오늘 이후 ~ 7일 이내, 완료 포함)
+    var thisWeekSectionTasks: [TaskModel] {
+        let cal = Calendar.current
+        let today = startOfToday
+        guard let weekEnd = cal.date(byAdding: .day, value: 7, to: today) else { return [] }
+        return sectionSorted(tasks.filter {
+            let s = cal.startOfDay(for: $0.effectiveStartDate)
+            return s > today && s < weekEnd
+        })
+    }
+
+    /// 다음 주 섹션 (7~14일, 완료 포함)
+    var nextWeekSectionTasks: [TaskModel] {
+        let cal = Calendar.current
+        let today = startOfToday
+        guard let s7 = cal.date(byAdding: .day, value: 7, to: today),
+              let s14 = cal.date(byAdding: .day, value: 14, to: today) else { return [] }
+        return sectionSorted(tasks.filter {
+            let s = cal.startOfDay(for: $0.effectiveStartDate)
+            return s >= s7 && s < s14
+        })
+    }
+
+    /// 남은(미완료) 할 일 수 — 오늘+이번주+다음주
+    var remainingCount: Int {
+        (todaySectionTasks + thisWeekSectionTasks + nextWeekSectionTasks)
+            .filter { !$0.isCompleted }.count
+    }
+
     /// Project 이름 가져오기
     func projectName(for projectId: UUID?) -> String? {
         guard let id = projectId else { return nil }

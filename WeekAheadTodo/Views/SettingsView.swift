@@ -28,6 +28,14 @@ struct SettingsView: View {
     @AppStorage("taskSectionOrder") private var taskSectionOrderData: Data = Data()
     @State private var editableTaskSections: [ContentView.SidebarSection] = []
 
+    @AppStorage("simpleModeEnabled") private var simpleModeEnabled = true
+
+    // 설정 카테고리 펼침 상태 (첫 카테고리만 기본 펼침)
+    @AppStorage("settingsCatNotifications") private var catNotificationsExpanded = true
+    @AppStorage("settingsCatCalendar") private var catCalendarExpanded = false
+    @AppStorage("settingsCatDisplay") private var catDisplayExpanded = false
+    @AppStorage("settingsCatTask") private var catTaskExpanded = false
+
     // 데이터 차이 확인 관련
     @State private var showingDataDifferenceAlert = false
     @State private var dataComparison: TaskViewModel.DataComparisonResult?
@@ -49,6 +57,42 @@ struct SettingsView: View {
         UserDefaults.standard.stringArray(forKey: "cloudProjectRecordNames")?.count ?? 0
     }
 
+    /// 설정 항목들을 카테고리별로 묶는 접이식 그룹. 평소엔 접혀 있어 원하는 설정만 펼쳐 본다.
+    @ViewBuilder
+    private func settingsCategory<Content: View>(
+        _ title: String,
+        icon: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.wrappedValue.toggle() }
+            }) {
+                HStack(spacing: DS.Spacing.sm) {
+                    Image(systemName: icon)
+                        .foregroundColor(DS.Color.accent)
+                        .frame(width: 22)
+                    Text(title)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, DS.Spacing.sm)
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded.wrappedValue {
+                VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+                    content()
+                }
+                .padding(.top, DS.Spacing.sm)
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -63,20 +107,32 @@ struct SettingsView: View {
             Divider()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    notificationSection
-                    reportingHabitsNotificationSection
-                    cloudSyncSection
-                    CalendarIntegrationView()
-                    calendarResetSection
-                    fontSizeSection
-                    taskSectionOrderView
-                    weekStartDaySection
-                    calendarDisplayHoursSection
-                    futurePreparationGoalSection
-                    timeBlockSection
+                VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+                    settingsCategory("알림", icon: "bell.fill", isExpanded: $catNotificationsExpanded) {
+                        notificationSection
+                        reportingHabitsNotificationSection
+                    }
+
+                    settingsCategory("동기화 & 캘린더", icon: "calendar", isExpanded: $catCalendarExpanded) {
+                        cloudSyncSection
+                        CalendarIntegrationView()
+                        calendarResetSection
+                        calendarDisplayHoursSection
+                    }
+
+                    settingsCategory("화면 표시", icon: "textformat.size", isExpanded: $catDisplayExpanded) {
+                        simpleModeSection
+                        fontSizeSection
+                        taskSectionOrderView
+                        weekStartDaySection
+                    }
+
+                    settingsCategory("작업 관리", icon: "checklist", isExpanded: $catTaskExpanded) {
+                        futurePreparationGoalSection
+                        timeBlockSection
+                    }
                 }
-                .padding(24)
+                .padding(DS.Spacing.xl)
             }
 
             Spacer()
@@ -783,6 +839,24 @@ struct SettingsView: View {
         } message: {
             Text("캘린더 연동 설정과 감지된 모든 패턴을 제거합니다. 승인된 패턴은 유지됩니다.")
         }
+    }
+
+    private var simpleModeSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("심플 모드")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("심플 모드 사용", isOn: $simpleModeEnabled)
+
+                Text("심플 모드는 오늘/이번 주 할 일만 큰 글씨로 보여주는 접근성 중심 화면입니다. 끄면 캘린더·패턴·통계 등 모든 기능이 있는 고급 화면으로 돌아갑니다.")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
     }
 
     private var fontSizeSection: some View {
