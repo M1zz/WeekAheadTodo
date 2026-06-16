@@ -13,9 +13,12 @@ struct SimpleHomeView: View {
 
     @State private var showingAdd = false
     @State private var newTitle = ""
-    @State private var newWhen: SimpleWhen = .today
+    @State private var newDate: Date = Date()
     /// 완료 항목이 펼쳐진 섹션들 (섹션 제목 기준)
     @State private var expandedCompleted: Set<String> = []
+    /// 기한 변경 대상 할 일과 편집 중인 날짜
+    @State private var deadlineTask: Task?
+    @State private var deadlineDate: Date = Date()
 
     /// 오늘 이후의 "이번 주" 항목에서 오늘 섹션과 겹치는 것 제거하기 위한 ID 집합
     private var todayIds: Set<UUID> {
@@ -73,9 +76,17 @@ struct SimpleHomeView: View {
         .sheet(isPresented: $showingAdd) {
             SimpleAddSheet(
                 title: $newTitle,
-                when: $newWhen,
+                date: $newDate,
                 onCancel: { resetAndCloseAdd() },
                 onSave: { saveNewTask() }
+            )
+        }
+        .sheet(item: $deadlineTask) { task in
+            DeadlineEditSheet(
+                taskTitle: task.title,
+                date: $deadlineDate,
+                onCancel: { deadlineTask = nil },
+                onSave: { saveDeadline(for: task) }
             )
         }
     }
@@ -135,6 +146,7 @@ struct SimpleHomeView: View {
         SimpleTaskRow(
             task: task,
             onToggle: { viewModel.toggleTaskCompletion(task) },
+            onEditDeadline: { startDeadlineEdit(task) },
             onDelete: { viewModel.deleteTask(task) }
         )
     }
@@ -217,7 +229,7 @@ struct SimpleHomeView: View {
     private func saveNewTask() {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let due = newWhen.date
+        let due = Calendar.current.startOfDay(for: newDate)
         let task = Task(title: trimmed, dueDate: due)
         viewModel.addTask(task)
         resetAndCloseAdd()
@@ -225,8 +237,22 @@ struct SimpleHomeView: View {
 
     private func resetAndCloseAdd() {
         newTitle = ""
-        newWhen = .today
+        newDate = Calendar.current.startOfDay(for: Date())
         showingAdd = false
+    }
+
+    // MARK: - 기한 변경
+
+    private func startDeadlineEdit(_ task: Task) {
+        deadlineDate = task.dueDate
+        deadlineTask = task
+    }
+
+    private func saveDeadline(for task: Task) {
+        var updated = task
+        updated.dueDate = Calendar.current.startOfDay(for: deadlineDate)
+        viewModel.updateTask(updated)
+        deadlineTask = nil
     }
 }
 
@@ -235,21 +261,30 @@ struct SimpleHomeView: View {
 private struct SimpleTaskRow: View {
     let task: Task
     let onToggle: () -> Void
+    let onEditDeadline: () -> Void
     let onDelete: () -> Void
 
-    private var dueText: String? {
+    /// 기한 표시 (오늘/내일/날짜)
+    private var dueLabel: String {
         let cal = Calendar.current
-        if cal.isDateInToday(task.dueDate) { return nil }
+        if cal.isDateInToday(task.dueDate) { return "오늘" }
+        if cal.isDateInTomorrow(task.dueDate) { return "내일" }
         return task.dueDateWithWeekday
     }
 
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: DS.Spacing.md) {
+        HStack(spacing: DS.Spacing.md) {
+            // 동그라미 = 완료 토글
+            Button(action: onToggle) {
                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
                     .foregroundStyle(task.isCompleted ? DS.Color.success : Color.primary)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
+            // 제목 영역 = 탭하면 기한 변경
+            Button(action: onEditDeadline) {
                 VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                     Text(task.title)
                         .font(.body)
@@ -258,21 +293,21 @@ private struct SimpleTaskRow: View {
                         .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                         .multilineTextAlignment(.leading)
 
-                    if let dueText {
-                        Text(dueText)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: DS.Spacing.xs) {
+                        Image(systemName: "calendar")
+                        Text(dueLabel)
                     }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
-
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, DS.Spacing.md)
-            .padding(.vertical, DS.Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, DS.Spacing.md)
+        .padding(.vertical, DS.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                 .fill(Color(NSColor.controlBackgroundColor))
@@ -282,16 +317,21 @@ private struct SimpleTaskRow: View {
                 .stroke(Color.primary.opacity(0.12), lineWidth: 1)
         )
         .contextMenu {
+            Button(action: onEditDeadline) {
+                Label("기한 변경", systemImage: "calendar")
+            }
             Button(role: .destructive, action: onDelete) {
                 Label("삭제", systemImage: "trash")
             }
         }
-        // VoiceOver: 한 줄을 하나의 버튼으로 읽고, 완료 상태와 삭제 동작 제공
+        // VoiceOver: 한 줄을 하나로 읽고 기본 동작=완료 토글, 추가 동작=기한 변경/삭제
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(task.title)
-        .accessibilityValue(task.isCompleted ? "완료됨" : "미완료")
+        .accessibilityValue("\(task.isCompleted ? "완료됨" : "미완료"), 기한 \(dueLabel)")
         .accessibilityHint("두 번 탭하면 완료 상태가 바뀝니다")
         .accessibilityAddTraits(task.isCompleted ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { onToggle() }
+        .accessibilityAction(named: "기한 변경", onEditDeadline)
         .accessibilityAction(named: "삭제", onDelete)
     }
 }
@@ -326,7 +366,7 @@ enum SimpleWhen: String, CaseIterable, Identifiable {
 
 private struct SimpleAddSheet: View {
     @Binding var title: String
-    @Binding var when: SimpleWhen
+    @Binding var date: Date
     var onCancel: () -> Void
     var onSave: () -> Void
 
@@ -364,15 +404,9 @@ private struct SimpleAddSheet: View {
             }
 
             VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                Text("언제 할까요?")
+                Text("기한 (언제까지?)")
                     .font(.headline)
-                Picker("언제", selection: $when) {
-                    ForEach(SimpleWhen.allCases) { w in
-                        Text(w.rawValue).tag(w)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .accessibilityLabel("언제 할지 선택")
+                QuickDatePicker(date: $date)
             }
 
             Spacer()
@@ -391,7 +425,79 @@ private struct SimpleAddSheet: View {
             }
         }
         .padding(DS.Spacing.xl)
-        .frame(width: 400, height: 320)
+        .frame(width: 420, height: 560)
         .onAppear { titleFocused = true }
+    }
+}
+
+// MARK: - 빠른 날짜 선택 (오늘/내일/이번 주말 버튼 + 달력)
+
+private struct QuickDatePicker: View {
+    @Binding var date: Date
+
+    private var selectedWhen: SimpleWhen? {
+        let cal = Calendar.current
+        return SimpleWhen.allCases.first { cal.isDate($0.date, inSameDayAs: date) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+            HStack(spacing: DS.Spacing.sm) {
+                ForEach(SimpleWhen.allCases) { w in
+                    let isSelected = selectedWhen == w
+                    Button(w.rawValue) { date = w.date }
+                        .buttonStyle(.bordered)
+                        .tint(isSelected ? DS.Color.accent : nil)
+                        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                }
+            }
+            .accessibilityLabel("빠른 기한 선택")
+
+            DatePicker("기한", selection: $date, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .accessibilityLabel("기한 날짜 선택")
+        }
+    }
+}
+
+// MARK: - 기한 변경 시트
+
+private struct DeadlineEditSheet: View {
+    let taskTitle: String
+    @Binding var date: Date
+    var onCancel: () -> Void
+    var onSave: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+            Text("기한 변경")
+                .font(.title2)
+                .fontWeight(.bold)
+                .accessibilityAddTraits(.isHeader)
+
+            Text(taskTitle)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            QuickDatePicker(date: $date)
+
+            Spacer()
+
+            HStack(spacing: DS.Spacing.md) {
+                Spacer()
+                Button("취소", action: onCancel)
+                    .controlSize(.large)
+                    .keyboardShortcut(.cancelAction)
+
+                Button("저장", action: onSave)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(DS.Spacing.xl)
+        .frame(width: 420, height: 560)
     }
 }

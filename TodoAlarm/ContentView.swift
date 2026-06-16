@@ -158,8 +158,11 @@ private struct SimpleTaskRowiOS: View {
     let task: TaskModel
     let onToggle: () -> Void
 
-    private var dueText: String? {
-        Calendar.current.isDateInToday(task.dueDate) ? nil : task.dueDateWithWeekday
+    private var dueLabel: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(task.dueDate) { return "오늘" }
+        if cal.isDateInTomorrow(task.dueDate) { return "내일" }
+        return task.dueDateWithWeekday
     }
 
     var body: some View {
@@ -177,11 +180,12 @@ private struct SimpleTaskRowiOS: View {
                         .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                         .multilineTextAlignment(.leading)
 
-                    if let dueText {
-                        Text(dueText)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                        Text(dueLabel)
                     }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 0)
@@ -197,7 +201,7 @@ private struct SimpleTaskRowiOS: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(task.title)
-        .accessibilityValue(task.isCompleted ? "완료됨" : "미완료")
+        .accessibilityValue("\(task.isCompleted ? "완료됨" : "미완료"), 기한 \(dueLabel)")
         .accessibilityHint("두 번 탭하면 완료 상태가 바뀝니다")
         .accessibilityAddTraits(task.isCompleted ? [.isButton, .isSelected] : .isButton)
     }
