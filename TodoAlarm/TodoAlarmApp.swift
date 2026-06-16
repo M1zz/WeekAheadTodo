@@ -12,6 +12,7 @@ import Combine
 @main
 struct TodoAlarmApp: App {
     @StateObject private var taskViewModel = TaskViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -33,6 +34,14 @@ struct TodoAlarmApp: App {
                     await taskViewModel.refreshNotificationsAndActivity()
 
                     print("✅ [iOS TodoAlarmApp] 앱 시작 완료")
+                }
+                .onChange(of: scenePhase) { newPhase in
+                    // 포그라운드 복귀 시 최신 데이터로 자동 동기화 (읽기 전용 뷰어)
+                    if newPhase == .active {
+                        _Concurrency.Task {
+                            await taskViewModel.syncFromCloud()
+                        }
+                    }
                 }
         }
     }

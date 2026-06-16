@@ -105,7 +105,7 @@ struct SettingsView: View {
                 // 앱 정보 섹션
                 Section("정보") {
                     LabeledContent("버전") {
-                        Text("1.0.0")
+                        Text(appVersion)
                     }
                     Text("macOS WeekAheadTodo 데이터를 읽기 전용으로 표시합니다.")
                         .font(.callout)
@@ -117,6 +117,14 @@ struct SettingsView: View {
     }
 
     // MARK: - Computed Properties
+
+    /// 번들에서 실제 버전/빌드 번호 표시
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
 
     private var authStatusIcon: String {
         switch notificationManager.authorizationStatus {

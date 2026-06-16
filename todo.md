@@ -178,6 +178,13 @@ AdvancedTaskParser.swift가 프로젝트에 추가된 후:
 - [x] iOS 행도 기한 항상 표시 + VoiceOver 값에 기한 포함 (iOS는 읽기 전용이라 편집은 macOS 전용)
 - [x] macOS/iOS 빌드 성공
 
+## ✅ 버전 1.0.3 + iOS 읽기 전용 뷰어 정리 (2026-06-16)
+- [x] 전 타깃 MARKETING_VERSION 1.0.3 통일, CURRENT_PROJECT_VERSION(build) 4 (macOS/iOS/위젯/테스트)
+- [x] iOS 설정 "버전" 하드코딩(1.0.0) → 번들에서 동적 표시
+- [x] iOS 포그라운드 복귀 시 자동 동기화 (scenePhase .active)
+- [x] iOS를 명확한 읽기 전용 뷰어로 — 완료 토글 제거(혼란 방지), 완료 상태는 macOS 동기화로만 표시
+- [x] macOS/iOS 빌드 성공
+
 ## 📋 향후 개선 사항
 
 - [ ] 자동 iCloud 동기화 (현재는 앱 시작 시에만)

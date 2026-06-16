@@ -109,7 +109,7 @@ struct ContentView: View {
                     .accessibilityAddTraits(.isHeader)
 
                 ForEach(incomplete) { task in
-                    SimpleTaskRowiOS(task: task) { viewModel.toggleTaskCompletion(task) }
+                    SimpleTaskRowiOS(task: task)
                 }
 
                 if !completed.isEmpty {
@@ -146,7 +146,7 @@ struct ContentView: View {
 
         if isExpanded {
             ForEach(completed) { task in
-                SimpleTaskRowiOS(task: task) { viewModel.toggleTaskCompletion(task) }
+                SimpleTaskRowiOS(task: task)
             }
         }
     }
@@ -156,7 +156,6 @@ struct ContentView: View {
 
 private struct SimpleTaskRowiOS: View {
     let task: TaskModel
-    let onToggle: () -> Void
 
     private var dueLabel: String {
         let cal = Calendar.current
@@ -165,45 +164,40 @@ private struct SimpleTaskRowiOS: View {
         return task.dueDateWithWeekday
     }
 
+    // 읽기 전용 표시 — 완료 여부는 macOS 동기화로만 바뀜
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 12) {
-                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(task.isCompleted ? Color.green : Color.primary)
+        HStack(spacing: 12) {
+            Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 22))
+                .foregroundStyle(task.isCompleted ? Color.green : Color.secondary)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(task.title)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .strikethrough(task.isCompleted, color: .secondary)
-                        .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
-                        .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .strikethrough(task.isCompleted, color: .secondary)
+                    .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
+                    .multilineTextAlignment(.leading)
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                        Text(dueLabel)
-                    }
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                    Text(dueLabel)
                 }
-
-                Spacer(minLength: 0)
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-            )
-            .contentShape(Rectangle())
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(task.title)
         .accessibilityValue("\(task.isCompleted ? "완료됨" : "미완료"), 기한 \(dueLabel)")
-        .accessibilityHint("두 번 탭하면 완료 상태가 바뀝니다")
-        .accessibilityAddTraits(task.isCompleted ? [.isButton, .isSelected] : .isButton)
     }
 }
 
